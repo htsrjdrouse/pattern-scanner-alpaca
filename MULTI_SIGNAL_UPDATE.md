@@ -25,7 +25,7 @@ Updated the Alpha Research Platform dashboard to support running multiple signal
 
 ### Usage
 
-1. Navigate to http://localhost:5002/research
+1. Navigate to http://localhost:5004/research
 2. In the "Quick Backtest" section, hold Ctrl (or Cmd on Mac) and click multiple signals
 3. Configure symbols, timeframe, and horizon as before
 4. Click "Run Backtest"

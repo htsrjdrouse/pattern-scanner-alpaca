@@ -1,4 +1,4 @@
-# Stock Pattern Scanner - Docker
+# Stock Pattern Scanner - Docker (Alpaca-powered)
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -19,13 +19,21 @@ COPY research_dashboard.py .
 COPY signals.py .
 COPY backtest.py .
 COPY analytics.py .
+COPY alpaca_client.py .
+COPY alpaca_data.py .
+COPY stream_manager.py .
+COPY order_manager.py .
 COPY sectors.json .
 COPY sector_scan.py .
+COPY .env.example .
 COPY data/ ./data/
 COPY journal/ ./journal/
 
+# Note: .env file must be provided at runtime with Alpaca credentials
+# Copy .env.example as template - users must create .env with real keys
+
 # Expose port
-EXPOSE 5002
+EXPOSE 5004
 
 # Run the scanner
 CMD ["python", "pattern_scanner.py"]

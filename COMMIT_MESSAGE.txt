@@ -1,0 +1,44 @@
+Initial commit: Alpaca-powered pattern scanner with live trading
+
+Integrated Alpaca Markets API for real-time trading and market data while
+maintaining full options analysis capabilities through hybrid data approach.
+
+Features:
+- Real-time price data and WebSocket streaming via Alpaca
+- Paper and live trading modes with order execution (market/limit orders)
+- Portfolio and position management
+- Hybrid data sources: Alpaca for trading, yfinance for options/fundamentals
+- Full options strategy analysis (Long Call, PMCC, Cash-Secured Put, Iron Condor)
+- Pattern detection (Cup & Handle, Double Bottom, Ascending Triangle, Bull Flag)
+- Technical indicators (RSI, MACD, ADX, CTO Larsson Lines)
+- DCF valuation with fundamental analysis
+- Trade journal for tracking performance
+- Alpha research platform with signal backtesting
+
+Technical Stack:
+- Flask web framework
+- Alpaca-py SDK for trading API
+- yfinance for options chains and fundamentals
+- pandas/pandas-ta for technical analysis
+- Docker containerized deployment
+
+Trading Modes:
+- PAPER: Safe testing environment (default)
+- LIVE: Real money trading (requires live API keys)
+
+API Endpoints:
+- /api/account - Account info and buying power
+- /api/positions - Current positions
+- /api/orders - Open orders
+- /api/order/market - Place market order
+- /api/order/limit - Place limit order
+- /api/stream/latest/<symbol> - Real-time price data
+- /api/stream/subscribe - Subscribe to WebSocket feed
+
+Security:
+- Environment-based configuration (.env)
+- No hardcoded API keys
+- Mode indicator always visible in UI
+- Comprehensive logging of all trades
+
+Forked from pattern_scanner_expanded with complete Alpaca integration.

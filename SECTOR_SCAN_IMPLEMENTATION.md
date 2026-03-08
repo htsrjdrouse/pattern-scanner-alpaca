@@ -55,7 +55,7 @@ python sector_scan.py --schedule
 ```
 
 **Web UI:**
-1. Navigate to http://localhost:5002/research
+1. Navigate to http://localhost:5004/research
 2. Click "Sector Scan" tab
 3. Configure scan settings
 4. Enable scheduler or click "Run Scan Now"
@@ -64,17 +64,17 @@ python sector_scan.py --schedule
 **API:**
 ```bash
 # Trigger scan
-curl -X POST http://localhost:5002/signals/sector/run \
+curl -X POST http://localhost:5004/signals/sector/run \
   -H "Content-Type: application/json" \
   -d '{"mode": "daily", "min_stocks": 15}'
 
 # Enable scheduler
-curl -X POST http://localhost:5002/signals/sector/schedule \
+curl -X POST http://localhost:5004/signals/sector/schedule \
   -H "Content-Type: application/json" \
   -d '{"enabled": true, "daily_time": "16:30", "weekly_time": "18:00"}'
 
 # Get results
-curl http://localhost:5002/signals/sector/results
+curl http://localhost:5004/signals/sector/results
 ```
 
 ### Trend Signal Classification

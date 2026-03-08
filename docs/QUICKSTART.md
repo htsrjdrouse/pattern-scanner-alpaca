@@ -12,7 +12,7 @@ No additional dependencies required beyond existing pattern_scanner requirements
 python pattern_scanner.py
 ```
 
-Access research dashboard at: **http://localhost:5002/research**
+Access research dashboard at: **http://localhost:5004/research**
 
 ### 2. Run Your First Backtest (Python)
 
@@ -49,7 +49,7 @@ print(f"Sharpe: {results['long_short_sharpe']:.2f}")
 ### 3. Run Your First Backtest (API)
 
 ```bash
-curl -X POST http://localhost:5002/signals/backtest \
+curl -X POST http://localhost:5004/signals/backtest \
   -H "Content-Type: application/json" \
   -d '{
     "signal_name": "rsi_14",
@@ -227,4 +227,4 @@ Make sure you're in the project directory: `/home/rista/pattern_scanner_expanded
 
 - Full docs: `docs/RESEARCH_PLATFORM.md`
 - Examples: `examples/research_workflow.py`
-- Web UI: http://localhost:5002/research
+- Web UI: http://localhost:5004/research

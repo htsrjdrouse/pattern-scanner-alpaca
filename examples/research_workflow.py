@@ -1,8 +1,7 @@
 """
-Example: Complete signal research workflow
+Example: Complete signal research workflow (Alpaca-powered)
 """
 import pandas as pd
-import yfinance as yf
 from datetime import datetime, timedelta
 from signals import get_signal, SIGNAL_REGISTRY
 from backtest import run_signal_backtest, run_decay_analysis
@@ -13,20 +12,17 @@ from analytics import (
     detect_market_regime,
     compute_regime_conditional_ic
 )
+from alpaca_data import fetch_stock_data
 
 
 def fetch_data(symbols, start_date, end_date):
-    """Fetch price data for analysis."""
+    """Fetch price data for analysis using Alpaca."""
     data = []
     for symbol in symbols:
         try:
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(start=start_date, end=end_date)
-            if df.empty:
+            df = fetch_stock_data(symbol, start_date, end_date)
+            if df is None or df.empty:
                 continue
-            df = df.reset_index()
-            df['symbol'] = symbol
-            df.columns = [c.lower() for c in df.columns]
             data.append(df[['symbol', 'date', 'open', 'high', 'low', 'close', 'volume']])
         except Exception as e:
             print(f"Error fetching {symbol}: {e}")

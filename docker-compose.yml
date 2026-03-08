@@ -3,10 +3,12 @@ version: '3.8'
 services:
   scanner:
     build: .
-    container_name: pattern-scanner
+    container_name: pattern-scanner-alpaca
     ports:
-      - "5002:5002"
+      - "5004:5004"
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
     volumes:

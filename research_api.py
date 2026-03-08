@@ -4,11 +4,11 @@ Extends existing pattern_scanner.py without breaking current functionality.
 """
 from flask import Blueprint, jsonify, request
 import pandas as pd
-import yfinance as yf
 from datetime import datetime, timedelta
 import signals
 import backtest
 import analytics
+from alpaca_data import fetch_stock_data
 
 research_bp = Blueprint('research', __name__, url_prefix='/signals')
 
@@ -30,18 +30,14 @@ def save_sectors(sectors_data):
         json.dump(sectors_data, f, indent=2)
 
 def fetch_price_data(symbols, start_date, end_date):
-    """Fetch price data for symbols."""
+    """Fetch price data for symbols using Alpaca."""
     data = []
     for symbol in symbols:
         try:
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(start=start_date, end=end_date)
-            if df.empty:
+            df = fetch_stock_data(symbol, start_date, end_date)
+            if df is None or df.empty:
                 continue
-            df = df.reset_index()
-            df['symbol'] = symbol
-            df.columns = [c.lower() for c in df.columns]
-            # Remove timezone to avoid comparison issues
+            # Remove timezone if present
             if 'date' in df.columns and hasattr(df['date'].dtype, 'tz') and df['date'].dt.tz is not None:
                 df['date'] = df['date'].dt.tz_localize(None)
             data.append(df[['symbol', 'date', 'open', 'high', 'low', 'close', 'volume']])
@@ -94,7 +90,7 @@ def run_backtest():
     # Fetch price data
     df_prices = fetch_price_data(symbols, start_date, end_date)
     if df_prices.empty:
-        return jsonify({'error': 'No price data available', 'details': 'yfinance returned no data'}), 400
+        return jsonify({'error': 'No price data available', 'details': 'Alpaca returned no data'}), 400
     
     # Compute signal
     df_signals = signal.compute(df_prices)

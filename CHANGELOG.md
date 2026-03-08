@@ -181,14 +181,14 @@ results = run_signal_backtest(df_signals, df_prices, horizon_days=20)
 
 #### REST API
 ```bash
-curl -X POST http://localhost:5002/signals/backtest \
+curl -X POST http://localhost:5004/signals/backtest \
   -H "Content-Type: application/json" \
   -d '{"signal_name": "rsi_14", "symbols": ["AAPL"], "horizon_days": 20}'
 ```
 
 #### Web UI
 ```
-http://localhost:5002/research
+http://localhost:5004/research
 ```
 
 ### Testing Results
@@ -207,7 +207,7 @@ No migration needed. Existing functionality unchanged.
 
 To use new features:
 1. Start server: `python pattern_scanner.py`
-2. Access dashboard: `http://localhost:5002/research`
+2. Access dashboard: `http://localhost:5004/research`
 3. Or use Python API: `from signals import get_signal`
 
 ### Known Limitations

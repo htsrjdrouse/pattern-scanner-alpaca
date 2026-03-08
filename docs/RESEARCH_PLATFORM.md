@@ -129,7 +129,7 @@ print(f"Sharpe: {results['long_short_sharpe']:.2f}")
 #### REST API
 
 ```bash
-curl -X POST http://localhost:5002/signals/backtest \
+curl -X POST http://localhost:5004/signals/backtest \
   -H "Content-Type: application/json" \
   -d '{
     "signal_name": "rsi_14",
@@ -321,7 +321,7 @@ Analyze portfolio turnover.
 
 ## Web Dashboard
 
-Access at: **http://localhost:5002/research**
+Access at: **http://localhost:5004/research**
 
 Features:
 - Signal library browser

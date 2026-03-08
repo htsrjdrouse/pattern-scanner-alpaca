@@ -79,7 +79,7 @@ docker exec pattern-scanner python -c "from signals import list_signals; ..."
 
 Now you can backtest pattern signals in the Alpha Research Platform:
 
-1. Go to http://localhost:5002/research
+1. Go to http://localhost:5004/research
 2. Select "cup_handle" (or other pattern signals) from the dropdown
 3. Choose symbols and timeframe
 4. Run backtest to see IC, hit rate, Sharpe ratio, etc.

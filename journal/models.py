@@ -2,7 +2,6 @@
 Trade Journal Database Models
 """
 from datetime import datetime, date, timedelta
-import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
 import json
@@ -10,6 +9,7 @@ import os
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, Date, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from alpaca_data import fetch_stock_data
 
 Base = declarative_base()
 
@@ -145,18 +145,21 @@ def restore_from_json():
 
 def fetch_historical_indicators(symbol, target_date):
     """
-    Fetch price, ADX, RSI, volume confirmation, and golden cross for a specific date.
+    Fetch price, ADX, RSI, volume confirmation, and golden cross for a specific date using Alpaca.
     Returns dict with data, or None if unavailable.
     """
     try:
-        ticker = yf.Ticker(symbol)
         # Fetch extra days for indicator calculation (need 200 days for SMA200)
-        start = target_date - timedelta(days=250)
-        end = target_date + timedelta(days=1)
-        df = ticker.history(start=start, end=end)
+        start = (target_date - timedelta(days=250)).strftime('%Y-%m-%d')
+        end = (target_date + timedelta(days=1)).strftime('%Y-%m-%d')
+        df = fetch_stock_data(symbol, start, end)
         
-        if df.empty:
+        if df is None or df.empty:
             return None
+        
+        # Convert to expected format
+        df = df.set_index('date')
+        df.columns = [c.capitalize() for c in df.columns if c != 'symbol']
         
         # Calculate indicators
         df.ta.adx(length=14, append=True)

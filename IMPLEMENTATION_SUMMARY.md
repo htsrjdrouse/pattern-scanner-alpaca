@@ -172,13 +172,13 @@ results = run_signal_backtest(df_signals, df_prices, horizon_days=20)
 
 ### REST API
 ```bash
-curl -X POST http://localhost:5002/signals/backtest \
+curl -X POST http://localhost:5004/signals/backtest \
   -H "Content-Type: application/json" \
   -d '{"signal_name": "rsi_14", "symbols": ["AAPL"], "horizon_days": 20}'
 ```
 
 ### Web UI
-Navigate to: `http://localhost:5002/research`
+Navigate to: `http://localhost:5004/research`
 
 ## Performance Benchmarks
 
@@ -214,7 +214,7 @@ All core modules tested and verified.
 ## Next Steps for Users
 
 1. **Start Server**: `python pattern_scanner.py`
-2. **Access Dashboard**: http://localhost:5002/research
+2. **Access Dashboard**: http://localhost:5004/research
 3. **Run Examples**: `python examples/research_workflow.py`
 4. **Read Docs**: `docs/QUICKSTART.md`
 

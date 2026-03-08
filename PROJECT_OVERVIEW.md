@@ -135,7 +135,7 @@ print(f"IC: {results['ic_pearson_mean']:.2%}")
 
 ### REST API
 ```bash
-curl -X POST http://localhost:5002/signals/backtest \
+curl -X POST http://localhost:5004/signals/backtest \
   -H "Content-Type: application/json" \
   -d '{
     "signal_name": "rsi_14",
@@ -148,7 +148,7 @@ curl -X POST http://localhost:5002/signals/backtest \
 
 ### Web UI
 ```
-http://localhost:5002/research
+http://localhost:5004/research
 ```
 
 ## 🧪 Testing
@@ -186,7 +186,7 @@ python pattern_scanner.py
 
 ### 2. Access Dashboard
 ```
-http://localhost:5002/research
+http://localhost:5004/research
 ```
 
 ### 3. Run Examples

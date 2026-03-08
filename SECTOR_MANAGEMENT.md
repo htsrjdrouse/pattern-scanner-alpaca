@@ -60,7 +60,7 @@ DELETE /signals/sectors/{sector_id}
 
 ### Benchmarking Sectors
 
-1. Navigate to http://localhost:5002/research
+1. Navigate to http://localhost:5004/research
 2. In the "Quick Backtest" section, select a sector from the dropdown
 3. The symbols field will auto-populate with sector tickers
 4. Select your signals and timeframe
@@ -120,7 +120,7 @@ Sectors are stored in `sectors.json` in the project root. The file structure:
 import requests
 
 # Backtest RSI signal on semiconductors
-response = requests.post('http://localhost:5002/signals/backtest', json={
+response = requests.post('http://localhost:5004/signals/backtest', json={
     "signal_name": "rsi_14",
     "symbols": ["NVDA", "AMD", "INTC", "AVGO", "QCOM"],
     "horizon_days": 20,
@@ -130,7 +130,7 @@ response = requests.post('http://localhost:5002/signals/backtest', json={
 semi_results = response.json()
 
 # Backtest same signal on energy
-response = requests.post('http://localhost:5002/signals/backtest', json={
+response = requests.post('http://localhost:5004/signals/backtest', json={
     "signal_name": "rsi_14",
     "symbols": ["XOM", "CVX", "COP", "EOG", "PXD"],
     "horizon_days": 20,

@@ -1,5 +1,5 @@
 """
-Test script to verify alpha research platform installation.
+Test script to verify alpha research platform installation and Alpaca integration.
 """
 import sys
 import pandas as pd
@@ -7,9 +7,86 @@ import numpy as np
 from datetime import datetime, timedelta
 
 
+def test_alpaca_client():
+    """Test Alpaca client initialization."""
+    print("Testing Alpaca client...")
+    try:
+        from alpaca_client import trading_client, stock_client, data_stream, get_mode
+        
+        assert trading_client is not None, "Trading client not initialized"
+        assert stock_client is not None, "Stock client not initialized"
+        assert data_stream is not None, "Data stream not initialized"
+        
+        mode = get_mode()
+        assert mode in ('paper', 'live'), f"Invalid mode: {mode}"
+        print(f"  ✓ Alpaca clients initialized (mode: {mode})")
+        
+        return True
+    except Exception as e:
+        print(f"  ✗ Error: {e}")
+        return False
+
+
+def test_alpaca_data():
+    """Test Alpaca data fetching."""
+    print("\nTesting Alpaca data fetching...")
+    try:
+        from alpaca_data import fetch_stock_data
+        
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        
+        df = fetch_stock_data('AAPL', start_date, end_date)
+        
+        assert df is not None, "No data returned"
+        assert not df.empty, "Empty DataFrame"
+        assert 'close' in df.columns, "Missing close column"
+        print(f"  ✓ Fetched {len(df)} bars for AAPL")
+        
+        return True
+    except Exception as e:
+        print(f"  ✗ Error: {e}")
+        return False
+
+
+def test_order_manager():
+    """Test order manager module."""
+    print("\nTesting order manager...")
+    try:
+        import order_manager
+        
+        # Test account info
+        account = order_manager.get_account_info()
+        assert 'equity' in account, "Missing equity in account info"
+        assert 'mode' in account, "Missing mode in account info"
+        print(f"  ✓ Account info retrieved (mode: {account['mode']})")
+        
+        return True
+    except Exception as e:
+        print(f"  ✗ Error: {e}")
+        return False
+
+
+def test_stream_manager():
+    """Test stream manager module."""
+    print("\nTesting stream manager...")
+    try:
+        import stream_manager
+        
+        # Just verify module loads
+        assert hasattr(stream_manager, 'subscribe'), "Missing subscribe function"
+        assert hasattr(stream_manager, 'get_latest'), "Missing get_latest function"
+        print(f"  ✓ Stream manager module loaded")
+        
+        return True
+    except Exception as e:
+        print(f"  ✗ Error: {e}")
+        return False
+
+
 def test_signals():
     """Test signal module."""
-    print("Testing signals module...")
+    print("\nTesting signals module...")
     try:
         from signals import get_signal, list_signals, SIGNAL_REGISTRY
         
@@ -185,6 +262,10 @@ def main():
     
     results = []
     
+    results.append(("Alpaca Client", test_alpaca_client()))
+    results.append(("Alpaca Data", test_alpaca_data()))
+    results.append(("Order Manager", test_order_manager()))
+    results.append(("Stream Manager", test_stream_manager()))
     results.append(("Signals", test_signals()))
     results.append(("Backtest", test_backtest()))
     results.append(("Analytics", test_analytics()))
@@ -202,11 +283,13 @@ def main():
     
     print("=" * 60)
     if all_passed:
-        print("✓ All tests passed! Platform is ready to use.")
+        print("✓ All tests passed! Alpaca-powered platform is ready to use.")
         print("\nNext steps:")
-        print("  1. Start server: python pattern_scanner.py")
-        print("  2. Visit: http://localhost:5002/research")
-        print("  3. Run examples: python examples/research_workflow.py")
+        print("  1. Verify .env file has your Alpaca credentials")
+        print("  2. Start server: python pattern_scanner.py")
+        print("  3. Visit: http://localhost:5002")
+        print("  4. Check trading mode badge (PAPER/LIVE)")
+        print("  5. Research dashboard: http://localhost:5002/research")
     else:
         print("✗ Some tests failed. Please check errors above.")
         sys.exit(1)

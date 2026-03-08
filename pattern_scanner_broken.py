@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # cup_handle_scanner_2.py
 # Enhanced Cup & Handle Scanner with Advanced Pattern Detection
-# Requirements: pip install flask yfinance pandas pandas_ta requests beautifulsoup4 scipy matplotlib
+# Requirements: pip install flask pandas pandas_ta requests beautifulsoup4 scipy matplotlib alpaca-py python-dotenv
 
 import re
 import json
@@ -11,14 +11,7 @@ from io import BytesIO
 from pathlib import Path
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-from flask import Flask, render_template_string, request, Response, flash, redirect
-import yfinance as yf
-
-# Alpaca integration
-from alpaca_data import fetch_stock_data, fetch_multiple_stocks
-from alpaca_client import get_mode
-import stream_manager
-import order_manager
+from flask import Flask, render_template_string, request, Response, flash, redirect, jsonify
 import pandas as pd
 import pandas_ta as ta
 import requests
@@ -30,8 +23,10 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 
-import json
-import os
+from alpaca_data import fetch_stock_data, fetch_multiple_stocks
+from alpaca_client import get_mode
+import stream_manager
+import order_manager
 
 app = Flask(__name__)
 app.secret_key = 'your-unique-secret-key-here-change-in-production'  # Required for sessions/flash
@@ -174,34 +169,31 @@ def get_all_us_tickers(min_market_cap=1_000_000_000):
 # ════════════════════════════════════════════════════════════════
 
 def get_company_info(symbol):
-    """Get detailed company information."""
+    """Get detailed company information from Alpaca."""
     try:
-        ticker = yf.Ticker(symbol)
-        info = ticker.info
+        from alpaca_client import trading_client
+        asset = trading_client.get_asset(symbol)
         
-        # Handle case where info is None
-        if info is None:
-            info = {}
-
+        # Alpaca provides limited company info, use basic data
         return {
-            'name': info.get('longName', info.get('shortName', symbol)),
-            'sector': info.get('sector', 'N/A'),
-            'industry': info.get('industry', 'N/A'),
-            'exchange': info.get('exchange', 'N/A'),
-            'market_cap': info.get('marketCap', 0),
-            'market_cap_fmt': format_market_cap(info.get('marketCap', 0)),
-            'description': info.get('longBusinessSummary', 'No description available.'),
-            'website': info.get('website', ''),
-            'employees': info.get('fullTimeEmployees', 'N/A'),
-            'country': info.get('country', 'N/A'),
-            'current_price': info.get('currentPrice', info.get('regularMarketPrice', 0)),
-            'fifty_two_week_high': info.get('fiftyTwoWeekHigh', 0),
-            'fifty_two_week_low': info.get('fiftyTwoWeekLow', 0),
-            'avg_volume': info.get('averageVolume', 0),
-            'pe_ratio': info.get('trailingPE', None),
-            'forward_pe': info.get('forwardPE', None),
-            'dividend_yield': info.get('dividendYield', None),
-            'beta': info.get('beta', None),
+            'name': asset.name if hasattr(asset, 'name') else symbol,
+            'sector': 'N/A',
+            'industry': 'N/A',
+            'exchange': asset.exchange.value if hasattr(asset, 'exchange') else 'N/A',
+            'market_cap': 0,
+            'market_cap_fmt': 'N/A',
+            'description': f'{symbol} - Tradable on {asset.exchange.value if hasattr(asset, "exchange") else "N/A"}',
+            'website': '',
+            'employees': 'N/A',
+            'country': 'N/A',
+            'current_price': 0,
+            'fifty_two_week_high': 0,
+            'fifty_two_week_low': 0,
+            'avg_volume': 0,
+            'pe_ratio': None,
+            'forward_pe': None,
+            'dividend_yield': None,
+            'beta': None,
         }
     except Exception as e:
         return {
@@ -262,46 +254,17 @@ def calculate_approx_delta(strike, current_price, days_to_exp, is_call=True):
 
 
 def calculate_iv_rank(symbol):
-    """Calculate IV rank (0-100) using 52-week IV range."""
-    try:
-        ticker = yf.Ticker(symbol)
-        expirations = ticker.options
-        if not expirations:
-            return 50
-        
-        ivs = []
-        for exp in expirations[:12]:  # Sample first 12 expirations
-            try:
-                chain = ticker.option_chain(exp)
-                calls_iv = chain.calls['impliedVolatility'].dropna()
-                if len(calls_iv) > 0:
-                    ivs.append(calls_iv.median())
-            except:
-                continue
-        
-        if len(ivs) < 3:
-            return 50
-        
-        current_iv = ivs[0] if ivs else 0.3
-        iv_low = min(ivs)
-        iv_high = max(ivs)
-        
-        if iv_high == iv_low:
-            return 50
-        
-        iv_rank = ((current_iv - iv_low) / (iv_high - iv_low)) * 100
-        return round(max(0, min(100, iv_rank)), 1)
-    except:
-        return 50
+    """Calculate IV rank (0-100) - simplified for Alpaca (no options data)."""
+    # Alpaca doesn't provide options data, return neutral value
+    return 50
 
 
 def get_vix():
-    """Fetch current VIX level."""
+    """Fetch current VIX level from Alpaca."""
     try:
-        vix = yf.Ticker("^VIX")
-        hist = vix.history(period="1d")
-        if not hist.empty:
-            return round(hist['Close'].iloc[-1], 2)
+        df = fetch_stock_data("VIX", (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d'), datetime.now().strftime('%Y-%m-%d'))
+        if df is not None and not df.empty:
+            return round(df['close'].iloc[-1], 2)
     except:
         pass
     return 20
@@ -324,22 +287,14 @@ def classify_regime(df, adx_value, cto_bullish):
 
 
 def suggest_bull_call_spread(symbol, current_price, analysis=None, budget=375, df=None):
-    """IV-aware options strategy selector with regime detection."""
-    try:
-        ticker = yf.Ticker(symbol)
-        try:
-            expirations = ticker.options
-        except:
-            return {'status': 'no_options', 'message': f'Options data unavailable for {symbol} — consider equity position sizing instead.'}
-        
-        if not expirations:
-            return {'status': 'no_options', 'message': f'Options data unavailable for {symbol} — consider equity position sizing instead.'}
-        
-        # Get IV rank and VIX
-        iv_rank = calculate_iv_rank(symbol)
-        vix = get_vix()
-        
-        # Regime detection using existing data
+    """IV-aware options strategy selector - Alpaca doesn't provide options data."""
+    return {
+        'status': 'no_options', 
+        'message': f'Options data unavailable (Alpaca limitation) — consider equity position sizing instead.'
+    }
+
+
+def _build_iron_condor(ticker, symbol, current_price, budget, iv_rank, vix, regime, trend_regime, trend_regime_desc, analysis):
         regime_type = 'UNKNOWN'
         regime_desc = 'Unknown'
         adx_value = None
@@ -863,105 +818,8 @@ def _build_pmcc(ticker, symbol, current_price, budget, iv_rank, vix, regime, tre
 
 
 def calculate_expected_move(symbol, current_price, pattern_target=None):
-    """Calculate expected move analysis using IV from options chain."""
-    try:
-        ticker = yf.Ticker(symbol)
-        expirations = ticker.options
-        if not expirations:
-            return {'status': 'no_data'}
-        
-        # Get ATM IV from nearest expiration >= 30 days
-        today = datetime.today()
-        target_exp = None
-        for exp in expirations:
-            try:
-                exp_date = datetime.strptime(exp, '%Y-%m-%d')
-                days = (exp_date - today).days
-                if days >= 30:
-                    target_exp = {'date': exp, 'days': days}
-                    break
-            except:
-                continue
-        
-        if not target_exp:
-            return {'status': 'no_data'}
-        
-        chain = ticker.option_chain(target_exp['date']).calls
-        if chain.empty:
-            return {'status': 'no_data'}
-        
-        # Get ATM IV
-        atm_option = chain.iloc[(chain['strike'] - current_price).abs().argsort()[:1]]
-        iv = float(atm_option['impliedVolatility'].iloc[0]) if pd.notna(atm_option['impliedVolatility'].iloc[0]) else None
-        
-        if not iv:
-            return {'status': 'no_data'}
-        
-        import math
-        
-        # Expected moves
-        move_1w = current_price * iv * math.sqrt(5/252)
-        move_1m = current_price * iv * math.sqrt(21/252)
-        move_45d = current_price * iv * math.sqrt(45/252)
-        
-        # Delta-based strikes
-        dte = target_exp['days']
-        delta_strikes = []
-        for target_delta in [0.30, 0.20, 0.15, 0.10]:
-            # Find strike closest to this delta
-            chain_copy = chain.copy()
-            chain_copy['approx_delta'] = chain_copy['strike'].apply(
-                lambda s: calculate_approx_delta(s, current_price, dte)
-            )
-            closest = chain_copy.iloc[(chain_copy['approx_delta'] - target_delta).abs().argsort()[:1]]
-            if not closest.empty:
-                strike = float(closest['strike'].iloc[0])
-                actual_delta = float(closest['approx_delta'].iloc[0])
-                prob_otm = (1 - actual_delta) * 100
-                distance_pct = ((strike - current_price) / current_price) * 100
-                delta_strikes.append({
-                    'delta': target_delta,
-                    'strike': round(strike, 2),
-                    'prob_otm': round(prob_otm, 1),
-                    'distance_pct': round(distance_pct, 1)
-                })
-        
-        # Pattern target comparison
-        target_assessment = None
-        if pattern_target:
-            target_pct = ((pattern_target - current_price) / current_price) * 100
-            upper_bound = current_price + move_45d
-            upper_pct = ((upper_bound - current_price) / current_price) * 100
-            
-            if pattern_target <= upper_bound:
-                assessment = 'WITHIN'
-                note = None
-            else:
-                assessment = 'EXCEEDS'
-                note = 'Target exceeds expected move — consider longer dated options (60-90 DTE) to give the setup time to play out.'
-            
-            target_assessment = {
-                'target': round(pattern_target, 2),
-                'target_pct': round(target_pct, 1),
-                'upper_bound': round(upper_bound, 2),
-                'upper_pct': round(upper_pct, 1),
-                'assessment': assessment,
-                'note': note
-            }
-        
-        return {
-            'status': 'success',
-            'iv': round(iv * 100, 1),
-            'move_1w': round(move_1w, 2),
-            'move_1m': round(move_1m, 2),
-            'move_45d': round(move_45d, 2),
-            'delta_strikes': delta_strikes,
-            'target_assessment': target_assessment,
-            'expiration': target_exp['date'],
-            'dte': dte
-        }
-    except:
-        return {'status': 'no_data'}
+    """Calculate expected move analysis - Alpaca doesn't provide options data."""
+    return {'status': 'no_data'}
 
 
 # ════════════════════════════════════════════════════════════════
@@ -969,27 +827,8 @@ def calculate_expected_move(symbol, current_price, pattern_target=None):
 # ════════════════════════════════════════════════════════════════
 
 def calculate_dcf_value(symbol):
-    """
-    Calculate intrinsic value using DCF model with tiered growth, scenarios, adjusted discount, and cross-checks.
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        info = ticker.info
-
-        # Get free cash flow
-        cashflow = ticker.cashflow
-        if cashflow is None or cashflow.empty:
-            return {'status': 'no_data', 'dcf_value': None, 'margin': None}
-
-        # Find Free Cash Flow
-        fcf = None
-        fcf_history = []
-
-        for row_name in ['Free Cash Flow', 'FreeCashFlow']:
-            if row_name in cashflow.index:
-                fcf_row = cashflow.loc[row_name]
-                fcf = fcf_row.iloc[0] if len(fcf_row) > 0 else None
-                fcf_history = fcf_row.tolist()[:4]  # Last 4 years
+    """Calculate intrinsic value - simplified for Alpaca (no fundamental data)."""
+    return {'status': 'no_data', 'dcf_value': None, 'margin': None}
                 break
 
         if fcf is None:
@@ -2279,32 +2118,30 @@ def scan_for_patterns(tickers=None, progress_callback=None):
     results = []
     total = len(tickers)
 
-    # Batch download all data at once - MUCH faster than individual calls
-
-    # Download in chunks to avoid timeout
-    chunk_size = 100
+    # Fetch data using Alpaca in batches
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+    
     all_data = {}
-
-    for i in range(0, len(tickers), chunk_size):
-        chunk = tickers[i:i+chunk_size]
-        chunk_str = ' '.join(chunk)
-        try:
-            data = yf.download(chunk_str, period="1y", group_by='ticker',
-                               progress=False, threads=True)
-
-            # Handle single vs multiple tickers
-            if len(chunk) == 1:
-                all_data[chunk[0]] = data
-            else:
-                for symbol in chunk:
-                    if symbol in data.columns.get_level_values(0):
-                        all_data[symbol] = data[symbol].dropna()
-        except Exception as e:
-            pass
-
+    
+    # Batch fetch with progress
+    for i in range(0, len(tickers), 50):
+        batch = tickers[i:i+50]
+        
         if progress_callback:
-            progress_callback(min(i + chunk_size, total), total,
-                              f"Downloaded {min(i + chunk_size, total)}/{total}")
+            progress_callback(min(i + 50, total), total,
+                              f"Downloading {min(i + 50, total)}/{total}")
+        
+        for symbol in batch:
+            try:
+                df = fetch_stock_data(symbol, start_date, end_date)
+                if df is not None and not df.empty and len(df) >= 150:
+                    # Convert to format expected by pattern detection
+                    df = df.set_index('date')
+                    df.columns = [c.capitalize() for c in df.columns if c != 'symbol']
+                    all_data[symbol] = df
+            except Exception as e:
+                continue
 
     # Now analyze each stock
     for idx, (symbol, df) in enumerate(all_data.items()):
@@ -3188,20 +3025,23 @@ def chart(symbol):
         # Parse EDGAR parameter
         show_edgar = request.args.get('edgar') == '1'
 
-        ticker = yf.Ticker(symbol)
         try:
             # Fetch enough data so 200 SMA covers the full displayed period
-            # Need: 252 (display) + 200 (SMA warmup) = 452 days minimum
-            # Request 500 days to be safe
-            from datetime import datetime, timedelta
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=700)  # ~500 trading days
-            df_full = ticker.history(start=start_date, end=end_date)
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=700)).strftime('%Y-%m-%d')
+            df_full = fetch_stock_data(symbol, start_date, end_date)
         except Exception as hist_err:
             return f"Error fetching history for {symbol}: {hist_err}"
 
         if df_full is None or df_full.empty:
             return f"No data available for {symbol}"
+
+        # Convert to expected format
+        df_full = df_full.set_index('date')
+        # Drop symbol column if it exists, then capitalize remaining columns
+        if 'symbol' in df_full.columns:
+            df_full = df_full.drop(columns=['symbol'])
+        df_full.columns = [c.capitalize() for c in df_full.columns]
 
         # Calculate SMAs on full data first (before trimming)
         df_full['SMA13'] = df_full['Close'].rolling(13).mean()
@@ -4077,13 +3917,21 @@ def tracked():
         # Fetch current metrics for each
         for stock in stocks:
             try:
-                ticker = yf.Ticker(stock['ticker'])
-                hist = ticker.history(period='60d')
-                if not hist.empty:
-                    stock['current_price'] = round(hist['Close'].iloc[-1], 2)
-                    stock['current_rsi'] = round(ta.rsi(hist['Close'], length=14).iloc[-1], 1) if len(hist) > 14 else None
-                    stock['avg_volume'] = int(hist['Volume'].tail(50).mean())
-                    stock['current_volume'] = int(hist['Volume'].iloc[-1])  # Today's volume
+                end_date = datetime.now().strftime('%Y-%m-%d')
+                start_date = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
+                df = fetch_stock_data(stock['ticker'], start_date, end_date)
+                
+                if df is not None and not df.empty:
+                    # Convert to expected format
+                    df = df.set_index('date')
+                    if 'symbol' in df.columns:
+                        df = df.drop(columns=['symbol'])
+                    df.columns = [c.capitalize() for c in df.columns]
+                    
+                    stock['current_price'] = round(df['Close'].iloc[-1], 2)
+                    stock['current_rsi'] = round(ta.rsi(df['Close'], length=14).iloc[-1], 1) if len(df) > 14 else None
+                    stock['avg_volume'] = int(df['Volume'].tail(50).mean())
+                    stock['current_volume'] = int(df['Volume'].iloc[-1])  # Today's volume
                 else:
                     stock['current_price'] = None
                     stock['current_rsi'] = None
@@ -4186,6 +4034,110 @@ def remove_tracked(ticker):
     except Exception as e:
         flash(f'Error removing stock: {str(e)}', 'error')
     return redirect('/tracked')
+
+
+# ════════════════════════════════════════════════════════════════
+# ALPACA TRADING & STREAMING API ENDPOINTS
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/api/account', methods=['GET'])
+def api_account():
+    """Get account information"""
+    try:
+        account = order_manager.get_account_info()
+        return jsonify(account)
+    except Exception as e:
+        return jsonify({'error': str(e), 'mode': get_mode()}), 500
+
+@app.route('/api/positions', methods=['GET'])
+def api_positions():
+    """Get current positions"""
+    try:
+        positions = order_manager.get_positions()
+        return jsonify({'positions': positions, 'mode': get_mode()})
+    except Exception as e:
+        return jsonify({'error': str(e), 'mode': get_mode()}), 500
+
+@app.route('/api/orders', methods=['GET'])
+def api_orders():
+    """Get open orders"""
+    try:
+        orders = order_manager.get_open_orders()
+        return jsonify({'orders': orders, 'mode': get_mode()})
+    except Exception as e:
+        return jsonify({'error': str(e), 'mode': get_mode()}), 500
+
+@app.route('/api/order/market', methods=['POST'])
+def api_order_market():
+    """Place market order"""
+    try:
+        data = request.get_json()
+        symbol = data.get('symbol')
+        qty = int(data.get('qty'))
+        side = data.get('side')
+        
+        if not all([symbol, qty, side]):
+            return jsonify({'error': 'Missing required fields: symbol, qty, side', 'mode': get_mode()}), 400
+        
+        order = order_manager.place_market_order(symbol, qty, side)
+        return jsonify(order)
+    except Exception as e:
+        return jsonify({'error': str(e), 'mode': get_mode()}), 500
+
+@app.route('/api/order/limit', methods=['POST'])
+def api_order_limit():
+    """Place limit order"""
+    try:
+        data = request.get_json()
+        symbol = data.get('symbol')
+        qty = int(data.get('qty'))
+        side = data.get('side')
+        limit_price = float(data.get('limit_price'))
+        
+        if not all([symbol, qty, side, limit_price]):
+            return jsonify({'error': 'Missing required fields: symbol, qty, side, limit_price', 'mode': get_mode()}), 400
+        
+        order = order_manager.place_limit_order(symbol, qty, side, limit_price)
+        return jsonify(order)
+    except Exception as e:
+        return jsonify({'error': str(e), 'mode': get_mode()}), 500
+
+@app.route('/api/order/<order_id>', methods=['DELETE'])
+def api_cancel_order(order_id):
+    """Cancel order"""
+    try:
+        result = order_manager.cancel_order(order_id)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e), 'mode': get_mode()}), 500
+
+@app.route('/api/stream/latest/<symbol>', methods=['GET'])
+def api_stream_latest(symbol):
+    """Get latest streaming data for symbol"""
+    try:
+        data = stream_manager.get_latest(symbol)
+        if data:
+            return jsonify({'data': data, 'mode': get_mode()})
+        else:
+            return jsonify({'error': 'No data available', 'mode': get_mode()}), 404
+    except Exception as e:
+        return jsonify({'error': str(e), 'mode': get_mode()}), 500
+
+@app.route('/api/stream/subscribe', methods=['POST'])
+def api_stream_subscribe():
+    """Subscribe to real-time data for symbols"""
+    try:
+        data = request.get_json()
+        symbols = data.get('symbols', [])
+        
+        if not symbols:
+            return jsonify({'error': 'No symbols provided', 'mode': get_mode()}), 400
+        
+        stream_manager.subscribe(symbols)
+        return jsonify({'status': 'subscribed', 'symbols': symbols, 'mode': get_mode()})
+    except Exception as e:
+        return jsonify({'error': str(e), 'mode': get_mode()}), 500
+
 
 # Register research API blueprint
 try:

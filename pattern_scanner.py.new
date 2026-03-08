@@ -13,12 +13,6 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from flask import Flask, render_template_string, request, Response, flash, redirect
 import yfinance as yf
-
-# Alpaca integration
-from alpaca_data import fetch_stock_data, fetch_multiple_stocks
-from alpaca_client import get_mode
-import stream_manager
-import order_manager
 import pandas as pd
 import pandas_ta as ta
 import requests
@@ -4202,4 +4196,4 @@ except ImportError:
 
 if __name__ == "__main__":
     # Disable reloader to prevent crashes during long scans
-    app.run(debug=True, host="0.0.0.0", port=5004, use_reloader=False)
+    app.run(debug=True, host="0.0.0.0", port=5002, use_reloader=False)
