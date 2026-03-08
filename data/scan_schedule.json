@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "daily_time": "16:30",
+  "weekly_day": "sunday",
+  "weekly_time": "18:00",
+  "min_stocks": 15
+}

@@ -1,0 +1,155 @@
+{
+  "sectors": {
+    "minerals_mining": {
+      "name": "Minerals & Mining",
+      "tickers": [
+        "NEM", "FCX", "GOLD", "AEM", "WPM", "KGC", "AG", "HL", "CDE", "PAAS",
+        "MP", "LTHM", "ALB", "SQM", "LAC", "PLL", "SGML", "NOVN", "RIO", "BHP",
+        "VALE", "SCCO", "TCK", "AA", "HBM"
+      ]
+    },
+    "energy": {
+      "name": "Energy (Oil & Gas)",
+      "tickers": [
+        "XOM", "CVX", "COP", "EOG", "PXD", "DVN", "MPC", "PSX", "VLO", "HES",
+        "OXY", "HAL", "SLB", "BKR", "FANG", "APA", "MRO", "CTRA", "PR", "SM",
+        "RRC", "AR", "CNX", "NOG", "KRP"
+      ]
+    },
+    "solar": {
+      "name": "Solar Energy",
+      "tickers": [
+        "ENPH", "SEDG", "FSLR", "CSIQ", "JKS", "SPWR", "RUN", "NOVA", "ARRY",
+        "SHLS", "MAXN", "FLNC", "BE", "PLUG", "HASI", "NEE", "AES", "CWEN",
+        "ORA", "GPRE"
+      ]
+    },
+    "nuclear": {
+      "name": "Nuclear Energy",
+      "tickers": [
+        "CCJ", "UEC", "URG", "DNN", "UUUU", "EU", "NXE", "LEU", "BWXT", "BWX",
+        "CEG", "VST", "ETR", "EXC", "PCG", "NNE", "SMR", "OKLO", "GEV", "AMETEK"
+      ]
+    },
+    "semiconductors": {
+      "name": "Semiconductors",
+      "tickers": [
+        "NVDA", "AMD", "INTC", "AVGO", "QCOM", "TXN", "MU", "AMAT", "LRCX",
+        "KLAC", "ASML", "TSM", "ARM", "MRVL", "ON", "SWKS", "QRVO", "MPWR",
+        "WOLF", "COHU", "ACLS", "ONTO", "FORM", "AMBA", "CRUS"
+      ]
+    },
+    "communications": {
+      "name": "Communications & Telecom",
+      "tickers": [
+        "T", "VZ", "TMUS", "CMCSA", "CHTR", "DISH", "LUMN", "USM", "SHEN",
+        "CABO", "WOW", "CNSL", "ATUS", "VOD", "ERIC", "NOK", "CSCO", "JNPR",
+        "INFN", "VIAV", "COMM", "RBBN", "ADTRAN", "CALX", "NTGR"
+      ]
+    },
+    "saas": {
+      "name": "SaaS / Cloud Software",
+      "tickers": [
+        "CRM", "NOW", "WDAY", "SNOW", "MDB", "DDOG", "ZS", "CRWD", "NET",
+        "HUBS", "VEEV", "BILL", "ZI", "GTLB", "CFLT", "DOMO", "BOX", "DOCN",
+        "APPF", "PCOR", "BRZE", "ALTR", "NCNO", "ASAN", "PD"
+      ]
+    },
+    "biotech": {
+      "name": "Biotechnology",
+      "tickers": [
+        "AMGN", "GILD", "BIIB", "VRTX", "REGN", "MRNA", "BNTX", "SGEN", "ALNY",
+        "INCY", "EXAS", "RARE", "ARWR", "NTLA", "BEAM", "CRSP", "EDIT", "FATE",
+        "KYMR", "RCUS", "IMVT", "DNLI", "PRAX", "ARVN", "ACAD"
+      ]
+    },
+    "healthcare": {
+      "name": "Healthcare (Non-Biotech)",
+      "tickers": [
+        "JNJ", "UNH", "PFE", "ABT", "TMO", "DHR", "SYK", "BSX", "MDT", "EW",
+        "ISRG", "IDXX", "A", "BDX", "ZBH", "HOLX", "TECH", "PODD", "INSP",
+        "TNDM", "NVCR", "SWAV", "ITGR", "MMSI", "RCM"
+      ]
+    },
+    "cybersecurity": {
+      "name": "Cybersecurity",
+      "tickers": [
+        "CRWD", "ZS", "PANW", "FTNT", "S", "CYBR", "TENB", "QLYS", "RPD",
+        "VRNS", "SAIL", "OKTA", "PING", "IDEX", "NET", "DDOG", "SIEM", "RDWR",
+        "OSPN", "SCWX", "CHKP", "FFIV", "TUFN", "MNDT", "CWAN"
+      ]
+    },
+    "ai": {
+      "name": "Artificial Intelligence",
+      "tickers": [
+        "NVDA", "MSFT", "GOOGL", "META", "AMD", "PLTR", "AI", "BBAI", "SOUN",
+        "GFAI", "IREN", "AIXI", "ASTS", "IONQ", "QUBT", "RGTI", "ARQT", "RXRX",
+        "TMDX", "IDAI", "LFMD", "PATH", "ABST", "NNOX", "DTRT"
+      ]
+    },
+    "data_centers": {
+      "name": "Data Centers & Infrastructure",
+      "tickers": [
+        "EQIX", "DLR", "AMT", "CCI", "SBAC", "IRM", "CONE", "QTS", "SWITCH",
+        "VRT", "SMCI", "HPE", "DELL", "NTAP", "PSTG", "STX", "WDC", "SEDG",
+        "ANET", "LITE", "VIAVI", "CIEN", "INFN", "ADTN", "CLFD"
+      ]
+    },
+    "crypto": {
+      "name": "Crypto & Blockchain",
+      "tickers": [
+        "COIN", "MSTR", "RIOT", "MARA", "CLSK", "CIFR", "HUT", "BTBT", "BITF",
+        "WULF", "IREN", "CORZ", "BTDR", "BRRR", "GBTC", "ARKB", "IBIT", "FBTC",
+        "EZBC", "HODL", "SQ", "PYPL", "SI", "SILVERGATE", "GLXY"
+      ]
+    },
+    "construction": {
+      "name": "Construction & Engineering",
+      "tickers": [
+        "CAT", "DE", "PWR", "EME", "MTZ", "PRIM", "DY", "ROAD", "STRL", "ARCO",
+        "FIX", "IESC", "MYR", "KFRC", "GVA", "MDU", "KNX", "APOG", "TREX",
+        "BLDR", "IBP", "LGIH", "CVCO", "SKY", "PATK"
+      ]
+    },
+    "agriculture": {
+      "name": "Agriculture",
+      "tickers": [
+        "ADM", "BG", "CALM", "TSN", "HRL", "SFM", "SAFM", "VITL", "APPH",
+        "AGFS", "CTVA", "FMC", "MOS", "NTR", "CF", "IPI", "UAN", "WLFC",
+        "INGR", "LANC", "JJSF", "SENEA", "DOLE", "AVO", "APPH"
+      ]
+    },
+    "materials": {
+      "name": "Materials & Specialty Chemicals",
+      "tickers": [
+        "LIN", "APD", "ECL", "SHW", "PPG", "RPM", "EMN", "CE", "HUN", "OLN",
+        "WLK", "TROX", "KRO", "MEOH", "CC", "IOSP", "AVNT", "BCPC", "CBT",
+        "GRA", "SCL", "FUL", "HWKN", "KWR", "ASIX"
+      ]
+    },
+    "chemical": {
+      "name": "Chemicals (Industrial & Specialty)",
+      "tickers": [
+        "DOW", "LYB", "DD", "PPG", "ALB", "MON", "IFF", "ASH", "ARCH", "POL",
+        "LXFR", "MTRN", "GVHLY", "TRONC", "UNVR", "NEON", "OLIN", "NEU",
+        "KOP", "CHEM", "FOE", "HPNN", "AMRS", "SYNT", "LOOP"
+      ]
+    },
+    "financial": {
+      "name": "Financial Services",
+      "tickers": [
+        "JPM", "BAC", "WFC", "GS", "MS", "C", "BX", "KKR", "APO", "ARES",
+        "BLK", "SCHW", "AXP", "COF", "DFS", "SYF", "ALLY", "SOFI", "LC",
+        "UPST", "AFRM", "NU", "FOUR", "PAYO", "OPEN"
+      ]
+    },
+    "reits": {
+      "name": "REITs",
+      "tickers": [
+        "PLD", "AMT", "EQIX", "CCI", "PSA", "EXR", "WELL", "VTR", "PEAK",
+        "O", "NNN", "STOR", "VICI", "MGM", "EPR", "SPG", "MAC", "SKT", "KIM",
+        "REG", "BRX", "AKR", "RPAI", "ROIC", "SITC"
+      ]
+    }
+  }
+}

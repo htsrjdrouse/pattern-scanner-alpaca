@@ -1,0 +1,18 @@
+source .venv/bin/activate
+ 
+To manage the scanner:
+
+ ```bash
+   cd /Users/richard/Documents/stocks/pattern_scanner
+
+   # Start
+   docker-compose up -d
+
+   # Stop
+   docker-compose down
+
+   # Rebuild after code changes
+   docker-compose up -d --build
+
+   # View logs
+   docker logs pattern-scanner -f

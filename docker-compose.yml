@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  scanner:
+    build: .
+    container_name: pattern-scanner
+    ports:
+      - "5002:5002"
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
