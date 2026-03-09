@@ -36,7 +36,7 @@ import os
 app = Flask(__name__)
 app.secret_key = 'your-unique-secret-key-here-change-in-production'  # Required for sessions/flash
 
-TRACKED_FILE = '/app/data/tracked_stocks.json'
+TRACKED_FILE = 'data/tracked_stocks.json'
 
 def load_tracked_stocks():
     if os.path.exists(TRACKED_FILE):
@@ -3980,7 +3980,110 @@ def chart(symbol):
                 </div>
             </div>
 
+            <!-- Trading Panel -->
+            <div class="card" style="margin-top: 20px; background: #1a2332;">
+                <h3>📈 Alpaca Paper Trading <span style="background: #ff9800; color: #000; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 10px;">{{ alpaca_mode }}</span></h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h4 style="color: #00c853;">Buy {{ symbol }}</h4>
+                        <form id="buyForm" style="display: flex; flex-direction: column; gap: 10px;">
+                            <input type="number" id="buyQty" placeholder="Quantity (e.g., 1 or 0.5)" step="0.01" min="0.01" style="padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 5px;">
+                            <input type="number" id="buyLimit" placeholder="Limit Price (optional)" step="0.01" style="padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 5px;">
+                            <button type="button" onclick="placeBuyOrder()" style="padding: 12px; background: #00c853; color: #000; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Buy Market</button>
+                            <button type="button" onclick="placeBuyLimit()" style="padding: 12px; background: #4caf50; color: #fff; border: none; border-radius: 5px; cursor: pointer;">Buy Limit</button>
+                        </form>
+                    </div>
+                    <div>
+                        <h4 style="color: #f44336;">Sell {{ symbol }}</h4>
+                        <form id="sellForm" style="display: flex; flex-direction: column; gap: 10px;">
+                            <input type="number" id="sellQty" placeholder="Quantity (e.g., 1 or 0.5)" step="0.01" min="0.01" style="padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 5px;">
+                            <input type="number" id="sellLimit" placeholder="Limit Price (optional)" step="0.01" style="padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 5px;">
+                            <button type="button" onclick="placeSellOrder()" style="padding: 12px; background: #f44336; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Sell Market</button>
+                            <button type="button" onclick="placeSellLimit()" style="padding: 12px; background: #ff5722; color: #fff; border: none; border-radius: 5px; cursor: pointer;">Sell Limit</button>
+                        </form>
+                    </div>
+                </div>
+                <div id="tradeStatus" style="margin-top: 15px; padding: 10px; border-radius: 5px; display: none;"></div>
+            </div>
+
         </div>
+        <script>
+            const symbol = '{{ symbol }}';
+            
+            function showStatus(message, isError = false) {
+                const status = document.getElementById('tradeStatus');
+                status.textContent = message;
+                status.style.display = 'block';
+                status.style.background = isError ? '#f44336' : '#00c853';
+                status.style.color = isError ? '#fff' : '#000';
+            }
+            
+            async function placeBuyOrder() {
+                const qty = document.getElementById('buyQty').value;
+                if (!qty) { showStatus('Enter quantity', true); return; }
+                try {
+                    const res = await fetch('/api/order/market', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({symbol, qty: parseFloat(qty), side: 'buy'})
+                    });
+                    const data = await res.json();
+                    showStatus(data.error || `Buy order placed: ${data.id}`, !!data.error);
+                } catch (e) {
+                    showStatus('Error: ' + e.message, true);
+                }
+            }
+            
+            async function placeSellOrder() {
+                const qty = document.getElementById('sellQty').value;
+                if (!qty) { showStatus('Enter quantity', true); return; }
+                try {
+                    const res = await fetch('/api/order/market', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({symbol, qty: parseFloat(qty), side: 'sell'})
+                    });
+                    const data = await res.json();
+                    showStatus(data.error || `Sell order placed: ${data.id}`, !!data.error);
+                } catch (e) {
+                    showStatus('Error: ' + e.message, true);
+                }
+            }
+            
+            async function placeBuyLimit() {
+                const qty = document.getElementById('buyQty').value;
+                const limit = document.getElementById('buyLimit').value;
+                if (!qty || !limit) { showStatus('Enter quantity and limit price', true); return; }
+                try {
+                    const res = await fetch('/api/order/limit', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({symbol, qty: parseFloat(qty), side: 'buy', limit_price: parseFloat(limit)})
+                    });
+                    const data = await res.json();
+                    showStatus(data.error || `Buy limit order placed: ${data.id}`, !!data.error);
+                } catch (e) {
+                    showStatus('Error: ' + e.message, true);
+                }
+            }
+            
+            async function placeSellLimit() {
+                const qty = document.getElementById('sellQty').value;
+                const limit = document.getElementById('sellLimit').value;
+                if (!qty || !limit) { showStatus('Enter quantity and limit price', true); return; }
+                try {
+                    const res = await fetch('/api/order/limit', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({symbol, qty: parseFloat(qty), side: 'sell', limit_price: parseFloat(limit)})
+                    });
+                    const data = await res.json();
+                    showStatus(data.error || `Sell limit order placed: ${data.id}`, !!data.error);
+                } catch (e) {
+                    showStatus('Error: ' + e.message, true);
+                }
+            }
+        </script>
         </body>
         </html>
         """
@@ -4002,7 +4105,8 @@ def chart(symbol):
                                       options=options_strategy,
                                       options_budget=options_budget,
                                       expected_move=expected_move,
-                                      edgar_financials=edgar_financials)
+                                      edgar_financials=edgar_financials,
+                                      alpaca_mode=os.getenv('ALPACA_MODE', 'paper').upper())
 
     except Exception as e:
         import traceback
@@ -4186,6 +4290,146 @@ def remove_tracked(ticker):
     except Exception as e:
         flash(f'Error removing stock: {str(e)}', 'error')
     return redirect('/tracked')
+
+# Trading API Routes
+@app.route('/api/order/market', methods=['POST'])
+def api_market_order():
+    try:
+        data = request.get_json()
+        symbol = data.get('symbol')
+        qty = data.get('qty')
+        side = data.get('side')
+        
+        if not all([symbol, qty, side]):
+            return {'error': 'Missing required fields'}, 400
+        
+        result = order_manager.place_market_order(symbol, float(qty), side)
+        
+        # Auto-log to trade journal
+        try:
+            from journal.models import Trade, get_session
+            from datetime import date
+            
+            # Get current price for the symbol
+            ticker = yf.Ticker(symbol)
+            current_price = ticker.info.get('currentPrice') or ticker.info.get('regularMarketPrice', 0)
+            
+            session = get_session()
+            trade = Trade(
+                symbol=symbol,
+                entry_date=date.today(),
+                entry_price=current_price,
+                shares=float(qty),
+                trade_type='stock',
+                status='open' if side.lower() == 'buy' else 'closed',
+                notes=f"Auto-logged from Alpaca {result.get('type', 'market')} order. Order ID: {result.get('order_id', 'N/A')}"
+            )
+            
+            # If selling, try to close an existing open position
+            if side.lower() == 'sell':
+                open_trade = session.query(Trade).filter_by(
+                    symbol=symbol, 
+                    status='open'
+                ).order_by(Trade.entry_date.desc()).first()
+                
+                if open_trade:
+                    open_trade.exit_date = date.today()
+                    open_trade.exit_price = current_price
+                    open_trade.exit_reason = 'manual_exit'
+                    open_trade.status = 'closed'
+                    open_trade.compute_metrics()
+                    session.commit()
+                    session.close()
+                    result['journal_logged'] = True
+                    result['journal_action'] = 'closed_existing_trade'
+                    return result
+            
+            session.add(trade)
+            session.commit()
+            session.close()
+            result['journal_logged'] = True
+        except Exception as journal_err:
+            result['journal_error'] = str(journal_err)
+        
+        return result
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+@app.route('/api/order/limit', methods=['POST'])
+def api_limit_order():
+    try:
+        data = request.get_json()
+        symbol = data.get('symbol')
+        qty = data.get('qty')
+        side = data.get('side')
+        limit_price = data.get('limit_price')
+        
+        if not all([symbol, qty, side, limit_price]):
+            return {'error': 'Missing required fields'}, 400
+        
+        result = order_manager.place_limit_order(symbol, float(qty), side, float(limit_price))
+        
+        # Auto-log to trade journal (using limit price as entry)
+        try:
+            from journal.models import Trade, get_session
+            from datetime import date
+            
+            session = get_session()
+            trade = Trade(
+                symbol=symbol,
+                entry_date=date.today(),
+                entry_price=float(limit_price),
+                shares=float(qty),
+                trade_type='stock',
+                status='open' if side.lower() == 'buy' else 'closed',
+                notes=f"Auto-logged from Alpaca limit order @ ${limit_price}. Order ID: {result.get('order_id', 'N/A')}"
+            )
+            
+            # If selling, try to close an existing open position
+            if side.lower() == 'sell':
+                open_trade = session.query(Trade).filter_by(
+                    symbol=symbol, 
+                    status='open'
+                ).order_by(Trade.entry_date.desc()).first()
+                
+                if open_trade:
+                    open_trade.exit_date = date.today()
+                    open_trade.exit_price = float(limit_price)
+                    open_trade.exit_reason = 'manual_exit'
+                    open_trade.status = 'closed'
+                    open_trade.compute_metrics()
+                    session.commit()
+                    session.close()
+                    result['journal_logged'] = True
+                    result['journal_action'] = 'closed_existing_trade'
+                    return result
+            
+            session.add(trade)
+            session.commit()
+            session.close()
+            result['journal_logged'] = True
+        except Exception as journal_err:
+            result['journal_error'] = str(journal_err)
+        
+        return result
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+@app.route('/api/positions', methods=['GET'])
+def api_positions():
+    try:
+        result = order_manager.get_positions()
+        return result
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+@app.route('/api/orders', methods=['GET'])
+def api_orders():
+    try:
+        result = order_manager.get_orders()
+        return result
+    except Exception as e:
+        return {'error': str(e)}, 500
 
 # Register research API blueprint
 try:
