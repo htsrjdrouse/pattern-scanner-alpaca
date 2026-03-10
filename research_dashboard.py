@@ -1408,6 +1408,11 @@ RESEARCH_DASHBOARD_HTML = """
                         actionCell = `<span style="padding: 4px 8px; border-radius: 4px; background: ${color}; color: ${rec === 'EVALUATE_ROLL' ? '#1e1e2e' : 'white'}; font-size: 0.85em; cursor: help;" title="${pos.rolling_vs_closing.reason}">${rec}</span>`;
                     }
                     
+                    // Add delete button for manual positions
+                    if (pos.id && pos.account !== 'alpaca_scanner') {
+                        actionCell += ` <button onclick="deleteManualPosition('${pos.id}')" style="padding: 4px 8px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; margin-left: 5px;">Delete</button>`;
+                    }
+                    
                     row.innerHTML = `
                         <td style="padding: 8px;">${pos.symbol}</td>
                         <td style="padding: 8px;">${pos.account}</td>
@@ -1520,6 +1525,28 @@ RESEARCH_DASHBOARD_HTML = """
             } catch (error) {
                 console.error('Error adding position:', error);
                 alert('Error adding position');
+            }
+        }
+        
+        async function deleteManualPosition(positionId) {
+            if (!confirm('Are you sure you want to delete this position?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/signals/risk/positions/manual/${positionId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('Position deleted successfully');
+                    await loadRiskSnapshot();
+                } else {
+                    alert('Failed to delete position');
+                }
+            } catch (error) {
+                console.error('Error deleting position:', error);
+                alert('Error deleting position');
             }
         }
         
