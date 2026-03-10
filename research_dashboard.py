@@ -492,6 +492,7 @@ RESEARCH_DASHBOARD_HTML = """
                 <!-- Alert Banner -->
                 <div id="riskAlertBanner" style="margin: 20px 0; padding: 15px; border-radius: 8px; display: none;">
                     <div id="riskAlertContent"></div>
+                    <button onclick="resetBaseline()" style="margin-top: 10px; padding: 8px 16px; background: #4fc3f7; color: #1e1e2e; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Reset Baseline (Fix False Alert)</button>
                 </div>
                 
                 <!-- Risk Status Dashboard -->
@@ -1552,6 +1553,29 @@ RESEARCH_DASHBOARD_HTML = """
             } catch (error) {
                 console.error('Error deleting position:', error);
                 alert('Error deleting position');
+            }
+        }
+        
+        async function resetBaseline() {
+            if (!confirm('This will reset your start-of-day baseline to your current portfolio value and clear recovery mode. This is useful when you first add manual positions. Continue?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/signals/risk/reset-baseline', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    alert(`Baseline reset to $${data.start_of_day_value.toFixed(0)}. Recovery mode cleared.`);
+                    await loadRiskSnapshot();
+                } else {
+                    alert('Failed to reset baseline');
+                }
+            } catch (error) {
+                console.error('Error resetting baseline:', error);
+                alert('Error resetting baseline');
             }
         }
         

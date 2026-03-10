@@ -697,6 +697,15 @@ def reset_recovery_mode():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@research_bp.route('/risk/reset-baseline', methods=['POST'])
+def reset_start_of_day():
+    """Reset start of day baseline to current portfolio value"""
+    try:
+        result = risk_manager.reset_start_of_day()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @research_bp.route('/risk/eod', methods=['POST'])
 def end_of_day_close():
     """End of day close"""

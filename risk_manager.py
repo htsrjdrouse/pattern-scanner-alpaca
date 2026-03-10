@@ -586,6 +586,44 @@ def reset_recovery_mode():
     save_daily_log(daily_log)
     return True
 
+def reset_start_of_day():
+    """Reset start of day value to current portfolio value"""
+    # Get current snapshot
+    alpaca_account, alpaca_positions = get_alpaca_positions()
+    manual_positions = load_manual_positions()
+    
+    # Calculate total current value
+    alpaca_value = alpaca_account['portfolio_value'] if alpaca_account else 0
+    manual_value = sum(p.get('market_value', 0) for p in manual_positions)
+    total_value = alpaca_value + manual_value
+    
+    # Update daily log
+    daily_log = load_daily_log()
+    daily_log['start_of_day_value'] = total_value
+    daily_log['start_of_day_date'] = date.today().isoformat()
+    
+    # Also reset recovery mode since we're resetting the baseline
+    daily_log['recovery_mode_active'] = False
+    daily_log['recovery_mode_exit_date'] = datetime.now().isoformat()
+    daily_log['consecutive_winning_days'] = 0
+    
+    # Get VIX
+    try:
+        vix = yf.Ticker('^VIX')
+        vix_hist = vix.history(period='1d')
+        if not vix_hist.empty:
+            daily_log['start_of_day_vix'] = float(vix_hist['Close'].iloc[-1])
+    except:
+        pass
+    
+    save_daily_log(daily_log)
+    
+    # Clear cache to force refresh
+    if CACHE_FILE.exists():
+        CACHE_FILE.unlink()
+    
+    return {'start_of_day_value': total_value, 'recovery_mode_reset': True}
+
 def get_risk_history():
     """Get 30-day risk history"""
     daily_log = load_daily_log()
