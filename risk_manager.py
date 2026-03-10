@@ -556,6 +556,11 @@ def add_manual_position(position_data):
     position_data['last_updated'] = datetime.now().isoformat()
     positions.append(position_data)
     save_manual_positions(positions)
+    
+    # Clear cache to force refresh
+    if CACHE_FILE.exists():
+        CACHE_FILE.unlink()
+    
     return position_data
 
 def update_manual_position(position_id, position_data):
@@ -567,6 +572,11 @@ def update_manual_position(position_id, position_data):
             position_data['last_updated'] = datetime.now().isoformat()
             positions[i] = position_data
             save_manual_positions(positions)
+            
+            # Clear cache to force refresh
+            if CACHE_FILE.exists():
+                CACHE_FILE.unlink()
+            
             return position_data
     return None
 

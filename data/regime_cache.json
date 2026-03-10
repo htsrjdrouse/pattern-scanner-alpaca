@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-03-10T15:14:04.254343",
+  "timestamp": "2026-03-10T16:17:02.846294",
   "cache_age_minutes": 0,
-  "spx_price": 6815.39,
-  "vix_level": 22.72,
-  "vix_3m": 23.86,
+  "spx_price": 6817.29,
+  "vix_level": 22.93,
+  "vix_3m": 23.98,
   "dimensions": {
     "vix_regime": {
       "value": "ELEVATED",
@@ -12,7 +12,7 @@
     },
     "term_structure": {
       "value": "CONTANGO",
-      "spread": 1.14,
+      "spread": 1.05,
       "score": 1.0,
       "description": "Normal, favorable for sellers"
     },
@@ -24,9 +24,9 @@
     },
     "vol_spread": {
       "value": "STRONG",
-      "realized_vol": 0.1176,
-      "implied_vol": 0.2272,
-      "spread": 0.1096,
+      "realized_vol": 0.1177,
+      "implied_vol": 0.2293,
+      "spread": 0.1116,
       "score": 1.0,
       "description": "IV significantly overpricing, clear seller edge"
     },

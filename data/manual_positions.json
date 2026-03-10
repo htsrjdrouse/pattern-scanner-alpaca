@@ -30,5 +30,21 @@
     "unrealized_plpc": 0.3660869565217392,
     "id": "a4cf7bf1-c32d-4be2-ae9e-a1502513fb03",
     "last_updated": "2026-03-10T15:44:08.745086"
+  },
+  {
+    "symbol": "GEV",
+    "account": "robinhood",
+    "position_type": "equity",
+    "side": "long",
+    "qty": 1.88,
+    "cost_basis": 690.04,
+    "current_price": 843.18,
+    "notes": "",
+    "date_entered": "2026-03-10",
+    "market_value": 1585.1783999999998,
+    "unrealized_pl": 287.90319999999997,
+    "unrealized_plpc": 0.22192916352675207,
+    "id": "a5b0cba0-9328-4108-9f81-27c94479a347",
+    "last_updated": "2026-03-10T16:18:54.977547"
   }
 ]

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-10T16:10:35.148066",
+  "timestamp": "2026-03-10T16:17:24.125294",
   "cache_age_minutes": 0,
   "market_open": true,
   "accounts": {
@@ -27,19 +27,19 @@
   },
   "total_portfolio_value": 108955.82517,
   "pnl": {
-    "daily": 8955.825169999996,
-    "daily_pct": 0.08955825169999997,
+    "daily": 0.0,
+    "daily_pct": 0.0,
     "weekly": 0,
     "weekly_pct": 0.0,
     "monthly": 0,
     "monthly_pct": 0.0,
-    "start_of_day_value": 100000.0
+    "start_of_day_value": 108955.82517
   },
   "limits": {
     "daily_loss": {
-      "status": "BREACHED",
-      "usage_pct": 17.911650339999994,
-      "current": 8955.825169999996,
+      "status": "OK",
+      "usage_pct": 0.0,
+      "current": 0.0,
       "limit": -500
     },
     "weekly_loss": {
@@ -87,8 +87,8 @@
   },
   "vix": {
     "current": 22.920000076293945,
-    "start_of_day": 22.81999969482422,
-    "change_pct": 0.0043821377216059975,
+    "start_of_day": 22.920000076293945,
+    "change_pct": 0.0,
     "spike_detected": false
   },
   "pdt": {
@@ -98,11 +98,11 @@
     "pdt_exempt": true
   },
   "recovery_mode": {
-    "active": true,
+    "active": false,
     "triggered_date": "2026-03-10T15:42:55.614974",
     "consecutive_winning_days": 0,
     "days_required": 2,
-    "current_size_multiplier": 0.5
+    "current_size_multiplier": 1.0
   },
   "positions": [
     {
@@ -144,23 +144,13 @@
   ],
   "alerts": [
     {
-      "level": "CRITICAL",
-      "type": "DAILY_LOSS_LIMIT",
-      "message": "Daily loss limit BREACHED \u2014 $8956 lost vs $500 limit. ACTIVATE RECOVERY MODE: close all new entries, reduce size to 50% until 2 consecutive winning days."
-    },
-    {
       "level": "WARNING",
       "type": "BUYING_POWER",
       "message": "Buying power usage at 167% of account \u2014 above 50% threshold. Do not open new positions until existing ones are reduced."
-    },
-    {
-      "level": "WARNING",
-      "type": "RECOVERY_MODE",
-      "message": "RECOVERY MODE ACTIVE \u2014 position size capped at 50% (max $125/trade). 0 of 2 winning days completed. 2 more winning day(s) required to exit recovery mode."
     }
   ],
-  "alert_count_critical": 1,
-  "alert_count_warning": 2,
+  "alert_count_critical": 0,
+  "alert_count_warning": 1,
   "risk_config": {
     "account_size_total": 50000,
     "daily_loss_limit_dollars": 500,
