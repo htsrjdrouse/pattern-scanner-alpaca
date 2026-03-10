@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-10T16:17:24.125294",
+  "timestamp": "2026-03-10T23:49:14.055472",
   "cache_age_minutes": 0,
   "market_open": true,
   "accounts": {
@@ -20,12 +20,12 @@
       "source": "manual"
     },
     "robinhood": {
-      "portfolio_value": 8955.82517,
-      "positions_count": 2,
+      "portfolio_value": 10541.00357,
+      "positions_count": 3,
       "source": "manual"
     }
   },
-  "total_portfolio_value": 108955.82517,
+  "total_portfolio_value": 110541.00357,
   "pnl": {
     "daily": 0.0,
     "daily_pct": 0.0,
@@ -33,7 +33,7 @@
     "weekly_pct": 0.0,
     "monthly": 0,
     "monthly_pct": 0.0,
-    "start_of_day_value": 108955.82517
+    "start_of_day_value": 110541.00357
   },
   "limits": {
     "daily_loss": {
@@ -56,39 +56,39 @@
     },
     "buying_power": {
       "status": "BREACHED",
-      "usage_pct": 1.6712126164516112,
-      "current": -0.8356063082258056,
+      "usage_pct": 1.6185667497283063,
+      "current": -0.8092833748641531,
       "limit": 0.5
     },
     "position_count": {
       "status": "OK",
-      "usage_pct": 0.1,
-      "current": 2,
+      "usage_pct": 0.15,
+      "current": 3,
       "limit": 20
     }
   },
   "exposure": {
-    "net_delta_dollars": 8955.82517,
+    "net_delta_dollars": 10541.00357,
     "directional_bias": "SIGNIFICANT_LONG",
-    "buying_power_usage_pct": -0.8356063082258056,
-    "largest_position_pct": 7.2165044023409886,
+    "buying_power_usage_pct": -0.8092833748641531,
+    "largest_position_pct": 7.113018396852971,
     "sector_concentrations": [
       {
         "sector": "Automotive",
-        "pct": 7.2165044023409886,
+        "pct": 7.113018396852971,
         "flagged": false
       },
       {
         "sector": "Other",
-        "pct": 1.0031801863687362,
+        "pct": 2.4228128599393717,
         "flagged": false
       }
     ]
   },
   "vix": {
-    "current": 22.920000076293945,
-    "start_of_day": 22.920000076293945,
-    "change_pct": 0.0,
+    "current": 24.93000030517578,
+    "start_of_day": 23.049999237060547,
+    "change_pct": 0.08156187116451209,
     "spike_detected": false
   },
   "pdt": {
@@ -99,7 +99,7 @@
   },
   "recovery_mode": {
     "active": false,
-    "triggered_date": "2026-03-10T15:42:55.614974",
+    "triggered_date": "2026-03-10T16:24:23.465698",
     "consecutive_winning_days": 0,
     "days_required": 2,
     "current_size_multiplier": 1.0
@@ -140,13 +140,31 @@
       "last_updated": "2026-03-10T15:44:08.745086",
       "rolling_vs_closing": null,
       "concentration_flag": false
+    },
+    {
+      "symbol": "GEV",
+      "account": "robinhood",
+      "position_type": "equity",
+      "side": "long",
+      "qty": 1.88,
+      "cost_basis": 690.04,
+      "current_price": 843.18,
+      "notes": "",
+      "date_entered": "2026-03-10",
+      "market_value": 1585.1783999999998,
+      "unrealized_pl": 287.90319999999997,
+      "unrealized_plpc": 0.22192916352675207,
+      "id": "a5b0cba0-9328-4108-9f81-27c94479a347",
+      "last_updated": "2026-03-10T16:18:54.977547",
+      "rolling_vs_closing": null,
+      "concentration_flag": false
     }
   ],
   "alerts": [
     {
       "level": "WARNING",
       "type": "BUYING_POWER",
-      "message": "Buying power usage at 167% of account \u2014 above 50% threshold. Do not open new positions until existing ones are reduced."
+      "message": "Buying power usage at 162% of account \u2014 above 50% threshold. Do not open new positions until existing ones are reduced."
     }
   ],
   "alert_count_critical": 0,

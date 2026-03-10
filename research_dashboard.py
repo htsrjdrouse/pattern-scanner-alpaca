@@ -177,6 +177,12 @@ RESEARCH_DASHBOARD_HTML = """
             <button onclick="showTab('regime')" id="tab-regime">Regime Classifier</button>
             <button onclick="showTab('risk')" id="tab-risk">Risk Manager</button>
         </div>
+        
+        <div style="text-align: center; margin-bottom: 20px;">
+            <span id="tastytrade-badge" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                TT CHECKING...
+            </span>
+        </div>
 
         <div id="signals-tab" class="tab-content active">
 
@@ -652,6 +658,39 @@ RESEARCH_DASHBOARD_HTML = """
         let sectorsData = {};
         let currentJobId = null;
         let regimeChart = null;
+
+        // Check Tastytrade connection status on page load
+        async function checkTastytradeStatus() {
+            try {
+                const response = await fetch('/signals/tastytrade/status');
+                const data = await response.json();
+                const badge = document.getElementById('tastytrade-badge');
+                
+                if (data.connected) {
+                    if (data.env === 'production') {
+                        badge.textContent = 'TT LIVE';
+                        badge.style.background = '#4caf50';
+                        badge.style.color = '#fff';
+                    } else {
+                        badge.textContent = 'TT SANDBOX';
+                        badge.style.background = '#ff9800';
+                        badge.style.color = '#000';
+                    }
+                } else {
+                    badge.textContent = 'TT OFFLINE';
+                    badge.style.background = '#f44336';
+                    badge.style.color = '#fff';
+                }
+            } catch (error) {
+                const badge = document.getElementById('tastytrade-badge');
+                badge.textContent = 'TT ERROR';
+                badge.style.background = '#9e9e9e';
+                badge.style.color = '#fff';
+            }
+        }
+        
+        // Check status on page load
+        checkTastytradeStatus();
 
         function showTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));

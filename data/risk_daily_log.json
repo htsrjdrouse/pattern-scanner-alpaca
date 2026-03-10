@@ -1,10 +1,10 @@
 {
-  "start_of_day_value": 108955.82517,
-  "start_of_day_vix": 22.920000076293945,
+  "start_of_day_value": 110541.00357,
+  "start_of_day_vix": 23.049999237060547,
   "start_of_day_date": "2026-03-10",
   "recovery_mode_active": false,
-  "recovery_mode_triggered_date": "2026-03-10T15:42:55.614974",
+  "recovery_mode_triggered_date": "2026-03-10T16:24:23.465698",
   "consecutive_winning_days": 0,
-  "recovery_mode_exit_date": "2026-03-10T16:17:20.639306",
+  "recovery_mode_exit_date": "2026-03-10T16:32:27.399772",
   "daily_history": []
 }

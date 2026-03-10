@@ -714,3 +714,9 @@ def end_of_day_close():
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@research_bp.route('/tastytrade/status')
+def tastytrade_status():
+    """Health check for Tastytrade connection. Used by dashboard."""
+    from hybrid_data import get_tastytrade_status
+    return jsonify(get_tastytrade_status())
