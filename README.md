@@ -28,7 +28,12 @@ A Flask-based stock pattern scanner with **live trading capabilities** powered b
 - Signal backtesting with IC/Sharpe metrics
 - Decay analysis across multiple horizons
 - Signal correlation and combination
-- Market regime detection
+- **Market Regime Classifier**: Pre-market intelligence for options premium selling
+  - 7-dimension market analysis (VIX, term structure, trend, volatility spread, breadth, put/call ratio, correlation)
+  - GREEN/YELLOW/RED regime classification with automatic strategy recommendations
+  - Hard override rules for dangerous market conditions (backwardation, VIX crisis, no vol edge)
+  - 30-day regime history with visualization
+  - 60-minute caching to prevent API rate limiting
 
 ## 📊 Hybrid Data Approach
 
@@ -151,6 +156,30 @@ Access at: **http://localhost:5004/research**
 - Analyze signal decay
 - Build composite signals
 - Regime-conditional analysis
+
+#### Market Regime Classifier
+The regime classifier analyzes 7 market dimensions to determine optimal conditions for options premium selling:
+
+**Dimensions Analyzed:**
+1. **VIX Regime** - Current volatility level (LOW/NORMAL/ELEVATED/CRISIS)
+2. **Term Structure** - VIX futures curve shape (CONTANGO/FLAT/BACKWARDATION)
+3. **Trend Assessment** - Market directionality via ADX (RANGE_BOUND/MIXED/TRENDING)
+4. **Vol Spread** - Implied vs realized volatility edge (STRONG/MILD/NONE)
+5. **Market Breadth** - Advance/decline and new highs/lows (BULLISH/NEUTRAL/BEARISH)
+6. **Put/Call Sentiment** - Options positioning (EXTREME_FEAR to EXTREME_COMPLACENCY)
+7. **Correlation Regime** - Stock correlation levels (HIGH/NORMAL/LOW)
+
+**Verdict System:**
+- **GREEN**: Sell premium aggressively (iron condors, 0.10-0.15 delta, full size)
+- **YELLOW**: Sell premium conservatively (single-side spreads, half size, wider strikes)
+- **RED**: No premium selling (sit in cash or use debit spreads only)
+
+**Hard Overrides:**
+- Backwardation detected → RED (regardless of other factors)
+- VIX > 30 → RED (crisis mode)
+- No vol edge + strong trend → RED (no edge for sellers)
+
+Access the regime classifier in the research dashboard's "Regime Classifier" tab.
 
 ## 🔒 Security
 
