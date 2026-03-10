@@ -30,21 +30,5 @@
     "unrealized_plpc": 0.3660869565217392,
     "id": "a4cf7bf1-c32d-4be2-ae9e-a1502513fb03",
     "last_updated": "2026-03-10T15:44:08.745086"
-  },
-  {
-    "symbol": "ERAS",
-    "account": "robinhood",
-    "position_type": "equity",
-    "side": "long",
-    "qty": 69.575,
-    "cost_basis": 11.5,
-    "current_price": 15.67,
-    "notes": "",
-    "date_entered": "2026-03-10",
-    "market_value": 1090.24025,
-    "unrealized_pl": 290.12775,
-    "unrealized_plpc": 0.3626086956521739,
-    "id": "4564aad6-83cf-45f9-8ff0-937a753c7c5d",
-    "last_updated": "2026-03-10T15:45:04.033682"
   }
 ]

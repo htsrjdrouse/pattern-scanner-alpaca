@@ -1408,11 +1408,6 @@ RESEARCH_DASHBOARD_HTML = """
                         actionCell = `<span style="padding: 4px 8px; border-radius: 4px; background: ${color}; color: ${rec === 'EVALUATE_ROLL' ? '#1e1e2e' : 'white'}; font-size: 0.85em; cursor: help;" title="${pos.rolling_vs_closing.reason}">${rec}</span>`;
                     }
                     
-                    // Add delete button for manual positions
-                    if (pos.id && pos.account !== 'alpaca_scanner') {
-                        actionCell += ` <button onclick="deleteManualPosition('${pos.id}')" style="padding: 4px 8px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; margin-left: 5px;">Delete</button>`;
-                    }
-                    
                     row.innerHTML = `
                         <td style="padding: 8px;">${pos.symbol}</td>
                         <td style="padding: 8px;">${pos.account}</td>
@@ -1422,9 +1417,19 @@ RESEARCH_DASHBOARD_HTML = """
                         <td style="padding: 8px; text-align: right;">$${pos.market_value.toFixed(0)}</td>
                         <td style="padding: 8px; text-align: right; color: ${plColor};">$${pos.unrealized_pl.toFixed(0)}</td>
                         <td style="padding: 8px; text-align: right; color: ${plColor};">${(pos.unrealized_plpc * 100).toFixed(1)}%</td>
-                        <td style="padding: 8px; text-align: center;">${actionCell}</td>
+                        <td style="padding: 8px; text-align: center;" id="action-${pos.id || 'none'}">${actionCell}</td>
                     `;
                     tbody.appendChild(row);
+                    
+                    // Add delete button for manual positions after row is added
+                    if (pos.id && pos.account !== 'alpaca_scanner') {
+                        const actionTd = document.getElementById(`action-${pos.id}`);
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.textContent = 'Delete';
+                        deleteBtn.style.cssText = 'padding: 4px 8px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; margin-left: 5px;';
+                        deleteBtn.onclick = () => deleteManualPosition(pos.id);
+                        actionTd.appendChild(deleteBtn);
+                    }
                 });
                 
                 // Load history chart

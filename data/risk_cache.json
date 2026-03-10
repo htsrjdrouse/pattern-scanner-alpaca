@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-10T15:42:55.615974",
+  "timestamp": "2026-03-10T15:50:50.504934",
   "cache_age_minutes": 0,
   "market_open": true,
   "accounts": {
@@ -20,15 +20,15 @@
       "source": "manual"
     },
     "robinhood": {
-      "portfolio_value": 7862.80192,
-      "positions_count": 1,
+      "portfolio_value": 10046.06542,
+      "positions_count": 3,
       "source": "manual"
     }
   },
-  "total_portfolio_value": 107862.80192,
+  "total_portfolio_value": 110046.06542,
   "pnl": {
-    "daily": 7862.801919999998,
-    "daily_pct": 0.07862801919999998,
+    "daily": 10046.065419999999,
+    "daily_pct": 0.10046065419999999,
     "weekly": 0,
     "weekly_pct": 0.0,
     "monthly": 0,
@@ -38,8 +38,8 @@
   "limits": {
     "daily_loss": {
       "status": "BREACHED",
-      "usage_pct": 15.725603839999996,
-      "current": 7862.801919999998,
+      "usage_pct": 20.09213084,
+      "current": 10046.065419999999,
       "limit": -500
     },
     "weekly_loss": {
@@ -56,34 +56,39 @@
     },
     "buying_power": {
       "status": "BREACHED",
-      "usage_pct": 1.708414697929627,
-      "current": -0.8542073489648135,
+      "usage_pct": 1.634841450017923,
+      "current": -0.8174207250089615,
       "limit": 0.5
     },
     "position_count": {
       "status": "OK",
-      "usage_pct": 0.05,
-      "current": 1,
+      "usage_pct": 0.15,
+      "current": 3,
       "limit": 20
     }
   },
   "exposure": {
-    "net_delta_dollars": 7862.80192,
+    "net_delta_dollars": 10046.06542,
     "directional_bias": "SIGNIFICANT_LONG",
-    "buying_power_usage_pct": -0.8542073489648135,
-    "largest_position_pct": 7.289632551759323,
+    "buying_power_usage_pct": -0.8174207250089615,
+    "largest_position_pct": 7.145009583024127,
     "sector_concentrations": [
       {
         "sector": "Automotive",
-        "pct": 7.289632551759323,
+        "pct": 7.145009583024127,
+        "flagged": false
+      },
+      {
+        "sector": "Other",
+        "pct": 1.9839541665278015,
         "flagged": false
       }
     ]
   },
   "vix": {
-    "current": 22.850000381469727,
+    "current": 22.979999542236328,
     "start_of_day": 22.81999969482422,
-    "change_pct": 0.0013146663911793232,
+    "change_pct": 0.007011386921639565,
     "spike_detected": false
   },
   "pdt": {
@@ -93,11 +98,11 @@
     "pdt_exempt": true
   },
   "recovery_mode": {
-    "active": false,
-    "triggered_date": null,
+    "active": true,
+    "triggered_date": "2026-03-10T15:42:55.614974",
     "consecutive_winning_days": 0,
     "days_required": 2,
-    "current_size_multiplier": 1.0
+    "current_size_multiplier": 0.5
   },
   "positions": [
     {
@@ -117,22 +122,63 @@
       "last_updated": "2026-03-10T15:42:52.392276",
       "rolling_vs_closing": null,
       "concentration_flag": false
+    },
+    {
+      "symbol": "ERAS",
+      "account": "robinhood",
+      "position_type": "equity",
+      "side": "long",
+      "qty": 69.575,
+      "cost_basis": 11.5,
+      "current_price": 15.71,
+      "notes": "",
+      "date_entered": "2026-03-10",
+      "market_value": 1093.0232500000002,
+      "unrealized_pl": 292.91075000000006,
+      "unrealized_plpc": 0.3660869565217392,
+      "id": "a4cf7bf1-c32d-4be2-ae9e-a1502513fb03",
+      "last_updated": "2026-03-10T15:44:08.745086",
+      "rolling_vs_closing": null,
+      "concentration_flag": false
+    },
+    {
+      "symbol": "ERAS",
+      "account": "robinhood",
+      "position_type": "equity",
+      "side": "long",
+      "qty": 69.575,
+      "cost_basis": 11.5,
+      "current_price": 15.67,
+      "notes": "",
+      "date_entered": "2026-03-10",
+      "market_value": 1090.24025,
+      "unrealized_pl": 290.12775,
+      "unrealized_plpc": 0.3626086956521739,
+      "id": "4564aad6-83cf-45f9-8ff0-937a753c7c5d",
+      "last_updated": "2026-03-10T15:45:04.033682",
+      "rolling_vs_closing": null,
+      "concentration_flag": false
     }
   ],
   "alerts": [
     {
       "level": "CRITICAL",
       "type": "DAILY_LOSS_LIMIT",
-      "message": "Daily loss limit BREACHED \u2014 $7863 lost vs $500 limit. ACTIVATE RECOVERY MODE: close all new entries, reduce size to 50% until 2 consecutive winning days."
+      "message": "Daily loss limit BREACHED \u2014 $10046 lost vs $500 limit. ACTIVATE RECOVERY MODE: close all new entries, reduce size to 50% until 2 consecutive winning days."
     },
     {
       "level": "WARNING",
       "type": "BUYING_POWER",
-      "message": "Buying power usage at 171% of account \u2014 above 50% threshold. Do not open new positions until existing ones are reduced."
+      "message": "Buying power usage at 163% of account \u2014 above 50% threshold. Do not open new positions until existing ones are reduced."
+    },
+    {
+      "level": "WARNING",
+      "type": "RECOVERY_MODE",
+      "message": "RECOVERY MODE ACTIVE \u2014 position size capped at 50% (max $125/trade). 0 of 2 winning days completed. 2 more winning day(s) required to exit recovery mode."
     }
   ],
   "alert_count_critical": 1,
-  "alert_count_warning": 1,
+  "alert_count_warning": 2,
   "risk_config": {
     "account_size_total": 50000,
     "daily_loss_limit_dollars": 500,
