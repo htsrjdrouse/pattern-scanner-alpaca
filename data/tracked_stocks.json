@@ -295,5 +295,16 @@
     "email": "rjdrouse@gmail.com",
     "added_at": "2026-03-07T05:13:59.019143",
     "notified": false
+  },
+  {
+    "ticker": "NTR",
+    "buy_point": 63.67,
+    "rsi_min": 50.0,
+    "rsi_max": 70.0,
+    "volume_multiple": 2.0,
+    "breakeven_move": 14.7,
+    "email": "rjdrouse@gmail.com",
+    "added_at": "2026-03-09T23:44:31.820084",
+    "notified": false
   }
 ]

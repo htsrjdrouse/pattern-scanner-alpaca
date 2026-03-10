@@ -174,6 +174,7 @@ RESEARCH_DASHBOARD_HTML = """
             <a href="/">Pattern Scanner</a>
             <button onclick="showTab('signals')" id="tab-signals" class="active">Signal Analysis</button>
             <button onclick="showTab('sector-scan')" id="tab-sector-scan">Sector Scan</button>
+            <button onclick="showTab('regime')" id="tab-regime">Regime Classifier</button>
         </div>
 
         <div id="signals-tab" class="tab-content active">
@@ -408,11 +409,86 @@ RESEARCH_DASHBOARD_HTML = """
             </div>
         </div>
 
+        <!-- REGIME CLASSIFIER TAB -->
+        <div id="regime-tab" class="tab-content">
+            <div class="section">
+                <h2>🎯 Market Regime Classifier</h2>
+                <p style="color: #9e9e9e;">Pre-market intelligence for options premium selling strategies</p>
+                
+                <!-- Status Banner -->
+                <div id="regimeStatus" style="padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                    <div style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 20px;">
+                        <div>
+                            <div id="verdictBadge" style="font-size: 2em; font-weight: bold; padding: 10px 30px; border-radius: 8px; display: inline-block;">LOADING...</div>
+                            <p style="margin: 10px 0 0 0; color: #9e9e9e;">Market Verdict</p>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.5em; font-weight: bold;" id="spxPrice">-</div>
+                            <p style="margin: 5px 0 0 0; color: #9e9e9e;">SPX Price</p>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.5em; font-weight: bold;" id="vixLevel">-</div>
+                            <p style="margin: 5px 0 0 0; color: #9e9e9e;">VIX Level</p>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.5em; font-weight: bold;" id="compositeScore">-</div>
+                            <p style="margin: 5px 0 0 0; color: #9e9e9e;">Composite Score</p>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; font-size: 0.9em; color: #9e9e9e;">
+                        <span id="regimeTimestamp">-</span> | Cache age: <span id="cacheAge">-</span> min
+                        <button onclick="refreshRegime()" style="margin-left: 15px; padding: 5px 15px; background: #4fc3f7; color: #1e1e2e; border: none; border-radius: 4px; cursor: pointer;">Refresh Now</button>
+                    </div>
+                </div>
+
+                <!-- 7-Dimension Scorecard -->
+                <h3 style="color: #4fc3f7; margin-top: 30px;">7-Dimension Analysis</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 15px; margin-top: 15px;" id="dimensionsGrid">
+                    <!-- Populated by JavaScript -->
+                </div>
+
+                <!-- Strategy Recommendation -->
+                <div id="strategyPanel" style="margin-top: 30px; padding: 20px; background: #1e1e2e; border-radius: 8px;">
+                    <h3 style="color: #4fc3f7; margin-top: 0;">📋 Strategy Recommendation</h3>
+                    <div id="overrideWarning" style="display: none; padding: 15px; background: #ef4444; color: white; border-radius: 5px; margin-bottom: 15px; font-weight: bold;">
+                        ⚠️ HARD OVERRIDE TRIGGERED
+                    </div>
+                    <p style="font-size: 1.2em; font-weight: bold; margin: 10px 0;" id="recommendedStrategy">-</p>
+                    <p style="margin: 10px 0;"><strong>Position Sizing:</strong> <span id="positionSizing">-</span></p>
+                    <p style="margin: 10px 0;"><strong>Entry Timing:</strong> <span id="entryTiming">-</span></p>
+                </div>
+
+                <!-- 30-Day History -->
+                <h3 style="color: #4fc3f7; margin-top: 30px;">30-Day Regime History</h3>
+                <div style="margin-top: 15px;">
+                    <canvas id="regimeChart" style="max-height: 200px;"></canvas>
+                </div>
+                <div style="margin-top: 15px; max-height: 300px; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead style="position: sticky; top: 0; background: #16213e;">
+                            <tr>
+                                <th style="padding: 10px; text-align: left;">Date</th>
+                                <th style="padding: 10px; text-align: right;">SPX</th>
+                                <th style="padding: 10px; text-align: right;">VIX</th>
+                                <th style="padding: 10px; text-align: right;">Score</th>
+                                <th style="padding: 10px; text-align: center;">Verdict</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTable">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         let sectorsData = {};
         let currentJobId = null;
+        let regimeChart = null;
 
         function showTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -900,6 +976,164 @@ RESEARCH_DASHBOARD_HTML = """
                 document.getElementById('corrResults').innerHTML = `<p style="color: #ef5350;">Error: ${error.message}</p>`;
             }
         });
+
+        // ============================================================================
+        // REGIME CLASSIFIER FUNCTIONS
+        // ============================================================================
+        
+        async function loadRegimeAnalysis() {
+            try {
+                const response = await fetch('/signals/regime/analysis');
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error('Regime analysis error:', data.error);
+                    return;
+                }
+                
+                // Update status banner
+                const verdictColors = {GREEN: '#22c55e', YELLOW: '#f59e0b', RED: '#ef4444'};
+                document.getElementById('verdictBadge').textContent = data.verdict;
+                document.getElementById('verdictBadge').style.background = verdictColors[data.verdict];
+                document.getElementById('verdictBadge').style.color = data.verdict === 'YELLOW' ? '#1e1e2e' : 'white';
+                
+                document.getElementById('spxPrice').textContent = data.spx_price ? `$${data.spx_price}` : '-';
+                document.getElementById('vixLevel').textContent = data.vix_level || '-';
+                document.getElementById('compositeScore').textContent = data.composite_score ? (data.composite_score * 100).toFixed(0) : '-';
+                document.getElementById('regimeTimestamp').textContent = new Date(data.timestamp).toLocaleString();
+                document.getElementById('cacheAge').textContent = data.cache_age_minutes.toFixed(1);
+                
+                // Update dimensions grid
+                const dimensionsGrid = document.getElementById('dimensionsGrid');
+                dimensionsGrid.innerHTML = '';
+                
+                Object.entries(data.dimensions).forEach(([key, dim]) => {
+                    const card = document.createElement('div');
+                    card.style.cssText = 'padding: 15px; background: #1e1e2e; border-radius: 8px;';
+                    
+                    const scorePercent = ((dim.score + 1) / 2) * 100;
+                    const barColor = dim.score > 0.3 ? '#22c55e' : (dim.score < -0.3 ? '#ef4444' : '#6b7280');
+                    
+                    card.innerHTML = `
+                        <h4 style="margin: 0 0 10px 0; color: #4fc3f7;">${key.replace(/_/g, ' ').toUpperCase()}</h4>
+                        <p style="margin: 5px 0; font-size: 1.1em; font-weight: bold;">${dim.value}</p>
+                        <div style="background: #0f0f23; height: 8px; border-radius: 4px; margin: 10px 0; overflow: hidden;">
+                            <div style="width: ${scorePercent}%; height: 100%; background: ${barColor}; transition: width 0.3s;"></div>
+                        </div>
+                        <p style="margin: 5px 0; font-size: 0.9em; color: #9e9e9e;">${dim.description}</p>
+                        <p style="margin: 5px 0; font-size: 0.85em; color: #6b7280;">Score: ${dim.score.toFixed(2)}</p>
+                    `;
+                    
+                    dimensionsGrid.appendChild(card);
+                });
+                
+                // Update strategy panel
+                if (data.hard_override_triggered) {
+                    document.getElementById('overrideWarning').style.display = 'block';
+                    document.getElementById('overrideWarning').innerHTML = `⚠️ HARD OVERRIDE: ${data.override_reason}`;
+                } else {
+                    document.getElementById('overrideWarning').style.display = 'none';
+                }
+                
+                document.getElementById('recommendedStrategy').textContent = data.recommended_strategy;
+                document.getElementById('positionSizing').textContent = data.position_sizing;
+                document.getElementById('entryTiming').textContent = data.entry_timing;
+                
+                // Load history
+                await loadRegimeHistory();
+                
+            } catch (error) {
+                console.error('Failed to load regime analysis:', error);
+            }
+        }
+        
+        async function refreshRegime() {
+            try {
+                document.getElementById('verdictBadge').textContent = 'REFRESHING...';
+                const response = await fetch('/signals/regime/refresh', {method: 'POST'});
+                const data = await response.json();
+                await loadRegimeAnalysis();
+            } catch (error) {
+                console.error('Failed to refresh regime:', error);
+            }
+        }
+        
+        async function loadRegimeHistory() {
+            try {
+                const response = await fetch('/signals/regime/history');
+                const data = await response.json();
+                
+                if (!data.history || data.history.length === 0) return;
+                
+                // Update table
+                const tbody = document.getElementById('historyTable');
+                tbody.innerHTML = '';
+                
+                data.history.slice().reverse().forEach(entry => {
+                    const verdictColors = {GREEN: '#22c55e', YELLOW: '#f59e0b', RED: '#ef4444'};
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td style="padding: 8px;">${new Date(entry.timestamp).toLocaleDateString()}</td>
+                        <td style="padding: 8px; text-align: right;">$${entry.spx_price}</td>
+                        <td style="padding: 8px; text-align: right;">${entry.vix_level}</td>
+                        <td style="padding: 8px; text-align: right;">${(entry.composite_score * 100).toFixed(0)}</td>
+                        <td style="padding: 8px; text-align: center;"><span style="padding: 4px 12px; border-radius: 4px; background: ${verdictColors[entry.verdict]}; color: ${entry.verdict === 'YELLOW' ? '#1e1e2e' : 'white'}; font-weight: bold;">${entry.verdict}</span></td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                
+                // Update chart
+                const ctx = document.getElementById('regimeChart').getContext('2d');
+                
+                if (regimeChart) {
+                    regimeChart.destroy();
+                }
+                
+                regimeChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.history.map(e => new Date(e.timestamp).toLocaleDateString()),
+                        datasets: [{
+                            label: 'Composite Score',
+                            data: data.history.map(e => e.composite_score * 100),
+                            borderColor: '#4fc3f7',
+                            backgroundColor: 'rgba(79, 195, 247, 0.1)',
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {display: false}
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                grid: {color: '#2e2e3e'},
+                                ticks: {color: '#9e9e9e'}
+                            },
+                            x: {
+                                grid: {color: '#2e2e3e'},
+                                ticks: {color: '#9e9e9e'}
+                            }
+                        }
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Failed to load regime history:', error);
+            }
+        }
+        
+        // Load regime data when tab is shown
+        const originalShowTab = showTab;
+        showTab = function(tabName) {
+            originalShowTab(tabName);
+            if (tabName === 'regime') {
+                loadRegimeAnalysis();
+            }
+        };
     </script>
 </body>
 </html>

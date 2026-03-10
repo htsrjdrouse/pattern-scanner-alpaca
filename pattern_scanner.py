@@ -4183,21 +4183,32 @@ def tracked():
             try:
                 ticker = yf.Ticker(stock['ticker'])
                 hist = ticker.history(period='60d')
+                info = ticker.info
                 if not hist.empty:
                     stock['current_price'] = round(hist['Close'].iloc[-1], 2)
                     stock['current_rsi'] = round(ta.rsi(hist['Close'], length=14).iloc[-1], 1) if len(hist) > 14 else None
                     stock['avg_volume'] = int(hist['Volume'].tail(50).mean())
                     stock['current_volume'] = int(hist['Volume'].iloc[-1])  # Today's volume
+                    
+                    # Calculate distance from 52W high
+                    fifty_two_week_high = info.get('fiftyTwoWeekHigh')
+                    if fifty_two_week_high and stock['current_price']:
+                        distance = ((stock['current_price'] - fifty_two_week_high) / fifty_two_week_high) * 100
+                        stock['distance_from_52w_high'] = round(distance, 1)
+                    else:
+                        stock['distance_from_52w_high'] = None
                 else:
                     stock['current_price'] = None
                     stock['current_rsi'] = None
                     stock['avg_volume'] = None
                     stock['current_volume'] = None
+                    stock['distance_from_52w_high'] = None
             except Exception as e:
                 stock['current_price'] = None
                 stock['current_rsi'] = None
                 stock['avg_volume'] = None
                 stock['current_volume'] = None
+                stock['distance_from_52w_high'] = None
         html = """
         <html>
         <head>
@@ -4247,9 +4258,8 @@ def tracked():
                     <th title="Ideal entry price based on pattern analysis">Buy Point</th>
                     <th title="RSI range for optimal entry (typically 50-70)">RSI Range</th>
                     <th title="Volume multiplier required for confirmation (e.g., 2x = double average volume)">Volume Req</th>
-                    <th title="Percentage move needed to cover typical spread/commission costs">Breakeven %</th>
+                    <th title="How far current price is from 52-week high">Distance from 52W High</th>
                     <th>Added Date</th>
-                    <th>Status</th>
                     <th>Actions</th>
                 </tr>
                 {% for track in tracks %}
@@ -4258,9 +4268,8 @@ def tracked():
                     <td>${{ track['buy_point'] }}{% if track['current_price'] %}<br><small style="color:#888;">(Curr: ${{ track['current_price'] }})</small>{% endif %}</td>
                     <td>{{ track['rsi_min'] }}-{{ track['rsi_max'] }}{% if track['current_rsi'] %}<br><small style="color:#888;">(Curr: {{ track['current_rsi'] }})</small>{% endif %}</td>
                     <td>{{ track['volume_multiple'] }}x{% if track['avg_volume'] %}<br><small style="color:{% if track['current_volume'] and track['current_volume'] >= (track['avg_volume'] * track['volume_multiple']) %}#4caf50{% else %}#888{% endif %};">(Avg: {{ track['avg_volume']|round(0) }} req: {{ (track['avg_volume'] * track['volume_multiple']) |round(0) }})</small>{% endif %}</td>
-                    <td>{% if track['breakeven_move'] %}{{ track['breakeven_move'] }}%{% else %}-{% endif %}</td>
+                    <td>{% if track['distance_from_52w_high'] %}{{ track['distance_from_52w_high'] }}%{% else %}-{% endif %}</td>
                     <td>{{ track['added_at'][:10] }}</td>
-                    <td><span class="status status-active">Active</span></td>
                     <td>
                         <form method="post" action="/tracked/{{ track['ticker'] }}/delete" style="display: inline;">
                             <button type="submit" class="btn btn-danger" onclick="return confirm('Remove {{ track['ticker'] }} from tracking?')">Remove</button>

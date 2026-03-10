@@ -571,3 +571,36 @@ def update_sector_basket():
     
     return jsonify({'error': 'Sector not found'}), 404
 
+
+
+# ============================================================================
+# REGIME CLASSIFIER ROUTES
+# ============================================================================
+import regime_classifier
+
+@research_bp.route('/regime/analysis', methods=['GET'])
+def get_regime_analysis():
+    """Get current regime analysis (cached if fresh)"""
+    try:
+        result = regime_classifier.run_regime_analysis(force_refresh=False)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@research_bp.route('/regime/refresh', methods=['POST'])
+def refresh_regime_analysis():
+    """Force refresh regime analysis"""
+    try:
+        result = regime_classifier.run_regime_analysis(force_refresh=True)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@research_bp.route('/regime/history', methods=['GET'])
+def get_regime_history():
+    """Get last 30 daily regime verdicts"""
+    try:
+        history = regime_classifier.get_regime_history()
+        return jsonify({'history': history})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
