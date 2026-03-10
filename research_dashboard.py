@@ -175,6 +175,7 @@ RESEARCH_DASHBOARD_HTML = """
             <button onclick="showTab('signals')" id="tab-signals" class="active">Signal Analysis</button>
             <button onclick="showTab('sector-scan')" id="tab-sector-scan">Sector Scan</button>
             <button onclick="showTab('regime')" id="tab-regime">Regime Classifier</button>
+            <button onclick="showTab('risk')" id="tab-risk">Risk Manager</button>
         </div>
 
         <div id="signals-tab" class="tab-content active">
@@ -478,6 +479,167 @@ RESEARCH_DASHBOARD_HTML = """
                             <!-- Populated by JavaScript -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- RISK MANAGER TAB -->
+        <div id="risk-tab" class="tab-content">
+            <div class="section">
+                <h2>🛡️ Wolverine Risk Management System</h2>
+                <p style="color: #9e9e9e;">Cross-account portfolio risk monitor with live Alpaca integration</p>
+                
+                <!-- Alert Banner -->
+                <div id="riskAlertBanner" style="margin: 20px 0; padding: 15px; border-radius: 8px; display: none;">
+                    <div id="riskAlertContent"></div>
+                </div>
+                
+                <!-- Risk Status Dashboard -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0;">
+                    <div class="card" style="text-align: center;">
+                        <h4 style="margin: 0 0 10px 0; color: #9e9e9e;">Daily P&L</h4>
+                        <div id="dailyPnl" style="font-size: 1.5em; font-weight: bold;">$0</div>
+                        <div style="margin-top: 10px; background: #0f0f23; height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div id="dailyPnlBar" style="height: 100%; width: 0%; background: #22c55e;"></div>
+                        </div>
+                    </div>
+                    <div class="card" style="text-align: center;">
+                        <h4 style="margin: 0 0 10px 0; color: #9e9e9e;">Weekly P&L</h4>
+                        <div id="weeklyPnl" style="font-size: 1.5em; font-weight: bold;">$0</div>
+                        <div style="margin-top: 10px; background: #0f0f23; height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div id="weeklyPnlBar" style="height: 100%; width: 0%; background: #22c55e;"></div>
+                        </div>
+                    </div>
+                    <div class="card" style="text-align: center;">
+                        <h4 style="margin: 0 0 10px 0; color: #9e9e9e;">Monthly P&L</h4>
+                        <div id="monthlyPnl" style="font-size: 1.5em; font-weight: bold;">$0</div>
+                        <div style="margin-top: 10px; background: #0f0f23; height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div id="monthlyPnlBar" style="height: 100%; width: 0%; background: #22c55e;"></div>
+                        </div>
+                    </div>
+                    <div class="card" style="text-align: center;">
+                        <h4 style="margin: 0 0 10px 0; color: #9e9e9e;">Buying Power</h4>
+                        <div id="buyingPower" style="font-size: 1.5em; font-weight: bold;">0%</div>
+                        <div style="margin-top: 10px; background: #0f0f23; height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div id="buyingPowerBar" style="height: 100%; width: 0%; background: #22c55e;"></div>
+                        </div>
+                    </div>
+                    <div class="card" style="text-align: center;">
+                        <h4 style="margin: 0 0 10px 0; color: #9e9e9e;">VIX</h4>
+                        <div id="vixLevel" style="font-size: 1.5em; font-weight: bold;">-</div>
+                        <div id="vixChange" style="margin-top: 5px; font-size: 0.9em; color: #9e9e9e;">-</div>
+                    </div>
+                </div>
+
+                <!-- Account Breakdown -->
+                <h3 style="color: #4fc3f7; margin-top: 30px;">Account Breakdown</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 15px;" id="accountsGrid">
+                    <!-- Populated by JavaScript -->
+                </div>
+
+                <!-- Portfolio Exposure -->
+                <h3 style="color: #4fc3f7; margin-top: 30px;">Portfolio Exposure</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-top: 15px;">
+                    <div class="card">
+                        <h4 style="margin: 0 0 10px 0;">Directional Bias</h4>
+                        <div id="directionalBias" style="font-size: 1.2em; font-weight: bold; margin: 10px 0;">NEUTRAL</div>
+                        <div style="background: #0f0f23; height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div id="deltaBar" style="height: 100%; width: 50%; background: #6b7280;"></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h4 style="margin: 0 0 10px 0;">PDT Tracker</h4>
+                        <div id="pdtInfo" style="margin: 10px 0;">
+                            <p style="margin: 5px 0;"><strong>Day Trades:</strong> <span id="pdtCount">0 / 3</span></p>
+                            <p style="margin: 5px 0;"><strong>Remaining:</strong> <span id="pdtRemaining">3</span></p>
+                            <p style="margin: 5px 0;"><strong>Account Equity:</strong> <span id="pdtEquity">$0</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Positions Table -->
+                <h3 style="color: #4fc3f7; margin-top: 30px;">Open Positions</h3>
+                <div style="margin-top: 15px; max-height: 400px; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead style="position: sticky; top: 0; background: #16213e;">
+                            <tr>
+                                <th style="padding: 10px; text-align: left;">Symbol</th>
+                                <th style="padding: 10px; text-align: left;">Account</th>
+                                <th style="padding: 10px; text-align: left;">Type</th>
+                                <th style="padding: 10px; text-align: left;">Side</th>
+                                <th style="padding: 10px; text-align: right;">Qty</th>
+                                <th style="padding: 10px; text-align: right;">Market Value</th>
+                                <th style="padding: 10px; text-align: right;">Unrealized P&L</th>
+                                <th style="padding: 10px; text-align: right;">P&L %</th>
+                                <th style="padding: 10px; text-align: center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positionsTable">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Add Manual Position Form -->
+                <details style="margin-top: 30px;">
+                    <summary style="cursor: pointer; color: #4fc3f7; font-weight: 600; padding: 10px; background: #1e1e2e; border-radius: 5px;">➕ Add Manual Position</summary>
+                    <div style="margin-top: 15px; padding: 20px; background: #1e1e2e; border-radius: 8px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; color: #9e9e9e;">Symbol</label>
+                                <input type="text" id="manualSymbol" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; color: #9e9e9e;">Account</label>
+                                <select id="manualAccount" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                                    <option value="thinkorswim">ThinkorSwim</option>
+                                    <option value="sofi">SoFi</option>
+                                    <option value="robinhood">Robinhood</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; color: #9e9e9e;">Position Type</label>
+                                <select id="manualType" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                                    <option value="equity">Equity</option>
+                                    <option value="call_option">Call Option</option>
+                                    <option value="put_option">Put Option</option>
+                                    <option value="call_spread">Call Spread</option>
+                                    <option value="put_spread">Put Spread</option>
+                                    <option value="iron_condor">Iron Condor</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; color: #9e9e9e;">Side</label>
+                                <select id="manualSide" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                                    <option value="long">Long</option>
+                                    <option value="short">Short</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; color: #9e9e9e;">Quantity</label>
+                                <input type="number" id="manualQty" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; color: #9e9e9e;">Cost Basis</label>
+                                <input type="number" id="manualCost" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; color: #9e9e9e;">Current Price</label>
+                                <input type="number" id="manualPrice" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <label style="display: block; margin-bottom: 5px; color: #9e9e9e;">Notes</label>
+                            <textarea id="manualNotes" rows="2" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;"></textarea>
+                        </div>
+                        <button onclick="addManualPosition()" style="margin-top: 15px; padding: 10px 20px; background: #4fc3f7; color: #1e1e2e; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Add Position</button>
+                    </div>
+                </details>
+
+                <!-- 30-Day P&L History -->
+                <h3 style="color: #4fc3f7; margin-top: 30px;">30-Day P&L History</h3>
+                <div style="margin-top: 15px;">
+                    <canvas id="riskHistoryChart" style="max-height: 200px;"></canvas>
                 </div>
             </div>
         </div>
@@ -1132,8 +1294,247 @@ RESEARCH_DASHBOARD_HTML = """
             originalShowTab(tabName);
             if (tabName === 'regime') {
                 loadRegimeAnalysis();
+            } else if (tabName === 'risk') {
+                loadRiskSnapshot();
             }
         };
+
+        // ============================================================================
+        // RISK MANAGER FUNCTIONS
+        // ============================================================================
+        
+        let riskHistoryChart = null;
+        let riskRefreshInterval = null;
+        
+        async function loadRiskSnapshot() {
+            try {
+                const response = await fetch('/signals/risk/snapshot');
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error('Risk snapshot error:', data.error);
+                    return;
+                }
+                
+                // Update alert banner
+                const banner = document.getElementById('riskAlertBanner');
+                const content = document.getElementById('riskAlertContent');
+                
+                if (data.alert_count_critical > 0) {
+                    banner.style.display = 'block';
+                    banner.style.background = '#ef4444';
+                    banner.style.color = 'white';
+                    const criticalAlerts = data.alerts.filter(a => a.level === 'CRITICAL');
+                    content.innerHTML = '<strong>⚠️ CRITICAL ALERTS:</strong><br>' + criticalAlerts.map(a => `• ${a.message}`).join('<br>');
+                } else if (data.alert_count_warning > 0) {
+                    banner.style.display = 'block';
+                    banner.style.background = '#f59e0b';
+                    banner.style.color = '#1e1e2e';
+                    const warningAlerts = data.alerts.filter(a => a.level === 'WARNING');
+                    content.innerHTML = '<strong>⚠ WARNING:</strong><br>' + warningAlerts.map(a => `• ${a.message}`).join('<br>');
+                } else {
+                    banner.style.display = 'block';
+                    banner.style.background = '#22c55e';
+                    banner.style.color = '#1e1e2e';
+                    content.innerHTML = '<strong>✓ All Clear</strong> — No risk alerts at this time';
+                }
+                
+                // Update P&L cards
+                const dailyColor = data.pnl.daily >= 0 ? '#22c55e' : '#ef4444';
+                document.getElementById('dailyPnl').textContent = `$${data.pnl.daily.toFixed(0)} (${(data.pnl.daily_pct * 100).toFixed(1)}%)`;
+                document.getElementById('dailyPnl').style.color = dailyColor;
+                document.getElementById('dailyPnlBar').style.width = `${Math.min(Math.abs(data.limits.daily_loss.usage_pct) * 100, 100)}%`;
+                document.getElementById('dailyPnlBar').style.background = data.limits.daily_loss.status === 'BREACHED' ? '#ef4444' : (data.limits.daily_loss.status === 'WARNING' ? '#f59e0b' : '#22c55e');
+                
+                const weeklyColor = data.pnl.weekly >= 0 ? '#22c55e' : '#ef4444';
+                document.getElementById('weeklyPnl').textContent = `$${data.pnl.weekly.toFixed(0)} (${(data.pnl.weekly_pct * 100).toFixed(1)}%)`;
+                document.getElementById('weeklyPnl').style.color = weeklyColor;
+                document.getElementById('weeklyPnlBar').style.width = `${Math.min(Math.abs(data.limits.weekly_loss.usage_pct) * 100, 100)}%`;
+                document.getElementById('weeklyPnlBar').style.background = data.limits.weekly_loss.status === 'BREACHED' ? '#ef4444' : (data.limits.weekly_loss.status === 'WARNING' ? '#f59e0b' : '#22c55e');
+                
+                const monthlyColor = data.pnl.monthly >= 0 ? '#22c55e' : '#ef4444';
+                document.getElementById('monthlyPnl').textContent = `$${data.pnl.monthly.toFixed(0)} (${(data.pnl.monthly_pct * 100).toFixed(1)}%)`;
+                document.getElementById('monthlyPnl').style.color = monthlyColor;
+                document.getElementById('monthlyPnlBar').style.width = `${Math.min(Math.abs(data.limits.monthly_loss.usage_pct) * 100, 100)}%`;
+                document.getElementById('monthlyPnlBar').style.background = data.limits.monthly_loss.status === 'BREACHED' ? '#ef4444' : (data.limits.monthly_loss.status === 'WARNING' ? '#f59e0b' : '#22c55e');
+                
+                document.getElementById('buyingPower').textContent = `${(data.limits.buying_power.current * 100).toFixed(0)}%`;
+                document.getElementById('buyingPowerBar').style.width = `${data.limits.buying_power.usage_pct * 100}%`;
+                document.getElementById('buyingPowerBar').style.background = data.limits.buying_power.status === 'BREACHED' ? '#ef4444' : (data.limits.buying_power.status === 'WARNING' ? '#f59e0b' : '#22c55e');
+                
+                document.getElementById('vixLevel').textContent = data.vix.current ? data.vix.current.toFixed(1) : '-';
+                document.getElementById('vixChange').textContent = data.vix.current ? `${data.vix.change_pct >= 0 ? '+' : ''}${(data.vix.change_pct * 100).toFixed(1)}% today` : '-';
+                document.getElementById('vixChange').style.color = data.vix.spike_detected ? '#ef4444' : '#9e9e9e';
+                
+                // Update accounts grid
+                const accountsGrid = document.getElementById('accountsGrid');
+                accountsGrid.innerHTML = '';
+                
+                Object.entries(data.accounts).forEach(([name, acc]) => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    const badge = acc.source === 'manual' ? '<span style="background: #f59e0b; color: #1e1e2e; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; margin-left: 5px;">MANUAL</span>' : '<span style="background: #22c55e; color: #1e1e2e; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; margin-left: 5px;">LIVE</span>';
+                    card.innerHTML = `
+                        <h4 style="margin: 0 0 10px 0;">${name.replace('_', ' ').toUpperCase()}${badge}</h4>
+                        <p style="margin: 5px 0;"><strong>Portfolio Value:</strong> $${acc.portfolio_value.toFixed(0)}</p>
+                        <p style="margin: 5px 0;"><strong>Positions:</strong> ${acc.positions_count}</p>
+                        ${acc.buying_power ? `<p style="margin: 5px 0;"><strong>Buying Power:</strong> $${acc.buying_power.toFixed(0)}</p>` : ''}
+                    `;
+                    accountsGrid.appendChild(card);
+                });
+                
+                // Update directional bias
+                document.getElementById('directionalBias').textContent = data.exposure.directional_bias;
+                const deltaBarPos = ((data.exposure.net_delta_dollars / data.total_portfolio_value) + 1) / 2 * 100;
+                document.getElementById('deltaBar').style.width = `${Math.min(Math.max(deltaBarPos, 0), 100)}%`;
+                
+                // Update PDT info
+                document.getElementById('pdtCount').textContent = `${data.pdt.daytrade_count} / 3`;
+                document.getElementById('pdtRemaining').textContent = data.pdt.remaining_day_trades;
+                document.getElementById('pdtEquity').textContent = `$${data.pdt.account_equity.toFixed(0)}`;
+                
+                // Update positions table
+                const tbody = document.getElementById('positionsTable');
+                tbody.innerHTML = '';
+                
+                data.positions.forEach(pos => {
+                    const row = document.createElement('tr');
+                    const plColor = pos.unrealized_pl >= 0 ? '#22c55e' : '#ef4444';
+                    let actionCell = '-';
+                    
+                    if (pos.rolling_vs_closing) {
+                        const rec = pos.rolling_vs_closing.recommendation;
+                        const color = rec === 'CLOSE' ? '#ef4444' : (rec === 'EVALUATE_ROLL' ? '#f59e0b' : '#22c55e');
+                        actionCell = `<span style="padding: 4px 8px; border-radius: 4px; background: ${color}; color: ${rec === 'EVALUATE_ROLL' ? '#1e1e2e' : 'white'}; font-size: 0.85em; cursor: help;" title="${pos.rolling_vs_closing.reason}">${rec}</span>`;
+                    }
+                    
+                    row.innerHTML = `
+                        <td style="padding: 8px;">${pos.symbol}</td>
+                        <td style="padding: 8px;">${pos.account}</td>
+                        <td style="padding: 8px;">${pos.position_type || pos.asset_class}</td>
+                        <td style="padding: 8px;">${pos.side}</td>
+                        <td style="padding: 8px; text-align: right;">${pos.qty}</td>
+                        <td style="padding: 8px; text-align: right;">$${pos.market_value.toFixed(0)}</td>
+                        <td style="padding: 8px; text-align: right; color: ${plColor};">$${pos.unrealized_pl.toFixed(0)}</td>
+                        <td style="padding: 8px; text-align: right; color: ${plColor};">${(pos.unrealized_plpc * 100).toFixed(1)}%</td>
+                        <td style="padding: 8px; text-align: center;">${actionCell}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                
+                // Load history chart
+                await loadRiskHistory();
+                
+            } catch (error) {
+                console.error('Failed to load risk snapshot:', error);
+            }
+        }
+        
+        async function loadRiskHistory() {
+            try {
+                const response = await fetch('/signals/risk/history');
+                const data = await response.json();
+                
+                if (!data.history || data.history.length === 0) return;
+                
+                const ctx = document.getElementById('riskHistoryChart').getContext('2d');
+                
+                if (riskHistoryChart) {
+                    riskHistoryChart.destroy();
+                }
+                
+                riskHistoryChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.history.map(e => new Date(e.date).toLocaleDateString()),
+                        datasets: [{
+                            label: 'Daily P&L',
+                            data: data.history.map(e => e.daily_pnl),
+                            borderColor: '#4fc3f7',
+                            backgroundColor: 'rgba(79, 195, 247, 0.1)',
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {display: false}
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                grid: {color: '#2e2e3e'},
+                                ticks: {color: '#9e9e9e'}
+                            },
+                            x: {
+                                grid: {color: '#2e2e3e'},
+                                ticks: {color: '#9e9e9e'}
+                            }
+                        }
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Failed to load risk history:', error);
+            }
+        }
+        
+        async function addManualPosition() {
+            const position = {
+                symbol: document.getElementById('manualSymbol').value.toUpperCase(),
+                account: document.getElementById('manualAccount').value,
+                position_type: document.getElementById('manualType').value,
+                side: document.getElementById('manualSide').value,
+                qty: parseFloat(document.getElementById('manualQty').value),
+                cost_basis: parseFloat(document.getElementById('manualCost').value),
+                current_price: parseFloat(document.getElementById('manualPrice').value),
+                notes: document.getElementById('manualNotes').value,
+                date_entered: new Date().toISOString().split('T')[0]
+            };
+            
+            position.market_value = position.qty * position.current_price;
+            position.unrealized_pl = (position.current_price - position.cost_basis) * position.qty;
+            position.unrealized_plpc = (position.current_price - position.cost_basis) / position.cost_basis;
+            
+            try {
+                const response = await fetch('/signals/risk/positions/manual', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(position)
+                });
+                
+                if (response.ok) {
+                    alert('Position added successfully');
+                    // Clear form
+                    document.getElementById('manualSymbol').value = '';
+                    document.getElementById('manualQty').value = '';
+                    document.getElementById('manualCost').value = '';
+                    document.getElementById('manualPrice').value = '';
+                    document.getElementById('manualNotes').value = '';
+                    // Reload snapshot
+                    await loadRiskSnapshot();
+                } else {
+                    alert('Failed to add position');
+                }
+            } catch (error) {
+                console.error('Error adding position:', error);
+                alert('Error adding position');
+            }
+        }
+        
+        // Auto-refresh risk data every 5 minutes when tab is active
+        function startRiskAutoRefresh() {
+            if (riskRefreshInterval) clearInterval(riskRefreshInterval);
+            riskRefreshInterval = setInterval(() => {
+                const activeTab = document.querySelector('.tab-content.active');
+                if (activeTab && activeTab.id === 'risk-tab') {
+                    loadRiskSnapshot();
+                }
+            }, 300000); // 5 minutes
+        }
+        
+        startRiskAutoRefresh();
     </script>
 </body>
 </html>

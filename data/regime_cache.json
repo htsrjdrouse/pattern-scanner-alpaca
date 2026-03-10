@@ -1,0 +1,61 @@
+{
+  "timestamp": "2026-03-10T15:14:04.254343",
+  "cache_age_minutes": 0,
+  "spx_price": 6815.39,
+  "vix_level": 22.72,
+  "vix_3m": 23.86,
+  "dimensions": {
+    "vix_regime": {
+      "value": "ELEVATED",
+      "score": 0.6,
+      "description": "Good premium but wider strikes required"
+    },
+    "term_structure": {
+      "value": "CONTANGO",
+      "spread": 1.14,
+      "score": 1.0,
+      "description": "Normal, favorable for sellers"
+    },
+    "trend_assessment": {
+      "value": "MIXED",
+      "adx": 27.3,
+      "score": 0.3,
+      "description": "Use wider strikes"
+    },
+    "vol_spread": {
+      "value": "STRONG",
+      "realized_vol": 0.1176,
+      "implied_vol": 0.2272,
+      "spread": 0.1096,
+      "score": 1.0,
+      "description": "IV significantly overpricing, clear seller edge"
+    },
+    "breadth": {
+      "value": "NEUTRAL",
+      "ad_ratio": 0.5,
+      "nh_nl_ratio": 0.5,
+      "score": 0.2,
+      "description": "Mixed breadth, proceed with caution"
+    },
+    "pcr_sentiment": {
+      "value": "UNKNOWN",
+      "pcr": 0.0,
+      "score": 0.0,
+      "description": ""
+    },
+    "correlation_regime": {
+      "value": "LOW",
+      "avg_correlation": 0.243,
+      "score": 0.8,
+      "description": "Stock-picking environment, individual names work"
+    }
+  },
+  "composite_score": 0.625,
+  "hard_override_triggered": false,
+  "override_reason": null,
+  "verdict": "GREEN",
+  "recommended_strategy": "Iron Condor \u2014 sell 0.10-0.15 delta on both sides, standard 5-wide spreads",
+  "position_sizing": "Full size \u2014 up to $500 per spread",
+  "entry_timing": "9:45-10:30 AM after opening volatility settles",
+  "errors": []
+}

@@ -24,6 +24,7 @@ COPY alpaca_data.py .
 COPY stream_manager.py .
 COPY order_manager.py .
 COPY regime_classifier.py .
+COPY risk_manager.py .
 COPY sectors.json .
 COPY sector_scan.py .
 COPY .env.example .

@@ -1,0 +1,9 @@
+[
+  {
+    "timestamp": "2026-03-10T15:14:04.254343",
+    "spx_price": 6815.39,
+    "vix_level": 22.72,
+    "composite_score": 0.625,
+    "verdict": "GREEN"
+  }
+]

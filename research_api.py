@@ -604,3 +604,104 @@ def get_regime_history():
         return jsonify({'history': history})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# RISK MANAGER ROUTES
+# ============================================================================
+import risk_manager
+
+@research_bp.route('/risk/snapshot', methods=['GET'])
+def get_risk_snapshot():
+    """Get current risk snapshot"""
+    try:
+        result = risk_manager.get_risk_snapshot(force_refresh=False)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@research_bp.route('/risk/refresh', methods=['POST'])
+def refresh_risk_snapshot():
+    """Force refresh risk snapshot"""
+    try:
+        result = risk_manager.get_risk_snapshot(force_refresh=True)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@research_bp.route('/risk/config', methods=['GET'])
+def get_risk_config():
+    """Get risk configuration"""
+    try:
+        config = risk_manager.load_config()
+        return jsonify(config)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@research_bp.route('/risk/config', methods=['POST'])
+def update_risk_config():
+    """Update risk configuration"""
+    try:
+        config = request.get_json()
+        risk_manager.save_config(config)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@research_bp.route('/risk/history', methods=['GET'])
+def get_risk_history():
+    """Get 30-day risk history"""
+    try:
+        history = risk_manager.get_risk_history()
+        return jsonify({'history': history})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@research_bp.route('/risk/positions/manual', methods=['POST'])
+def add_manual_position():
+    """Add manual position"""
+    try:
+        position_data = request.get_json()
+        result = risk_manager.add_manual_position(position_data)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@research_bp.route('/risk/positions/manual/<position_id>', methods=['PUT'])
+def update_manual_position(position_id):
+    """Update manual position"""
+    try:
+        position_data = request.get_json()
+        result = risk_manager.update_manual_position(position_id, position_data)
+        if result:
+            return jsonify(result)
+        return jsonify({'error': 'Position not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@research_bp.route('/risk/positions/manual/<position_id>', methods=['DELETE'])
+def delete_manual_position(position_id):
+    """Delete manual position"""
+    try:
+        risk_manager.delete_manual_position(position_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@research_bp.route('/risk/recovery/reset', methods=['POST'])
+def reset_recovery_mode():
+    """Reset recovery mode"""
+    try:
+        risk_manager.reset_recovery_mode()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@research_bp.route('/risk/eod', methods=['POST'])
+def end_of_day_close():
+    """End of day close"""
+    try:
+        result = risk_manager.end_of_day_close()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
