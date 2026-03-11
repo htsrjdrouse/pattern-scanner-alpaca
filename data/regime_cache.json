@@ -1,11 +1,11 @@
 {
-  "timestamp": "2026-03-11T03:49:38.056862",
+  "timestamp": "2026-03-11T03:56:18.849884",
   "cache_age_minutes": 0,
   "spx_price": 6781.48,
   "vix_level": 24.93,
   "vix_3m": 25.51,
   "term_structure_source": "yfinance_fallback",
-  "pcr_source": "unavailable",
+  "pcr_source": "cboe_equity_csv",
   "dimensions": {
     "vix_regime": {
       "value": "ELEVATED",
@@ -40,10 +40,10 @@
       "description": "Mixed breadth, proceed with caution"
     },
     "pcr_sentiment": {
-      "value": "UNKNOWN",
-      "pcr": 0.0,
-      "score": 0.0,
-      "description": ""
+      "value": "NEUTRAL",
+      "pcr": 0.65,
+      "score": 0.2,
+      "description": "Balanced sentiment"
     },
     "correlation_regime": {
       "value": "LOW",
@@ -52,14 +52,12 @@
       "description": "Stock-picking environment, individual names work"
     }
   },
-  "composite_score": 0.625,
+  "composite_score": 0.645,
   "hard_override_triggered": false,
   "override_reason": null,
   "verdict": "GREEN",
   "recommended_strategy": "Iron Condor \u2014 sell 0.10-0.15 delta on both sides, standard 5-wide spreads",
   "position_sizing": "Full size \u2014 up to $500 per spread",
   "entry_timing": "9:45-10:30 AM after opening volatility settles",
-  "errors": [
-    "PCR data unavailable from all sources"
-  ]
+  "errors": []
 }

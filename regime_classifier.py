@@ -327,19 +327,14 @@ def run_regime_analysis(force_refresh=False):
     
     def _fetch_cboe_pcr() -> tuple:
         """
-        Fetch put/call ratio directly from CBOE's public daily statistics page.
+        Fetch put/call ratio from CBOE's CDN CSV files.
         Returns (pcr_value, source_label) or (None, 'unavailable') on failure.
 
-        CBOE publishes two relevant CSVs:
-          - Equity P/C:  https://www.cboe.com/data/volatility-indexes/  (not CSV)
-          - Daily stats: https://www.cboe.com/us/options/market_statistics/daily/
-            direct CSV:  https://www.cboe.com/publish/scheduledtask/mktstat/daily_volume.csv
-
-        The daily_volume.csv contains total put volume and call volume for all CBOE
-        products. We compute total P/C = total_put_volume / total_call_volume.
-
-        If that fails, try the equity-only P/C from:
-          https://www.cboe.com/publish/scheduledtask/mktstat/equity_pc.csv
+        CBOE publishes historical P/C ratios on their CDN:
+          - Equity P/C:  https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/equitypc.csv
+          - Total P/C:   https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/totalpc.csv
+        
+        Format: Header rows, then DATE,CALL,PUT,TOTAL,P/C Ratio
         """
         import requests
         
@@ -349,38 +344,37 @@ def run_regime_analysis(force_refresh=False):
 
         # Attempt 1: equity-only P/C ratio CSV (most relevant for sentiment)
         try:
-            url = 'https://www.cboe.com/publish/scheduledtask/mktstat/equity_pc.csv'
+            url = 'https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/equitypc.csv'
             resp = requests.get(url, headers=headers, timeout=10)
             resp.raise_for_status()
-            # File format: DATE,PC_RATIO  (header on row 0, data starts row 1)
-            df = pd.read_csv(io.StringIO(resp.text))
-            df.columns = [c.strip().upper() for c in df.columns]
-            # Find the ratio column — may be named PC_RATIO, P/C, RATIO, etc.
-            ratio_col = next(
-                (c for c in df.columns if 'RATIO' in c or 'PC' in c or 'P/C' in c),
-                None
-            )
-            if ratio_col:
-                val = pd.to_numeric(df[ratio_col].iloc[-1], errors='coerce')
-                if pd.notna(val) and val > 0:
-                    return round(float(val), 3), 'cboe_equity_pc'
+            # Skip header rows, find data
+            lines = resp.text.strip().split('\n')
+            for i, line in enumerate(lines):
+                if 'DATE,CALL,PUT,TOTAL,P/C Ratio' in line:
+                    # Parse last data row
+                    data_lines = [l for l in lines[i+1:] if l.strip() and not l.startswith(',')]
+                    if data_lines:
+                        last_row = data_lines[-1].split(',')
+                        if len(last_row) >= 5:
+                            pcr = float(last_row[4])
+                            return round(pcr, 3), 'cboe_equity_csv'
         except Exception:
             pass
 
-        # Attempt 2: total P/C from daily volume CSV
+        # Attempt 2: total P/C ratio CSV
         try:
-            url = 'https://www.cboe.com/publish/scheduledtask/mktstat/daily_volume.csv'
+            url = 'https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/totalpc.csv'
             resp = requests.get(url, headers=headers, timeout=10)
             resp.raise_for_status()
-            df = pd.read_csv(io.StringIO(resp.text))
-            df.columns = [c.strip().upper() for c in df.columns]
-            put_col = next((c for c in df.columns if 'PUT' in c), None)
-            call_col = next((c for c in df.columns if 'CALL' in c), None)
-            if put_col and call_col:
-                puts = pd.to_numeric(df[put_col].iloc[-1], errors='coerce')
-                calls = pd.to_numeric(df[call_col].iloc[-1], errors='coerce')
-                if pd.notna(puts) and pd.notna(calls) and calls > 0:
-                    return round(float(puts / calls), 3), 'cboe_total_pc'
+            lines = resp.text.strip().split('\n')
+            for i, line in enumerate(lines):
+                if 'DATE,CALL,PUT,TOTAL,P/C Ratio' in line:
+                    data_lines = [l for l in lines[i+1:] if l.strip() and not l.startswith(',')]
+                    if data_lines:
+                        last_row = data_lines[-1].split(',')
+                        if len(last_row) >= 5:
+                            pcr = float(last_row[4])
+                            return round(pcr, 3), 'cboe_total_csv'
         except Exception:
             pass
 
