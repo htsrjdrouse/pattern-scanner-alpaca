@@ -2272,6 +2272,31 @@ def generate_unified_chart(symbol, df, pattern, asc_triangle, bull_flag, double_
 # MAIN SCANNER (BATCH DOWNLOAD FOR SPEED)
 # ════════════════════════════════════════════════════════════════
 
+def get_next_earnings_days(symbol: str) -> int | None:
+    """Returns number of days until next earnings, or None if unavailable."""
+    try:
+        cal = yf.Ticker(symbol).calendar
+        if cal is None:
+            return None
+        if isinstance(cal, dict):
+            earnings_date = cal.get('Earnings Date')
+            if isinstance(earnings_date, list) and len(earnings_date) > 0:
+                earnings_date = earnings_date[0]
+        elif hasattr(cal, 'columns') and 'Earnings Date' in cal.columns:
+            earnings_date = cal['Earnings Date'].iloc[0]
+        else:
+            return None
+        if earnings_date is None:
+            return None
+        if hasattr(earnings_date, 'date'):
+            earnings_date = earnings_date.date()
+        from datetime import date
+        days = (earnings_date - date.today()).days
+        return days if days >= 0 else None
+    except Exception:
+        return None
+
+
 def scan_for_patterns(tickers=None, progress_callback=None):
     if tickers is None:
         tickers = get_sp500_tickers()
@@ -2365,6 +2390,9 @@ def scan_for_patterns(tickers=None, progress_callback=None):
                 dcf_result = calculate_dcf_value(symbol)
                 analysis['dcf_value'] = dcf_result.get('dcf_value')
                 analysis['margin_of_safety'] = dcf_result.get('margin')
+                
+                # Get earnings days (batched with existing yfinance calls)
+                analysis['earnings_days'] = get_next_earnings_days(symbol)
 
                 results.append(analysis)
 
@@ -2758,6 +2786,9 @@ SCAN_RESULTS_TEMPLATE = """
                 <th>Golden Cross</th>
                 <th>Status</th>
                 <th>Score</th>
+                <th>Trend</th>
+                <th>Earnings</th>
+                <th>Options</th>
                 <th>Price</th>
                 <th>Buy Point</th>
                 <th>Cup Analysis</th>
@@ -2788,6 +2819,34 @@ SCAN_RESULTS_TEMPLATE = """
                 <td>{% if r.golden_cross and r.golden_cross.golden_cross %}<span style="color: gold; font-weight: bold;">⭐ YES<br><span style="font-size:10px;">({{ r.golden_cross.days_since_golden }}d ago)</span></span>{% elif r.golden_cross and r.golden_cross.sma50_above_200 %}<span style="color: #8bc34a;">50>200</span>{% elif r.golden_cross and r.golden_cross.death_cross %}<span style="color: #f44336;">☠️ Death<br><span style="font-size:10px;">({{ r.golden_cross.days_since_death }}d ago)</span></span>{% else %}<span style="color: #888;">-</span>{% endif %}</td>
                 <td class="{{ r.status.lower().replace(' ', '-') }}">{{ r.status }}</td>
                 <td>{{ r.signal_score }}</td>
+                <td>
+                    {% if r.adx %}
+                        {{ r.adx }}
+                        {% if r.adx < 20 %}
+                            <span class="badge" style="background: #4caf50; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 4px;">RANGE</span>
+                        {% elif r.adx <= 28 %}
+                            <span class="badge" style="background: #ff9800; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 4px;">MIXED</span>
+                        {% else %}
+                            <span class="badge" style="background: #f44336; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 4px;">TREND</span>
+                        {% endif %}
+                    {% else %}-{% endif %}
+                </td>
+                <td>
+                    {% if r.earnings_days is not none %}
+                        {% if r.earnings_days > 30 %}
+                            ✅ {{ r.earnings_days }}d
+                        {% elif r.earnings_days >= 21 %}
+                            🟡 {{ r.earnings_days }}d
+                        {% else %}
+                            ⚠️ {{ r.earnings_days }}d
+                        {% endif %}
+                    {% else %}
+                        ✅ Clear
+                    {% endif %}
+                </td>
+                <td>
+                    <button class="view-btn" onclick="openStockDrawer('{{ r.symbol }}')" style="background: #2196f3; cursor: pointer; border: none; padding: 6px 12px; border-radius: 4px; color: white; font-size: 12px;">📊 Analyze</button>
+                </td>
                 <td>${{ r.current_price }}</td>
                 <td>${{ r.buy_point }}</td>
                 <td class="cup-analysis">Depth: {{ r.cup_depth }}% / {{ r.cup_days }}d<br>U-shape: {{ r.u_shape }}<br>Symmetry: {{ r.symmetry }}%</td>
@@ -3105,6 +3164,184 @@ SCAN_RESULTS_TEMPLATE = """
             document.getElementById('filterStatus').textContent = `Showing Tier ${tier} only (${count} stocks)`;
         }
         </script>
+
+        <!-- Stock Detail Drawer -->
+        <div id="drawer-overlay"></div>
+        <div id="stock-drawer">
+            <div id="drawer-content"></div>
+        </div>
+
+        <script>
+        let currentDrawerSymbol = null;
+
+        async function openStockDrawer(symbol) {
+            currentDrawerSymbol = symbol;
+            document.getElementById('stock-drawer').classList.add('open');
+            document.getElementById('drawer-overlay').classList.add('visible');
+            showDrawerLoading(symbol);
+            
+            try {
+                const resp = await fetch(`/signals/stock/detail/${symbol}`);
+                const data = await resp.json();
+                renderDrawerContent(data);
+            } catch (err) {
+                showDrawerError(symbol, err);
+            }
+        }
+
+        function closeStockDrawer() {
+            document.getElementById('stock-drawer').classList.remove('open');
+            document.getElementById('drawer-overlay').classList.remove('visible');
+            currentDrawerSymbol = null;
+        }
+
+        function showDrawerLoading(symbol) {
+            document.getElementById('drawer-content').innerHTML = `
+                <div style="padding: 20px;">
+                    <button onclick="closeStockDrawer()" style="float: right; background: none; border: none; font-size: 24px; cursor: pointer; color: #eee;">×</button>
+                    <h2 style="color: #00d4ff; margin-top: 0;">${symbol}</h2>
+                    <p style="color: #888;">Loading...</p>
+                </div>
+            `;
+        }
+
+        function showDrawerError(symbol, err) {
+            document.getElementById('drawer-content').innerHTML = `
+                <div style="padding: 20px;">
+                    <button onclick="closeStockDrawer()" style="float: right; background: none; border: none; font-size: 24px; cursor: pointer; color: #eee;">×</button>
+                    <h2 style="color: #00d4ff; margin-top: 0;">${symbol}</h2>
+                    <p style="color: #f44336;">Error loading data: ${err.message}</p>
+                </div>
+            `;
+        }
+
+        function renderDrawerContent(data) {
+            const formatNumber = (num) => {
+                if (!num) return 'N/A';
+                if (num >= 1e9) return `$${(num/1e9).toFixed(1)}B`;
+                if (num >= 1e6) return `$${(num/1e6).toFixed(1)}M`;
+                return num.toLocaleString();
+            };
+
+            const strategyHtml = data.recommended_options_strategy ? `
+                <div style="border-left: 4px solid ${data.recommended_options_strategy.color === 'blue' ? '#2196f3' : data.recommended_options_strategy.color === 'amber' ? '#ff9800' : '#4caf50'}; padding: 15px; background: #16213e; border-radius: 4px; margin-bottom: 20px;">
+                    <h3 style="margin: 0 0 8px 0; color: #00d4ff; font-size: 18px;">${data.recommended_options_strategy.strategy}</h3>
+                    <p style="margin: 0; color: #ccc; font-size: 14px;">${data.recommended_options_strategy.rationale}</p>
+                </div>
+            ` : `
+                <div style="border-left: 4px solid #ff9800; padding: 15px; background: #16213e; border-radius: 4px; margin-bottom: 20px;">
+                    <p style="margin: 0; color: #ff9800;">IV data unavailable — cannot recommend strategy</p>
+                </div>
+            `;
+
+            const ivHtml = data.iv_rank ? `
+                <div style="margin-bottom: 8px;">
+                    <div style="height: 20px; background: linear-gradient(to right, #2196f3 0%, #2196f3 30%, #ff9800 30%, #ff9800 60%, #4caf50 60%, #4caf50 100%); border-radius: 4px; position: relative;">
+                        <div style="position: absolute; left: ${data.iv_rank.iv_rank || data.iv_rank.iv_percentile}%; top: -5px; width: 3px; height: 30px; background: white;"></div>
+                    </div>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: #ccc;">IV Rank: ${(data.iv_rank.iv_rank || data.iv_rank.iv_percentile).toFixed(1)}%</p>
+                </div>
+            ` : `<p style="color: #ff9800; margin: 0;">Tastytrade data unavailable</p>`;
+
+            const optionsHtml = data.options_summary ? `
+                <p style="margin: 0 0 8px 0; color: #888; font-size: 12px;">Expiry: ${data.options_summary.nearest_expiry} | ATM Strike: $${data.options_summary.atm_strike}</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <p style="margin: 0; color: #00d4ff; font-weight: bold;">Call</p>
+                        <p style="margin: 4px 0; font-size: 13px;">IV: ${(data.options_summary.atm_call_iv * 100).toFixed(1)}%</p>
+                        <p style="margin: 4px 0; font-size: 13px;">Bid/Ask: $${data.options_summary.atm_call_bid} / $${data.options_summary.atm_call_ask}</p>
+                    </div>
+                    <div>
+                        <p style="margin: 0; color: #00d4ff; font-weight: bold;">Put</p>
+                        <p style="margin: 4px 0; font-size: 13px;">IV: ${(data.options_summary.atm_put_iv * 100).toFixed(1)}%</p>
+                        <p style="margin: 4px 0; font-size: 13px;">Bid/Ask: $${data.options_summary.atm_put_bid} / $${data.options_summary.atm_put_ask}</p>
+                    </div>
+                </div>
+            ` : `<p style="color: #888; margin: 0;">No options chain available</p>`;
+
+            const earningsHtml = data.earnings_days !== null ? `
+                <p style="margin: 0; font-size: 14px;">
+                    ${data.earnings_days > 30 ? '✅' : data.earnings_days >= 21 ? '🟡' : '⚠️'} 
+                    ${data.earnings_days} days until earnings
+                </p>
+                ${data.earnings_days < 21 ? '<p style="margin: 8px 0 0 0; color: #ff9800; font-size: 12px;">⚠️ Verify DTE does not cross earnings before placing spread</p>' : ''}
+            ` : `<p style="margin: 0; color: #888;">Earnings date unavailable</p>`;
+
+            document.getElementById('drawer-content').innerHTML = `
+                <div style="padding: 20px;">
+                    <button onclick="closeStockDrawer()" style="float: right; background: none; border: none; font-size: 24px; cursor: pointer; color: #eee;">×</button>
+                    <h2 style="color: #00d4ff; margin: 0 0 4px 0;">${data.symbol}</h2>
+                    <h3 style="color: #eee; margin: 0 0 8px 0; font-weight: normal;">${data.company_name}</h3>
+                    <p style="color: #888; font-size: 13px; margin: 0 0 20px 0;">${data.sector} | ${formatNumber(data.market_cap)} | Vol: ${formatNumber(data.avg_volume)}</p>
+                    
+                    ${strategyHtml}
+                    
+                    <div style="background: #16213e; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
+                        <h4 style="margin: 0 0 10px 0; color: #00d4ff;">IV Rank</h4>
+                        ${ivHtml}
+                    </div>
+                    
+                    <div style="background: #16213e; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
+                        <h4 style="margin: 0 0 10px 0; color: #00d4ff;">Options Chain Summary</h4>
+                        ${optionsHtml}
+                    </div>
+                    
+                    <div style="background: #16213e; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
+                        <h4 style="margin: 0 0 10px 0; color: #00d4ff;">Earnings</h4>
+                        ${earningsHtml}
+                    </div>
+                    
+                    <p style="color: #666; font-size: 11px; margin: 20px 0 0 0;">
+                        Options data via yfinance (delayed) | IV Rank via Tastytrade<br>
+                        Fetched: ${new Date(data.timestamp).toLocaleString()}
+                    </p>
+                </div>
+            `;
+        }
+
+        document.getElementById('drawer-overlay').addEventListener('click', closeStockDrawer);
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeStockDrawer();
+        });
+        </script>
+
+        <style>
+        #stock-drawer {
+            position: fixed;
+            top: 0;
+            right: -480px;
+            width: 480px;
+            height: 100vh;
+            background: #0f1419;
+            border-left: 1px solid #333;
+            overflow-y: auto;
+            transition: right 0.3s ease;
+            z-index: 1000;
+        }
+
+        #stock-drawer.open {
+            right: 0;
+        }
+
+        #drawer-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        #drawer-overlay.visible {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            #stock-drawer {
+                width: 100vw;
+                right: -100vw;
+            }
+        }
+        </style>
 
         {% else %}
         <p style="color: #ff9800; font-size: 18px;">No cup & handle patterns found in current scan.</p>

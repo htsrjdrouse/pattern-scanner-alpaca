@@ -720,3 +720,108 @@ def tastytrade_status():
     """Health check for Tastytrade connection. Used by dashboard."""
     from hybrid_data import get_tastytrade_status
     return jsonify(get_tastytrade_status())
+
+@research_bp.route('/stock/detail/<symbol>', methods=['GET'])
+def get_stock_detail(symbol):
+    """Get complete per-stock options analysis package"""
+    import yfinance as yf
+    from pattern_scanner import get_next_earnings_days
+    
+    symbol = symbol.upper()
+    result = {
+        'symbol': symbol,
+        'timestamp': datetime.now().isoformat(),
+        'errors': []
+    }
+
+    # 1. Price + basic info
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period='60d')
+        info = ticker.info
+        result['price'] = round(hist['Close'].iloc[-1], 2) if not hist.empty else None
+        result['company_name'] = info.get('longName', symbol)
+        result['sector'] = info.get('sector', 'Unknown')
+        result['market_cap'] = info.get('marketCap')
+        result['avg_volume'] = info.get('averageVolume')
+    except Exception as e:
+        result['errors'].append(f'Price fetch failed: {str(e)}')
+
+    # 2. IV Rank from Tastytrade
+    try:
+        from hybrid_data import get_iv_rank
+        iv_data = get_iv_rank(symbol)
+        result['iv_rank'] = iv_data
+    except Exception as e:
+        result['iv_rank'] = None
+        result['errors'].append(f'IV rank unavailable: {str(e)}')
+
+    # 3. Options chain summary
+    try:
+        ticker = yf.Ticker(symbol)
+        expirations = ticker.options
+        if expirations:
+            nearest_expiry = expirations[0]
+            chain = ticker.option_chain(nearest_expiry)
+            calls = chain.calls
+            puts = chain.puts
+            current_price = result.get('price', 0)
+            atm_strike = calls.iloc[(calls['strike'] - current_price).abs().argsort()[:1]]['strike'].values[0]
+            atm_call = calls[calls['strike'] == atm_strike].iloc[0]
+            atm_put = puts[puts['strike'] == atm_strike].iloc[0]
+            result['options_summary'] = {
+                'nearest_expiry': nearest_expiry,
+                'atm_strike': float(atm_strike),
+                'atm_call_iv': round(float(atm_call.get('impliedVolatility', 0)), 4),
+                'atm_put_iv': round(float(atm_put.get('impliedVolatility', 0)), 4),
+                'atm_call_bid': round(float(atm_call.get('bid', 0)), 2),
+                'atm_call_ask': round(float(atm_call.get('ask', 0)), 2),
+                'atm_put_bid': round(float(atm_put.get('bid', 0)), 2),
+                'atm_put_ask': round(float(atm_put.get('ask', 0)), 2),
+            }
+        else:
+            result['options_summary'] = None
+            result['errors'].append('No options chain available')
+    except Exception as e:
+        result['options_summary'] = None
+        result['errors'].append(f'Options chain failed: {str(e)}')
+
+    # 4. Earnings
+    try:
+        result['earnings_days'] = get_next_earnings_days(symbol)
+    except Exception as e:
+        result['earnings_days'] = None
+
+    # 5. Strategy recommendation
+    try:
+        iv_rank_val = result.get('iv_rank', {})
+        if isinstance(iv_rank_val, dict):
+            iv_pct = iv_rank_val.get('iv_rank') or iv_rank_val.get('iv_percentile')
+        else:
+            iv_pct = None
+
+        if iv_pct is not None:
+            if iv_pct < 30:
+                result['recommended_options_strategy'] = {
+                    'strategy': 'Long Call',
+                    'rationale': f'IV rank {iv_pct:.0f}% — low IV, buy premium cheaply',
+                    'color': 'blue'
+                }
+            elif iv_pct < 60:
+                result['recommended_options_strategy'] = {
+                    'strategy': "Poor Man's Covered Call",
+                    'rationale': f'IV rank {iv_pct:.0f}% — moderate IV, diagonal spread',
+                    'color': 'amber'
+                }
+            else:
+                result['recommended_options_strategy'] = {
+                    'strategy': 'Cash-Secured Put',
+                    'rationale': f'IV rank {iv_pct:.0f}% — elevated IV, sell premium',
+                    'color': 'green'
+                }
+        else:
+            result['recommended_options_strategy'] = None
+    except Exception:
+        result['recommended_options_strategy'] = None
+
+    return jsonify(result)
