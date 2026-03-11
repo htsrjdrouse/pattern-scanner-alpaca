@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-03-10T16:17:02.846294",
+  "timestamp": "2026-03-11T03:23:27.799355",
   "cache_age_minutes": 0,
-  "spx_price": 6817.29,
-  "vix_level": 22.93,
-  "vix_3m": 23.98,
+  "spx_price": 6781.48,
+  "vix_level": 24.93,
+  "vix_3m": 25.51,
   "dimensions": {
     "vix_regime": {
       "value": "ELEVATED",
@@ -12,21 +12,21 @@
     },
     "term_structure": {
       "value": "CONTANGO",
-      "spread": 1.05,
+      "spread": 0.58,
       "score": 1.0,
       "description": "Normal, favorable for sellers"
     },
     "trend_assessment": {
       "value": "MIXED",
-      "adx": 27.3,
+      "adx": 27.0,
       "score": 0.3,
       "description": "Use wider strikes"
     },
     "vol_spread": {
       "value": "STRONG",
-      "realized_vol": 0.1177,
-      "implied_vol": 0.2293,
-      "spread": 0.1116,
+      "realized_vol": 0.1167,
+      "implied_vol": 0.2493,
+      "spread": 0.1326,
       "score": 1.0,
       "description": "IV significantly overpricing, clear seller edge"
     },
@@ -45,7 +45,7 @@
     },
     "correlation_regime": {
       "value": "LOW",
-      "avg_correlation": 0.243,
+      "avg_correlation": 0.242,
       "score": 0.8,
       "description": "Stock-picking environment, individual names work"
     }

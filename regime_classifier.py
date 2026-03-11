@@ -82,6 +82,8 @@ def run_regime_analysis(force_refresh=False):
         'spx_price': None,
         'vix_level': None,
         'vix_3m': None,
+        'term_structure_source': 'unknown',
+        'pcr_source': 'unavailable',
         'dimensions': {},
         'composite_score': 0.0,
         'hard_override_triggered': False,
@@ -118,16 +120,29 @@ def run_regime_analysis(force_refresh=False):
     except Exception as e:
         result['errors'].append(f'VIX fetch failed: {str(e)}')
     
-    # Fetch VIX3M
+    # Fetch VIX3M — try Tastytrade live futures first, fall back to yfinance
     try:
-        vix3m = yf.Ticker('^VIX3M')
-        vix3m_hist = vix3m.history(period='5d')
-        if not vix3m_hist.empty:
-            result['vix_3m'] = round(vix3m_hist['Close'].iloc[-1], 2)
+        from hybrid_data import get_vix_term_structure
+        tt_term = get_vix_term_structure()
+        if tt_term and tt_term.get('vix_3m'):
+            result['vix_3m'] = round(tt_term['vix_3m'], 2)
+            result['term_structure_source'] = tt_term.get('source', 'tastytrade')
         else:
+            raise ValueError("Tastytrade term structure unavailable")
+    except Exception:
+        # Fallback: yfinance ^VIX3M proxy
+        try:
+            vix3m = yf.Ticker('^VIX3M')
+            vix3m_hist = vix3m.history(period='5d')
+            if not vix3m_hist.empty:
+                result['vix_3m'] = round(vix3m_hist['Close'].iloc[-1], 2)
+                result['term_structure_source'] = 'yfinance_fallback'
+            else:
+                result['vix_3m'] = None
+                result['term_structure_source'] = 'unavailable'
+        except:
             result['vix_3m'] = None
-    except:
-        result['vix_3m'] = None
+            result['term_structure_source'] = 'unavailable'
     
     # 1. VIX Regime
     vix_score = 0.0
@@ -303,39 +318,51 @@ def run_regime_analysis(force_refresh=False):
     # 6. Put/Call Ratio
     pcr_score = 0.0
     pcr_sentiment = 'UNKNOWN'
-    pcr_value = 0.0
+    pcr_value = None
+    pcr_source = 'unavailable'
     pcr_desc = ''
-    try:
-        pcall = yf.Ticker('^PCALL')
-        pcall_hist = pcall.history(period='5d')
-        if not pcall_hist.empty:
-            pcr_value = pcall_hist['Close'].iloc[-1]
-            if pcr_value > 1.2:
-                pcr_sentiment = 'EXTREME_FEAR'
-                pcr_score = 0.8
-                pcr_desc = 'Elevated put buying, contrarian bullish'
-            elif pcr_value > 0.9:
-                pcr_sentiment = 'FEAR'
-                pcr_score = 0.5
-                pcr_desc = 'Slight put bias, mild bullish lean'
-            elif pcr_value > 0.6:
-                pcr_sentiment = 'NEUTRAL'
-                pcr_score = 0.2
-                pcr_desc = 'Balanced sentiment'
-            elif pcr_value > 0.4:
-                pcr_sentiment = 'COMPLACENCY'
-                pcr_score = -0.3
-                pcr_desc = 'Caution on call side'
-            else:
-                pcr_sentiment = 'EXTREME_COMPLACENCY'
-                pcr_score = -0.8
-                pcr_desc = 'Significant caution, risk of reversal'
-    except Exception as e:
-        result['errors'].append(f'PCR fetch failed: {str(e)}')
     
+    # PCR fetch — try multiple CBOE ticker symbols with fallback chain
+    for pcr_ticker in ['^CPCE', '^CPC', '^PCALL']:
+        try:
+            pcr_data = yf.Ticker(pcr_ticker).history(period='5d')
+            if not pcr_data.empty:
+                val = pcr_data['Close'].iloc[-1]
+                if val > 0:
+                    pcr_value = round(val, 3)
+                    pcr_source = pcr_ticker
+                    break
+        except Exception:
+            continue
+    
+    if pcr_value is not None:
+        if pcr_value > 1.2:
+            pcr_sentiment = 'EXTREME_FEAR'
+            pcr_score = 0.8
+            pcr_desc = 'Elevated put buying, contrarian bullish'
+        elif pcr_value > 0.9:
+            pcr_sentiment = 'FEAR'
+            pcr_score = 0.5
+            pcr_desc = 'Slight put bias, mild bullish lean'
+        elif pcr_value > 0.6:
+            pcr_sentiment = 'NEUTRAL'
+            pcr_score = 0.2
+            pcr_desc = 'Balanced sentiment'
+        elif pcr_value > 0.4:
+            pcr_sentiment = 'COMPLACENCY'
+            pcr_score = -0.3
+            pcr_desc = 'Caution on call side'
+        else:
+            pcr_sentiment = 'EXTREME_COMPLACENCY'
+            pcr_score = -0.8
+            pcr_desc = 'Significant caution, risk of reversal'
+    else:
+        result['errors'].append('PCR data unavailable from all sources')
+    
+    result['pcr_source'] = pcr_source
     result['dimensions']['pcr_sentiment'] = {
         'value': pcr_sentiment,
-        'pcr': round(pcr_value, 3),
+        'pcr': pcr_value if pcr_value is not None else 0.0,
         'score': pcr_score,
         'description': pcr_desc
     }
