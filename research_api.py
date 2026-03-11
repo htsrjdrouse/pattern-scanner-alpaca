@@ -749,8 +749,8 @@ def get_stock_detail(symbol):
 
     # 2. IV Rank from Tastytrade
     try:
-        from hybrid_data import get_iv_rank
-        iv_data = get_iv_rank(symbol)
+        from tastytrade_data import get_iv_rank_with_retry
+        iv_data = get_iv_rank_with_retry(symbol)
         result['iv_rank'] = iv_data
     except Exception as e:
         result['iv_rank'] = None

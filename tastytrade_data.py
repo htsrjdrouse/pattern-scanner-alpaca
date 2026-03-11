@@ -206,6 +206,139 @@ def get_strike_by_delta(symbol: str, expiration: date, target_delta: float,
 # ── IV Rank ──────────────────────────────────────────────────────────────────
 
 @_require_session  
+def _validate_iv_rank(symbol: str, iv_rank_value: float) -> tuple[float | None, str]:
+    """Cross-validate IV rank against ATM IV from yfinance."""
+    import yfinance as yf
+    
+    if iv_rank_value is None:
+        return None, 'unvalidated'
+    
+    if iv_rank_value > 5:
+        return iv_rank_value, 'valid'
+    
+    # IV rank 0-5% — cross-validate
+    try:
+        ticker = yf.Ticker(symbol)
+        expirations = ticker.options
+        if not expirations:
+            return iv_rank_value, 'unvalidated'
+        
+        chain = ticker.option_chain(expirations[0])
+        calls = chain.calls
+        
+        if calls.empty:
+            return iv_rank_value, 'unvalidated'
+        
+        hist = ticker.history(period='2d')
+        if hist.empty:
+            return iv_rank_value, 'unvalidated'
+        current_price = hist['Close'].iloc[-1]
+        
+        atm_idx = (calls['strike'] - current_price).abs().idxmin()
+        atm_iv = calls.loc[atm_idx, 'impliedVolatility']
+        
+        if atm_iv > 0.20 and iv_rank_value < 5:
+            return None, 'suspect_low'
+        
+        return iv_rank_value, 'valid'
+    
+    except Exception:
+        return iv_rank_value, 'unvalidated'
+
+
+def get_iv_rank_with_retry(symbol: str, max_retries: int = 2) -> dict:
+    """Fetch IV rank with retry logic and validation."""
+    import time
+    from tastytrade_client import get_session
+    
+    last_result = None
+    session = get_session()
+    
+    for attempt in range(max_retries):
+        try:
+            result = get_iv_rank(symbol, session=session)
+            iv_val = None
+            
+            if isinstance(result, dict):
+                iv_val = result.get('iv_rank') or result.get('iv_percentile')
+            elif isinstance(result, (int, float)):
+                iv_val = float(result)
+            
+            validated_val, status = _validate_iv_rank(symbol, iv_val)
+            
+            if status == 'suspect_low' and attempt < max_retries - 1:
+                time.sleep(1.5)
+                last_result = result
+                continue
+            
+            if validated_val is None and status == 'suspect_low':
+                return _iv_rank_yfinance_fallback(symbol)
+            
+            if isinstance(result, dict):
+                result['iv_rank_validation'] = status
+            return result
+        
+        except Exception as e:
+            last_result = {'error': str(e)}
+            if attempt < max_retries - 1:
+                time.sleep(1.0)
+    
+    return last_result or _iv_rank_yfinance_fallback(symbol)
+
+
+def _iv_rank_yfinance_fallback(symbol: str) -> dict:
+    """Approximate IV rank using yfinance when Tastytrade is unreliable."""
+    import yfinance as yf
+    import numpy as np
+    
+    try:
+        ticker = yf.Ticker(symbol)
+        expirations = ticker.options
+        if not expirations:
+            return {'iv_rank': None, 'source': 'unavailable'}
+        
+        chain = ticker.option_chain(expirations[0])
+        calls = chain.calls
+        hist = ticker.history(period='2d')
+        
+        if calls.empty or hist.empty:
+            return {'iv_rank': None, 'source': 'unavailable'}
+        
+        current_price = hist['Close'].iloc[-1]
+        atm_idx = (calls['strike'] - current_price).abs().idxmin()
+        current_iv = float(calls.loc[atm_idx, 'impliedVolatility'])
+        
+        hist_1y = ticker.history(period='1y')
+        if len(hist_1y) < 50:
+            return {'iv_rank': None, 'source': 'unavailable'}
+        
+        returns = hist_1y['Close'].pct_change().dropna()
+        realized_vol = float(returns.std() * np.sqrt(252))
+        
+        iv_low_est = realized_vol * 0.8
+        iv_high_est = realized_vol * 2.5
+        
+        if iv_high_est <= iv_low_est:
+            return {'iv_rank': None, 'source': 'unavailable'}
+        
+        iv_rank_approx = round(
+            ((current_iv - iv_low_est) / (iv_high_est - iv_low_est)) * 100, 1
+        )
+        iv_rank_approx = max(0.0, min(100.0, iv_rank_approx))
+        
+        return {
+            'iv_rank': iv_rank_approx,
+            'iv_percentile': iv_rank_approx,
+            'current_iv': round(current_iv, 4),
+            'realized_vol': round(realized_vol, 4),
+            'source': 'yfinance_approximation',
+            'iv_rank_validation': 'approximated'
+        }
+    
+    except Exception as e:
+        return {'iv_rank': None, 'source': 'unavailable', 'error': str(e)}
+
+
 def get_iv_rank(symbol: str, session=None) -> dict | None:
     """
     Get current IV rank and IV percentile for a symbol.
@@ -222,6 +355,9 @@ def get_iv_rank(symbol: str, session=None) -> dict | None:
     }
     Falls back to yfinance calculation if Tastytrade data unavailable.
     """
+    if session is None:
+        return _get_iv_rank_yfinance_fallback(symbol)
+    
     async def _fetch():
         try:
             from tastytrade.instruments import Equity

@@ -317,5 +317,16 @@
     "email": "rjdrouse@gmail.com",
     "added_at": "2026-03-10T18:17:58.802641",
     "notified": false
+  },
+  {
+    "ticker": "VRTX",
+    "buy_point": 484.63,
+    "rsi_min": 50.0,
+    "rsi_max": 70.0,
+    "volume_multiple": 2.0,
+    "breakeven_move": 23.9,
+    "email": "rjdrouse@gmail.com",
+    "added_at": "2026-03-11T04:50:21.755228",
+    "notified": false
   }
 ]

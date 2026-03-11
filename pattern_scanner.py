@@ -659,29 +659,89 @@ def _build_cash_secured_put(ticker, symbol, current_price, budget, iv_rank, vix,
     }
 
 
+def _select_leap_expiry(expirations: list, min_dte: int = 180) -> str | None:
+    """Select nearest expiry >= min_dte days, prefer 270 days."""
+    from datetime import datetime, date
+    
+    today = date.today()
+    valid = []
+    
+    for exp_str in expirations:
+        try:
+            exp_date = datetime.strptime(exp_str, '%Y-%m-%d').date()
+            dte = (exp_date - today).days
+            if dte >= min_dte:
+                valid.append((dte, exp_str))
+        except Exception:
+            continue
+    
+    if not valid:
+        return None
+    
+    target_dte = 270
+    valid.sort(key=lambda x: abs(x[0] - target_dte))
+    return valid[0][1]
+
+
+def _select_pmcc_short_leg(calls_df, current_price: float, dte: int, 
+                           min_iv: float = 0.15, min_oi: int = 10) -> dict | None:
+    """Select best short call leg for PMCC with liquidity filters."""
+    import pandas as pd
+    
+    df = calls_df.copy()
+    
+    # OTM calls only
+    df = df[df['strike'] > current_price]
+    
+    # Minimum OI
+    df = df[df['openInterest'] >= min_oi]
+    
+    # Minimum IV
+    df = df[df['impliedVolatility'] >= min_iv]
+    
+    if df.empty:
+        return None
+    
+    # Target 3-15% OTM (approx 0.25-0.40 delta)
+    df['distance_pct'] = (df['strike'] - current_price) / current_price
+    df = df[(df['distance_pct'] >= 0.03) & (df['distance_pct'] <= 0.15)]
+    
+    if df.empty:
+        return None
+    
+    # Score by IV * OI (maximize premium + liquidity)
+    df['score'] = df['impliedVolatility'] * df['openInterest'].clip(upper=100)
+    best = df.loc[df['score'].idxmax()]
+    
+    return {
+        'strike': float(best['strike']),
+        'bid': float(best['bid']) if pd.notna(best['bid']) and best['bid'] > 0 else float(best['lastPrice']) * 0.95,
+        'ask': float(best['ask']) if pd.notna(best['ask']) else float(best['lastPrice']) * 1.05,
+        'delta': calculate_approx_delta(float(best['strike']), current_price, dte),
+        'iv': float(best['impliedVolatility']),
+        'volume': int(best['volume']) if pd.notna(best['volume']) else 0,
+        'oi': int(best['openInterest'])
+    }
+
+
 def _build_pmcc(ticker, symbol, current_price, budget, iv_rank, vix, regime, trend_regime, trend_regime_desc, analysis):
     """Build Poor Man's Covered Call (diagonal spread)."""
     rationale = 'Moderate IV — diagonal gives long delta exposure with reduced capital vs. shares, and short leg offsets cost.'
     today = datetime.today()
     expirations = ticker.options
     
-    # Find long leg: 90+ DTE
-    long_exps = []
-    for exp in expirations:
-        try:
-            exp_date = datetime.strptime(exp, '%Y-%m-%d')
-            days = (exp_date - today).days
-            if days >= 90:
-                long_exps.append({'date': exp, 'days': days})
-        except:
-            continue
+    # Find LEAP leg: minimum 180 DTE, prefer 270
+    long_exp_str = _select_leap_expiry(expirations, min_dte=180)
+    if not long_exp_str:
+        return {
+            'status': 'error',
+            'message': 'PMCC unavailable — no LEAP expiry (180+ days) found',
+            'strategy': 'Long Call (PMCC unavailable)',
+            'rationale': 'PMCC requires a LEAP (180+ days). Consider a straight long call instead.'
+        }
     
-    if not long_exps:
-        return {'status': 'error', 'message': 'No long-dated expirations'}
-    
-    long_exp = min(long_exps, key=lambda x: abs(x['days'] - 120))
-    long_exp_str = long_exp['date']
-    long_days = long_exp['days']
+    long_exp_date = datetime.strptime(long_exp_str, '%Y-%m-%d')
+    long_days = (long_exp_date - today).days
     
     # Find short leg: 30-45 DTE
     short_exps = []
@@ -724,28 +784,29 @@ def _build_pmcc(ticker, symbol, current_price, budget, iv_rank, vix, regime, tre
     long_volume = int(long_option['volume']) if pd.notna(long_option['volume']) else 0
     long_oi = int(long_option['openInterest']) if pd.notna(long_option['openInterest']) else 0
     
-    # Short leg: OTM (0.30 delta)
+    # Short leg: OTM with liquidity filters
     short_chain = ticker.option_chain(short_exp_str).calls
     if short_chain.empty:
         return {'status': 'error', 'message': 'Empty short chain'}
     
-    short_chain = short_chain.copy()
-    short_chain['approx_delta'] = short_chain['strike'].apply(lambda s: calculate_approx_delta(s, current_price, short_days))
-    short_candidates = short_chain[(short_chain['approx_delta'] >= 0.25) & (short_chain['approx_delta'] <= 0.35)]
+    short_leg = _select_pmcc_short_leg(short_chain, current_price, short_days)
     
-    if short_candidates.empty:
-        short_option = short_chain.iloc[(short_chain['strike'] - current_price * 1.05).abs().argsort()[:1]].iloc[0]
-    else:
-        short_option = short_candidates.iloc[(short_candidates['approx_delta'] - 0.30).abs().argsort()[:1]].iloc[0]
+    if short_leg is None:
+        return {
+            'status': 'error',
+            'message': 'PMCC unavailable — no liquid short leg found',
+            'strategy': 'Long Call (PMCC unavailable)',
+            'rationale': 'PMCC requires a liquid short call with IV ≥ 15% and OI ≥ 10. No qualifying short leg found. Consider a straight long call on the LEAP leg instead.'
+        }
     
-    short_strike = float(short_option['strike'])
-    short_bid = float(short_option['bid']) if pd.notna(short_option['bid']) and short_option['bid'] > 0 else float(short_option['lastPrice']) * 0.95
-    short_ask = float(short_option['ask']) if pd.notna(short_option['ask']) else short_bid * 1.05
+    short_strike = short_leg['strike']
+    short_bid = short_leg['bid']
+    short_ask = short_leg['ask']
     short_mid = (short_ask + short_bid) / 2
-    short_delta = calculate_approx_delta(short_strike, current_price, short_days)
-    short_iv = float(short_option['impliedVolatility']) if pd.notna(short_option['impliedVolatility']) else None
-    short_volume = int(short_option['volume']) if pd.notna(short_option['volume']) else 0
-    short_oi = int(short_option['openInterest']) if pd.notna(short_option['openInterest']) else 0
+    short_delta = short_leg['delta']
+    short_iv = short_leg['iv']
+    short_volume = short_leg['volume']
+    short_oi = short_leg['oi']
     
     net_debit = long_mid - short_mid
     contracts = max(1, int(budget / (net_debit * 100)))
