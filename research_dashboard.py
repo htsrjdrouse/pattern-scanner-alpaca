@@ -1490,6 +1490,7 @@ RESEARCH_DASHBOARD_HTML = """
         // ============================================================================
         // RISK MANAGER FUNCTIONS
         // ============================================================================
+        // Version: 2026-03-11-16:30 - Null safety for positions
         
         let riskHistoryChart = null;
         let riskRefreshInterval = null;
