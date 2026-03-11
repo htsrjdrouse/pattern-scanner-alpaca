@@ -277,11 +277,19 @@ def get_risk_snapshot(force_refresh=False):
             daily_log['start_of_day_vix'] = None
         
         save_daily_log(daily_log)
+    
+    # Auto-fix: If baseline is way off (more than 50% different from current), reset it
+    # This handles old baselines that didn't include all accounts
+    start_of_day_value = daily_log.get('start_of_day_value', total_portfolio_value)
+    if start_of_day_value > 0:
+        diff_pct = abs(total_portfolio_value - start_of_day_value) / start_of_day_value
+        if diff_pct > 0.5:  # More than 50% difference suggests bad baseline
+            daily_log['start_of_day_value'] = total_portfolio_value
+            save_daily_log(daily_log)
+            start_of_day_value = total_portfolio_value
+    
     # Combine all positions
     all_positions = alpaca_positions + manual_positions
-    
-    for account_name in ['thinkorswim', 'sofi', 'robinhood']:
-        account_positions = [p for p in manual_positions if p.get('account') == account_name]
     
     for account_name in ['thinkorswim', 'sofi', 'robinhood']:
         account_positions = [p for p in manual_positions if p.get('account') == account_name]
@@ -291,8 +299,7 @@ def get_risk_snapshot(force_refresh=False):
             "source": "manual"
         }
     
-    # Calculate P&L
-    start_of_day_value = daily_log.get('start_of_day_value', total_portfolio_value)
+    # Calculate P&L (start_of_day_value already set above with auto-fix)
     daily_pnl = total_portfolio_value - start_of_day_value
     daily_pnl_pct = (daily_pnl / start_of_day_value) if start_of_day_value > 0 else 0
     

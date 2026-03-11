@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-11T16:23:53.034084",
+  "timestamp": "2026-03-11T16:50:30.460962",
   "cache_age_minutes": 0,
   "market_open": true,
   "accounts": {
@@ -86,9 +86,9 @@
     ]
   },
   "vix": {
-    "current": 25.799999237060547,
+    "current": 25.260000228881836,
     "start_of_day": 24.93000030517578,
-    "change_pct": 0.034897670326307334,
+    "change_pct": 0.013237060556214375,
     "spike_detected": false
   },
   "pdt": {
