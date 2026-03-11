@@ -20,17 +20,29 @@ logger = logging.getLogger(__name__)
 def _run_async(coro):
     """Run an async coroutine from synchronous Flask context."""
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(asyncio.run, coro)
-                return future.result(timeout=15)
-        else:
-            return loop.run_until_complete(coro)
+        # Try nest_asyncio first to handle nested event loops
+        try:
+            import nest_asyncio
+            nest_asyncio.apply()
+        except ImportError:
+            pass
+        
+        return asyncio.run(coro)
+    except RuntimeError as e:
+        # If asyncio.run fails, try creating a new event loop
+        if "Event loop is closed" in str(e) or "no running event loop" in str(e):
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(coro)
+                finally:
+                    loop.close()
+            except Exception:
+                pass
     except Exception as e:
         logger.error(f"Async execution error: {e}")
-        return None
+    return None
 
 
 def _require_session(func):

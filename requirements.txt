@@ -16,3 +16,4 @@ python-dotenv>=1.0.0
 websocket-client>=1.8.0
 yfinance>=0.2.30
 tastytrade>=12.0.0
+nest_asyncio>=1.6.0
