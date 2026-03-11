@@ -372,22 +372,28 @@ def get_iv_rank(symbol: str, session=None) -> dict | None:
     
     async def _fetch():
         try:
-            from tastytrade.instruments import Equity
-            equity = await Equity.get(session, symbol)
+            from tastytrade.metrics import get_market_metrics
             
-            # Get market metrics which includes IV rank
-            metrics = await equity.get_market_metrics(session)
+            metrics_list = await get_market_metrics(session, [symbol])
             
-            if metrics and hasattr(metrics, 'implied_volatility_index_rank'):
-                return {
-                    'symbol': symbol,
-                    'current_iv': float(metrics.implied_volatility_index or 0),
-                    'iv_rank': float(metrics.implied_volatility_index_rank or 0) * 100,
-                    'iv_percentile': float(metrics.implied_volatility_percentile or 0) * 100,
-                    'iv_high_52w': float(metrics.implied_volatility_index_high or 0),
-                    'iv_low_52w': float(metrics.implied_volatility_index_low or 0),
-                    'source': 'tastytrade'
-                }
+            if metrics_list and len(metrics_list) > 0:
+                metrics = metrics_list[0]
+                
+                # Parse IV rank - it's returned as a string like "0.45" (45%)
+                iv_rank_str = metrics.implied_volatility_index_rank
+                iv_percentile_str = metrics.implied_volatility_percentile
+                
+                iv_rank = float(iv_rank_str) * 100 if iv_rank_str else None
+                iv_percentile = float(iv_percentile_str) * 100 if iv_percentile_str else None
+                
+                if iv_rank is not None or iv_percentile is not None:
+                    return {
+                        'symbol': symbol,
+                        'current_iv': float(metrics.implied_volatility_index or 0),
+                        'iv_rank': iv_rank or iv_percentile or 0,
+                        'iv_percentile': iv_percentile or iv_rank or 0,
+                        'source': 'tastytrade'
+                    }
         except Exception as e:
             logger.warning(f"Tastytrade IV rank fetch failed for {symbol}: {e}")
         
