@@ -3441,15 +3441,22 @@ SCAN_RESULTS_TEMPLATE = """
                 </div>
             `;
 
-            const ivRankVal = data?.iv_rank?.iv_rank || data?.iv_rank?.iv_percentile;
+            const ivRankVal = data?.iv_rank?.resolved_value || data?.iv_rank?.iv_rank || data?.iv_rank?.iv_percentile;
+            const ivSource = data?.iv_rank?.resolved_source || data?.iv_rank?.source || 'unknown';
+            const sourceLabel = ivSource === 'tastytrade' ? 'Tastytrade ✅' : 
+                               ivSource === 'yfinance_approximation' ? 'yfinance approx ⚠️' :
+                               ivSource === 'atm_iv_heuristic' ? 'ATM IV estimate ⚠️' :
+                               ivSource === 'market_default' ? 'market default ⚠️' : 'unknown';
+            
             const ivHtml = ivRankVal !== undefined && ivRankVal !== null ? `
                 <div style="margin-bottom: 8px;">
                     <div style="height: 20px; background: linear-gradient(to right, #2196f3 0%, #2196f3 30%, #ff9800 30%, #ff9800 60%, #4caf50 60%, #4caf50 100%); border-radius: 4px; position: relative;">
                         <div style="position: absolute; left: ${fmt(ivRankVal, 1, '0')}%; top: -5px; width: 3px; height: 30px; background: white;"></div>
                     </div>
                     <p style="margin: 8px 0 0 0; font-size: 14px; color: #ccc;">IV Rank: ${fmt(ivRankVal, 1)}%</p>
+                    <p style="margin: 4px 0 0 0; font-size: 12px; color: #888;">Source: ${sourceLabel}</p>
                 </div>
-            ` : `<p style="color: #ff9800; margin: 0;">Tastytrade data unavailable</p>`;
+            ` : `<p style="color: #ff9800; margin: 0;">IV data unavailable</p>`;
 
             const optionsHtml = data.options_summary ? `
                 <p style="margin: 0 0 8px 0; color: #888; font-size: 12px;">Expiry: ${data.options_summary.nearest_expiry || '—'} | ATM Strike: $${fmt(data.options_summary.atm_strike, 2)}</p>
