@@ -1587,7 +1587,7 @@ RESEARCH_DASHBOARD_HTML = """
                 
                 data.positions.forEach(pos => {
                     const row = document.createElement('tr');
-                    const plColor = pos.unrealized_pl >= 0 ? '#22c55e' : '#ef4444';
+                    const plColor = (pos.unrealized_pl || 0) >= 0 ? '#22c55e' : '#ef4444';
                     let actionCell = '-';
                     
                     if (pos.rolling_vs_closing) {
@@ -1596,15 +1596,18 @@ RESEARCH_DASHBOARD_HTML = """
                         actionCell = `<span style="padding: 4px 8px; border-radius: 4px; background: ${color}; color: ${rec === 'EVALUATE_ROLL' ? '#1e1e2e' : 'white'}; font-size: 0.85em; cursor: help;" title="${pos.rolling_vs_closing.reason}">${rec}</span>`;
                     }
                     
+                    const unrealizedPL = pos.unrealized_pl !== null && pos.unrealized_pl !== undefined ? pos.unrealized_pl : 0;
+                    const unrealizedPLPC = pos.unrealized_plpc !== null && pos.unrealized_plpc !== undefined ? pos.unrealized_plpc : 0;
+                    
                     row.innerHTML = `
                         <td style="padding: 8px;">${pos.symbol}</td>
                         <td style="padding: 8px;">${pos.account}</td>
                         <td style="padding: 8px;">${pos.position_type || pos.asset_class}</td>
                         <td style="padding: 8px;">${pos.side}</td>
                         <td style="padding: 8px; text-align: right;">${pos.qty}</td>
-                        <td style="padding: 8px; text-align: right;">$${pos.market_value.toFixed(0)}</td>
-                        <td style="padding: 8px; text-align: right; color: ${plColor};">$${pos.unrealized_pl.toFixed(0)}</td>
-                        <td style="padding: 8px; text-align: right; color: ${plColor};">${(pos.unrealized_plpc * 100).toFixed(1)}%</td>
+                        <td style="padding: 8px; text-align: right;">$${(pos.market_value || 0).toFixed(0)}</td>
+                        <td style="padding: 8px; text-align: right; color: ${plColor};">$${unrealizedPL.toFixed(0)}</td>
+                        <td style="padding: 8px; text-align: right; color: ${plColor};">${(unrealizedPLPC * 100).toFixed(1)}%</td>
                         <td style="padding: 8px; text-align: center;" id="action-${pos.id || 'none'}">${actionCell}</td>
                     `;
                     tbody.appendChild(row);

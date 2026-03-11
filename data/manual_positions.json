@@ -46,5 +46,21 @@
     "unrealized_plpc": 0.22192916352675207,
     "id": "a5b0cba0-9328-4108-9f81-27c94479a347",
     "last_updated": "2026-03-10T16:18:54.977547"
+  },
+  {
+    "symbol": "SOLS",
+    "account": "robinhood",
+    "position_type": "equity",
+    "side": "long",
+    "qty": 6.6,
+    "cost_basis": null,
+    "current_price": 45.49,
+    "notes": "",
+    "date_entered": "2026-03-11",
+    "market_value": 300.234,
+    "unrealized_pl": null,
+    "unrealized_plpc": null,
+    "id": "fe6f99b5-cade-4210-9024-1ea09f4af37d",
+    "last_updated": "2026-03-11T23:23:59.431229"
   }
 ]

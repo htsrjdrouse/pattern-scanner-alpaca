@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-11T16:59:05.201210",
+  "timestamp": "2026-03-11T23:27:00.791145",
   "cache_age_minutes": 0,
   "market_open": true,
   "accounts": {
@@ -20,15 +20,15 @@
       "source": "manual"
     },
     "robinhood": {
-      "portfolio_value": 10541.00357,
-      "positions_count": 3,
+      "portfolio_value": 10841.23757,
+      "positions_count": 4,
       "source": "manual"
     }
   },
-  "total_portfolio_value": 110541.00357,
+  "total_portfolio_value": 110841.23757,
   "pnl": {
-    "daily": 0.0,
-    "daily_pct": 0.0,
+    "daily": 300.23399999999674,
+    "daily_pct": 0.0027160419238447912,
     "weekly": 0,
     "weekly_pct": 0.0,
     "monthly": 0,
@@ -38,8 +38,8 @@
   "limits": {
     "daily_loss": {
       "status": "OK",
-      "usage_pct": 0.0,
-      "current": 0.0,
+      "usage_pct": 0.6004679999999935,
+      "current": 300.23399999999674,
       "limit": -500
     },
     "weekly_loss": {
@@ -55,40 +55,40 @@
       "limit": -0.1
     },
     "buying_power": {
-      "status": "BREACHED",
-      "usage_pct": 1.6185667497283063,
-      "current": -0.8092833748641531,
+      "status": "OK",
+      "usage_pct": 0.0,
+      "current": 0,
       "limit": 0.5
     },
     "position_count": {
       "status": "OK",
-      "usage_pct": 0.15,
-      "current": 3,
+      "usage_pct": 0.2,
+      "current": 4,
       "limit": 20
     }
   },
   "exposure": {
-    "net_delta_dollars": 10541.00357,
+    "net_delta_dollars": 10841.237570000001,
     "directional_bias": "SIGNIFICANT_LONG",
-    "buying_power_usage_pct": -0.8092833748641531,
-    "largest_position_pct": 7.113018396852971,
+    "buying_power_usage_pct": 0,
+    "largest_position_pct": 7.093751470461861,
     "sector_concentrations": [
       {
         "sector": "Automotive",
-        "pct": 7.113018396852971,
+        "pct": 7.093751470461861,
         "flagged": false
       },
       {
         "sector": "Other",
-        "pct": 2.4228128599393717,
+        "pct": 2.68711872521183,
         "flagged": false
       }
     ]
   },
   "vix": {
-    "current": 25.139999389648438,
+    "current": 24.229999542236328,
     "start_of_day": 25.139999389648438,
-    "change_pct": 0.0,
+    "change_pct": -0.03619728995645115,
     "spike_detected": false
   },
   "pdt": {
@@ -158,17 +158,29 @@
       "last_updated": "2026-03-10T16:18:54.977547",
       "rolling_vs_closing": null,
       "concentration_flag": false
-    }
-  ],
-  "alerts": [
+    },
     {
-      "level": "WARNING",
-      "type": "BUYING_POWER",
-      "message": "Buying power usage at 162% of account \u2014 above 50% threshold. Do not open new positions until existing ones are reduced."
+      "symbol": "SOLS",
+      "account": "robinhood",
+      "position_type": "equity",
+      "side": "long",
+      "qty": 6.6,
+      "cost_basis": null,
+      "current_price": 45.49,
+      "notes": "",
+      "date_entered": "2026-03-11",
+      "market_value": 300.234,
+      "unrealized_pl": null,
+      "unrealized_plpc": null,
+      "id": "fe6f99b5-cade-4210-9024-1ea09f4af37d",
+      "last_updated": "2026-03-11T23:23:59.431229",
+      "rolling_vs_closing": null,
+      "concentration_flag": false
     }
   ],
+  "alerts": [],
   "alert_count_critical": 0,
-  "alert_count_warning": 1,
+  "alert_count_warning": 0,
   "risk_config": {
     "account_size_total": 50000,
     "daily_loss_limit_dollars": 500,

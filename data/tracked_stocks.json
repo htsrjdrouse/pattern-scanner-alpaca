@@ -339,5 +339,16 @@
     "email": "rjdrouse@gmail.com",
     "added_at": "2026-03-11T14:50:08.850645",
     "notified": false
+  },
+  {
+    "ticker": "XENE",
+    "buy_point": 45.06,
+    "rsi_min": 50.0,
+    "rsi_max": 70.0,
+    "volume_multiple": 2.0,
+    "breakeven_move": 13.5,
+    "email": "rjdrouse@gmail.com",
+    "added_at": "2026-03-11T22:00:19.765301",
+    "notified": false
   }
 ]
