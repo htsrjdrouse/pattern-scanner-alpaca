@@ -37,9 +37,10 @@ A Flask-based stock pattern scanner with **live trading capabilities** powered b
 
 ## 📊 Hybrid Data Approach
 
-**Best of both worlds:**
+**Best of three worlds:**
 - **Alpaca**: Real-time prices, order execution, streaming data
-- **yfinance**: Options chains, IV data, company fundamentals
+- **Tastytrade**: IV rank, IV percentile, market metrics (with fallback to yfinance approximation)
+- **yfinance**: Options chains, historical data, company fundamentals
 
 ## 🛠️ Quick Start
 
@@ -84,15 +85,21 @@ docker compose logs -f
 
 Create `.env` file:
 ```
+# Alpaca Trading (required)
 ALPACA_API_KEY=your_api_key_here
 ALPACA_SECRET_KEY=your_secret_key_here
 ALPACA_MODE=paper
+
+# Tastytrade Market Data (optional - falls back to yfinance if not configured)
+TASTYTRADE_CLIENT_SECRET=your_client_secret_here
+TASTYTRADE_REFRESH_TOKEN=your_refresh_token_here
 ```
 
 **⚠️ IMPORTANT**: 
 - Start with `ALPACA_MODE=paper` for testing
 - Never commit your `.env` file
 - Mode badge always shows PAPER/LIVE in UI
+- Tastytrade credentials are optional - system uses yfinance approximation as fallback
 
 ## 📡 API Endpoints
 
