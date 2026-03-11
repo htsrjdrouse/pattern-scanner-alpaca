@@ -284,10 +284,12 @@ def get_risk_snapshot(force_refresh=False):
     if start_of_day_value > 0:
         diff_pct = abs(total_portfolio_value - start_of_day_value) / start_of_day_value
         if diff_pct > 0.5:  # More than 50% difference suggests bad baseline
+            print(f"[WOLVERINE] Auto-fixing baseline: {start_of_day_value} -> {total_portfolio_value} (diff: {diff_pct:.1%})")
             daily_log['start_of_day_value'] = total_portfolio_value
             save_daily_log(daily_log)
             start_of_day_value = total_portfolio_value
     
+    print(f"[WOLVERINE] Total portfolio: ${total_portfolio_value:,.0f}, Baseline: ${start_of_day_value:,.0f}, Daily P&L: ${total_portfolio_value - start_of_day_value:,.0f}")
     # Combine all positions
     all_positions = alpaca_positions + manual_positions
     
@@ -318,14 +320,20 @@ def get_risk_snapshot(force_refresh=False):
     monthly_pnl_pct = (monthly_pnl / start_of_day_value) if start_of_day_value > 0 else 0
     
     # Evaluate limits
+    alpaca_portfolio = accounts['alpaca_scanner']['portfolio_value']
+    alpaca_buying_power = accounts['alpaca_scanner']['buying_power']
+    
+    # Buying power usage: how much of Alpaca account is deployed
+    # If portfolio = $100k and buying power = $50k, then $50k is deployed (50% usage)
+    buying_power_usage = 0
+    if alpaca_portfolio > 0 and alpaca_buying_power < alpaca_portfolio:
+        buying_power_usage = (alpaca_portfolio - alpaca_buying_power) / alpaca_portfolio
+    
     limits = {
         "daily_loss": evaluate_limit(daily_pnl, -config['daily_loss_limit_dollars']),
         "weekly_loss": evaluate_limit(weekly_pnl, -config['weekly_loss_limit_dollars']),
         "monthly_loss": evaluate_limit(monthly_pnl_pct, -config['monthly_loss_limit_pct']),
-        "buying_power": evaluate_limit(
-            (total_portfolio_value - accounts['alpaca_scanner']['buying_power']) / total_portfolio_value if total_portfolio_value > 0 else 0,
-            config['max_buying_power_usage_pct']
-        ),
+        "buying_power": evaluate_limit(buying_power_usage, config['max_buying_power_usage_pct']),
         "position_count": evaluate_limit(len(all_positions), config['max_positions_total'])
     }
     
