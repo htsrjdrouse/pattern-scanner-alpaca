@@ -3363,6 +3363,7 @@ SCAN_RESULTS_TEMPLATE = """
         </div>
 
         <script>
+        // Version: 2026-03-11-09:12 - IV rank resolution display fix
         let currentDrawerSymbol = null;
 
         async function openStockDrawer(symbol) {
