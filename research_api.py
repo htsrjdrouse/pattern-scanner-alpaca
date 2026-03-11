@@ -663,6 +663,11 @@ def add_manual_position():
     try:
         position_data = request.get_json()
         result = risk_manager.add_manual_position(position_data)
+        # Clear cache so new position shows immediately
+        import os
+        cache_file = 'data/risk_cache.json'
+        if os.path.exists(cache_file):
+            os.remove(cache_file)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -673,6 +678,11 @@ def update_manual_position(position_id):
     try:
         position_data = request.get_json()
         result = risk_manager.update_manual_position(position_id, position_data)
+        # Clear cache so update shows immediately
+        import os
+        cache_file = 'data/risk_cache.json'
+        if os.path.exists(cache_file):
+            os.remove(cache_file)
         if result:
             return jsonify(result)
         return jsonify({'error': 'Position not found'}), 404
@@ -684,6 +694,11 @@ def delete_manual_position(position_id):
     """Delete manual position"""
     try:
         risk_manager.delete_manual_position(position_id)
+        # Clear cache so deletion shows immediately
+        import os
+        cache_file = 'data/risk_cache.json'
+        if os.path.exists(cache_file):
+            os.remove(cache_file)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
