@@ -726,6 +726,63 @@ def get_stock_detail(symbol):
     """Get complete per-stock options analysis package"""
     import yfinance as yf
     from pattern_scanner import get_next_earnings_days
+    from datetime import datetime, date
+    
+    def select_nearest_valid_expiry(expirations: list, min_dte: int = 7):
+        """Select nearest expiry with at least min_dte days remaining"""
+        today = date.today()
+        for exp_str in expirations:
+            try:
+                exp_date = datetime.strptime(exp_str, '%Y-%m-%d').date()
+                dte = (exp_date - today).days
+                if dte >= min_dte:
+                    return exp_str
+            except Exception:
+                continue
+        return None
+    
+    def resolve_iv_rank(sym: str, iv_rank_data: dict):
+        """Resolve IV rank from available sources in priority order"""
+        # 1. Try Tastytrade result
+        if isinstance(iv_rank_data, dict):
+            val = iv_rank_data.get('iv_rank') or iv_rank_data.get('iv_percentile')
+            if val is not None and val > 0:
+                return float(val), 'tastytrade'
+        
+        # 2. Try yfinance approximation
+        try:
+            from tastytrade_data import _iv_rank_yfinance_fallback
+            yf_result = _iv_rank_yfinance_fallback(sym)
+            val = yf_result.get('iv_rank')
+            if val is not None and val > 0:
+                return float(val), 'yfinance_approximation'
+        except Exception:
+            pass
+        
+        # 3. Use ATM IV as heuristic
+        try:
+            ticker = yf.Ticker(sym)
+            expirations = [e for e in ticker.options 
+                          if (datetime.strptime(e, '%Y-%m-%d').date() - date.today()).days >= 7]
+            if expirations:
+                chain = ticker.option_chain(expirations[0])
+                calls = chain.calls
+                hist = ticker.history(period='2d')
+                if not calls.empty and not hist.empty:
+                    price = hist['Close'].iloc[-1]
+                    atm_idx = (calls['strike'] - price).abs().idxmin()
+                    atm_iv = float(calls.loc[atm_idx, 'impliedVolatility']) * 100
+                    if atm_iv > 30:
+                        return 75.0, 'atm_iv_heuristic'
+                    elif atm_iv > 15:
+                        return 45.0, 'atm_iv_heuristic'
+                    else:
+                        return 15.0, 'atm_iv_heuristic'
+        except Exception:
+            pass
+        
+        # 4. Market default
+        return 45.0, 'market_default'
     
     symbol = symbol.upper()
     result = {
@@ -761,24 +818,28 @@ def get_stock_detail(symbol):
         ticker = yf.Ticker(symbol)
         expirations = ticker.options
         if expirations:
-            nearest_expiry = expirations[0]
-            chain = ticker.option_chain(nearest_expiry)
-            calls = chain.calls
-            puts = chain.puts
-            current_price = result.get('price', 0)
-            atm_strike = calls.iloc[(calls['strike'] - current_price).abs().argsort()[:1]]['strike'].values[0]
-            atm_call = calls[calls['strike'] == atm_strike].iloc[0]
-            atm_put = puts[puts['strike'] == atm_strike].iloc[0]
-            result['options_summary'] = {
-                'nearest_expiry': nearest_expiry,
-                'atm_strike': float(atm_strike),
-                'atm_call_iv': round(float(atm_call.get('impliedVolatility', 0)), 4),
-                'atm_put_iv': round(float(atm_put.get('impliedVolatility', 0)), 4),
-                'atm_call_bid': round(float(atm_call.get('bid', 0)), 2),
-                'atm_call_ask': round(float(atm_call.get('ask', 0)), 2),
-                'atm_put_bid': round(float(atm_put.get('bid', 0)), 2),
-                'atm_put_ask': round(float(atm_put.get('ask', 0)), 2),
-            }
+            nearest_expiry = select_nearest_valid_expiry(expirations, min_dte=7)
+            if nearest_expiry is None:
+                result['options_summary'] = None
+                result['errors'].append('No valid expiry found (all within 7 days)')
+            else:
+                chain = ticker.option_chain(nearest_expiry)
+                calls = chain.calls
+                puts = chain.puts
+                current_price = result.get('price', 0)
+                atm_strike = calls.iloc[(calls['strike'] - current_price).abs().argsort()[:1]]['strike'].values[0]
+                atm_call = calls[calls['strike'] == atm_strike].iloc[0]
+                atm_put = puts[puts['strike'] == atm_strike].iloc[0]
+                result['options_summary'] = {
+                    'nearest_expiry': nearest_expiry,
+                    'atm_strike': float(atm_strike),
+                    'atm_call_iv': round(float(atm_call.get('impliedVolatility', 0)), 4),
+                    'atm_put_iv': round(float(atm_put.get('impliedVolatility', 0)), 4),
+                    'atm_call_bid': round(float(atm_call.get('bid', 0)), 2),
+                    'atm_call_ask': round(float(atm_call.get('ask', 0)), 2),
+                    'atm_put_bid': round(float(atm_put.get('bid', 0)), 2),
+                    'atm_put_ask': round(float(atm_put.get('ask', 0)), 2),
+                }
         else:
             result['options_summary'] = None
             result['errors'].append('No options chain available')
@@ -792,36 +853,45 @@ def get_stock_detail(symbol):
     except Exception as e:
         result['earnings_days'] = None
 
-    # 5. Strategy recommendation
+    # 5. Strategy recommendation with IV rank resolution
     try:
-        iv_rank_val = result.get('iv_rank', {})
-        if isinstance(iv_rank_val, dict):
-            iv_pct = iv_rank_val.get('iv_rank') or iv_rank_val.get('iv_percentile')
+        iv_rank_value, iv_source = resolve_iv_rank(symbol, result.get('iv_rank', {}))
+        
+        # Update iv_rank in result with resolved value
+        if isinstance(result.get('iv_rank'), dict):
+            result['iv_rank']['resolved_value'] = iv_rank_value
+            result['iv_rank']['resolved_source'] = iv_source
         else:
-            iv_pct = None
-
-        if iv_pct is not None:
-            if iv_pct < 30:
-                result['recommended_options_strategy'] = {
-                    'strategy': 'Long Call',
-                    'rationale': f'IV rank {iv_pct:.0f}% — low IV, buy premium cheaply',
-                    'color': 'blue'
-                }
-            elif iv_pct < 60:
-                result['recommended_options_strategy'] = {
-                    'strategy': "Poor Man's Covered Call",
-                    'rationale': f'IV rank {iv_pct:.0f}% — moderate IV, diagonal spread',
-                    'color': 'amber'
-                }
-            else:
-                result['recommended_options_strategy'] = {
-                    'strategy': 'Cash-Secured Put',
-                    'rationale': f'IV rank {iv_pct:.0f}% — elevated IV, sell premium',
-                    'color': 'green'
-                }
+            result['iv_rank'] = {
+                'iv_rank': iv_rank_value,
+                'resolved_source': iv_source
+            }
+        
+        # Select strategy - iv_rank_value is always non-null
+        if iv_rank_value < 30:
+            result['recommended_options_strategy'] = {
+                'strategy': 'Long Call',
+                'rationale': f'IV rank {iv_rank_value:.0f}% ({iv_source}) — low IV, buy premium cheaply',
+                'color': 'blue'
+            }
+        elif iv_rank_value < 60:
+            result['recommended_options_strategy'] = {
+                'strategy': "Poor Man's Covered Call",
+                'rationale': f'IV rank {iv_rank_value:.0f}% ({iv_source}) — moderate IV, diagonal spread',
+                'color': 'amber'
+            }
         else:
-            result['recommended_options_strategy'] = None
-    except Exception:
-        result['recommended_options_strategy'] = None
+            result['recommended_options_strategy'] = {
+                'strategy': 'Cash-Secured Put',
+                'rationale': f'IV rank {iv_rank_value:.0f}% ({iv_source}) — elevated IV, sell premium',
+                'color': 'green'
+            }
+    except Exception as e:
+        # Even if resolution fails, provide market default
+        result['recommended_options_strategy'] = {
+            'strategy': "Poor Man's Covered Call",
+            'rationale': 'IV rank 45% (market_default) — moderate IV, diagonal spread',
+            'color': 'amber'
+        }
 
     return jsonify(result)
