@@ -886,12 +886,15 @@ def calculate_expected_move(symbol, current_price, pattern_target=None):
         if not target_exp:
             return {'status': 'no_data'}
         
-        chain = ticker.option_chain(target_exp['date']).calls
-        if chain.empty:
+        chain_data = ticker.option_chain(target_exp['date'])
+        calls = chain_data.calls
+        puts = chain_data.puts
+        
+        if calls.empty:
             return {'status': 'no_data'}
         
-        # Get ATM IV
-        atm_option = chain.iloc[(chain['strike'] - current_price).abs().argsort()[:1]]
+        # Get ATM IV from calls
+        atm_option = calls.iloc[(calls['strike'] - current_price).abs().argsort()[:1]]
         iv = float(atm_option['impliedVolatility'].iloc[0]) if pd.notna(atm_option['impliedVolatility'].iloc[0]) else None
         
         if not iv:
@@ -904,26 +907,90 @@ def calculate_expected_move(symbol, current_price, pattern_target=None):
         move_1m = current_price * iv * math.sqrt(21/252)
         move_45d = current_price * iv * math.sqrt(45/252)
         
-        # Delta-based strikes
+        # Delta-based strikes using PUTS chain
         dte = target_exp['days']
         delta_strikes = []
-        for target_delta in [0.30, 0.20, 0.15, 0.10]:
-            # Find strike closest to this delta
-            chain_copy = chain.copy()
-            chain_copy['approx_delta'] = chain_copy['strike'].apply(
-                lambda s: calculate_approx_delta(s, current_price, dte)
+        target_deltas = [0.30, 0.20, 0.15, 0.10]
+        
+        # Check if puts chain has delta column
+        has_delta = 'delta' in puts.columns and puts['delta'].notna().any()
+        
+        if has_delta:
+            # Use actual delta from yfinance (put deltas are negative)
+            puts_copy = puts.copy()
+            puts_copy['abs_delta'] = puts_copy['delta'].abs()
+            puts_copy = puts_copy.dropna(subset=['abs_delta'])
+            
+            for target_delta in target_deltas:
+                if not puts_copy.empty:
+                    idx = (puts_copy['abs_delta'] - target_delta).abs().idxmin()
+                    row = puts_copy.loc[idx]
+                    strike = float(row['strike'])
+                    actual_delta = float(row['abs_delta'])
+                    prob_otm = (1 - actual_delta) * 100
+                    distance_pct = ((strike - current_price) / current_price) * 100
+                    delta_strikes.append({
+                        'delta': target_delta,
+                        'strike': round(strike, 2),
+                        'prob_otm': round(prob_otm, 1),
+                        'distance_pct': round(distance_pct, 1)
+                    })
+        else:
+            # Fallback: approximate delta using Black-Scholes
+            import numpy as np
+            from scipy.stats import norm
+            from datetime import date
+            
+            def approx_put_delta(strike_val, iv_val):
+                try:
+                    S = current_price
+                    K = strike_val
+                    T = dte / 365.0
+                    sigma = iv_val
+                    r = 0.05
+                    if T <= 0 or sigma <= 0:
+                        return None
+                    d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
+                    put_delta = norm.cdf(d1) - 1
+                    return abs(put_delta)
+                except:
+                    return None
+            
+            puts_copy = puts.copy()
+            puts_copy['abs_delta'] = puts_copy.apply(
+                lambda row: approx_put_delta(row['strike'], row['impliedVolatility']), 
+                axis=1
             )
-            closest = chain_copy.iloc[(chain_copy['approx_delta'] - target_delta).abs().argsort()[:1]]
-            if not closest.empty:
-                strike = float(closest['strike'].iloc[0])
-                actual_delta = float(closest['approx_delta'].iloc[0])
-                prob_otm = (1 - actual_delta) * 100
-                distance_pct = ((strike - current_price) / current_price) * 100
+            puts_copy = puts_copy.dropna(subset=['abs_delta'])
+            
+            for target_delta in target_deltas:
+                if not puts_copy.empty:
+                    idx = (puts_copy['abs_delta'] - target_delta).abs().idxmin()
+                    row = puts_copy.loc[idx]
+                    strike = float(row['strike'])
+                    actual_delta = float(row['abs_delta'])
+                    prob_otm = (1 - actual_delta) * 100
+                    distance_pct = ((strike - current_price) / current_price) * 100
+                    delta_strikes.append({
+                        'delta': target_delta,
+                        'strike': round(strike, 2),
+                        'prob_otm': round(prob_otm, 1),
+                        'distance_pct': round(distance_pct, 1)
+                    })
+        
+        # If delta_strikes is still empty, use fallback estimates
+        if not delta_strikes:
+            delta_to_approx_pct = {0.30: -5.0, 0.20: -8.0, 0.15: -10.0, 0.10: -13.0}
+            for delta in target_deltas:
+                pct = delta_to_approx_pct[delta]
+                strike = round(current_price * (1 + pct / 100), 2)
+                prob_otm = round((1 - delta) * 100, 1)
                 delta_strikes.append({
-                    'delta': target_delta,
-                    'strike': round(strike, 2),
-                    'prob_otm': round(prob_otm, 1),
-                    'distance_pct': round(distance_pct, 1)
+                    'delta': delta,
+                    'strike': strike,
+                    'prob_otm': prob_otm,
+                    'distance_pct': pct,
+                    'estimated': True
                 })
         
         # Pattern target comparison
