@@ -1794,5 +1794,10 @@ def add_research_routes(app):
     @app.route('/research')
     def research_dashboard():
         import signals
+        from flask import make_response
         signal_list = signals.list_signals()
-        return render_template_string(RESEARCH_DASHBOARD_HTML, signals=signal_list)
+        response = make_response(render_template_string(RESEARCH_DASHBOARD_HTML, signals=signal_list))
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
