@@ -9,6 +9,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from pathlib import Path
 import pandas_ta as ta
+import io
 
 CACHE_FILE = Path('data/regime_cache.json')
 HISTORY_FILE = Path('data/regime_history.json')
@@ -322,18 +323,85 @@ def run_regime_analysis(force_refresh=False):
     pcr_source = 'unavailable'
     pcr_desc = ''
     
-    # PCR fetch — try multiple CBOE ticker symbols with fallback chain
-    for pcr_ticker in ['^CPCE', '^CPC', '^PCALL']:
+    # PCR fetch — CBOE direct CSV first, yfinance tickers as last resort
+    
+    def _fetch_cboe_pcr() -> tuple:
+        """
+        Fetch put/call ratio directly from CBOE's public daily statistics page.
+        Returns (pcr_value, source_label) or (None, 'unavailable') on failure.
+
+        CBOE publishes two relevant CSVs:
+          - Equity P/C:  https://www.cboe.com/data/volatility-indexes/  (not CSV)
+          - Daily stats: https://www.cboe.com/us/options/market_statistics/daily/
+            direct CSV:  https://www.cboe.com/publish/scheduledtask/mktstat/daily_volume.csv
+
+        The daily_volume.csv contains total put volume and call volume for all CBOE
+        products. We compute total P/C = total_put_volume / total_call_volume.
+
+        If that fails, try the equity-only P/C from:
+          https://www.cboe.com/publish/scheduledtask/mktstat/equity_pc.csv
+        """
+        import requests
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (compatible; market-regime-classifier/1.0)'
+        }
+
+        # Attempt 1: equity-only P/C ratio CSV (most relevant for sentiment)
         try:
-            pcr_data = yf.Ticker(pcr_ticker).history(period='5d')
-            if not pcr_data.empty:
-                val = pcr_data['Close'].iloc[-1]
-                if val > 0:
-                    pcr_value = round(val, 3)
-                    pcr_source = pcr_ticker
-                    break
+            url = 'https://www.cboe.com/publish/scheduledtask/mktstat/equity_pc.csv'
+            resp = requests.get(url, headers=headers, timeout=10)
+            resp.raise_for_status()
+            # File format: DATE,PC_RATIO  (header on row 0, data starts row 1)
+            df = pd.read_csv(io.StringIO(resp.text))
+            df.columns = [c.strip().upper() for c in df.columns]
+            # Find the ratio column — may be named PC_RATIO, P/C, RATIO, etc.
+            ratio_col = next(
+                (c for c in df.columns if 'RATIO' in c or 'PC' in c or 'P/C' in c),
+                None
+            )
+            if ratio_col:
+                val = pd.to_numeric(df[ratio_col].iloc[-1], errors='coerce')
+                if pd.notna(val) and val > 0:
+                    return round(float(val), 3), 'cboe_equity_pc'
         except Exception:
-            continue
+            pass
+
+        # Attempt 2: total P/C from daily volume CSV
+        try:
+            url = 'https://www.cboe.com/publish/scheduledtask/mktstat/daily_volume.csv'
+            resp = requests.get(url, headers=headers, timeout=10)
+            resp.raise_for_status()
+            df = pd.read_csv(io.StringIO(resp.text))
+            df.columns = [c.strip().upper() for c in df.columns]
+            put_col = next((c for c in df.columns if 'PUT' in c), None)
+            call_col = next((c for c in df.columns if 'CALL' in c), None)
+            if put_col and call_col:
+                puts = pd.to_numeric(df[put_col].iloc[-1], errors='coerce')
+                calls = pd.to_numeric(df[call_col].iloc[-1], errors='coerce')
+                if pd.notna(puts) and pd.notna(calls) and calls > 0:
+                    return round(float(puts / calls), 3), 'cboe_total_pc'
+        except Exception:
+            pass
+
+        return None, 'unavailable'
+
+    # Try CBOE direct first
+    pcr_value, pcr_source = _fetch_cboe_pcr()
+
+    # Last resort: yfinance tickers (kept as fallback, known to be unreliable)
+    if pcr_value is None:
+        for pcr_ticker in ['^CPCE', '^CPC', '^PCALL']:
+            try:
+                pcr_data = yf.Ticker(pcr_ticker).history(period='5d')
+                if not pcr_data.empty:
+                    val = pcr_data['Close'].iloc[-1]
+                    if val > 0:
+                        pcr_value = round(val, 3)
+                        pcr_source = pcr_ticker
+                        break
+            except Exception:
+                continue
     
     if pcr_value is not None:
         if pcr_value > 1.2:

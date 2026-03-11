@@ -1283,7 +1283,7 @@ RESEARCH_DASHBOARD_HTML = """
                     metricsLine = `VIX: ${data.vix_level}`;
                 } else if (key === 'term_structure') {
                     const spread = data.vix_3m && data.vix_level ? (data.vix_3m - data.vix_level).toFixed(2) : '-';
-                    metricsLine = `Spread: ${spread} pts | Source: ${data.term_structure_source}`;
+                    metricsLine = `Spread: ${spread} pts | Source: ${data.term_structure_source || 'unknown'}`;
                 } else if (key === 'trend_assessment') {
                     metricsLine = `ADX: ${dim.adx || '-'}`;
                 } else if (key === 'vol_spread') {
@@ -1291,7 +1291,7 @@ RESEARCH_DASHBOARD_HTML = """
                 } else if (key === 'breadth') {
                     metricsLine = `A/D: ${(dim.ad_ratio * 100).toFixed(0)}% | NH/NL: ${(dim.nh_nl_ratio * 100).toFixed(0)}%`;
                 } else if (key === 'pcr_sentiment') {
-                    metricsLine = `PCR: ${dim.pcr} | Source: ${data.pcr_source}`;
+                    metricsLine = `PCR: ${dim.pcr} | Source: ${data.pcr_source || 'unknown'}`;
                 } else if (key === 'correlation_regime') {
                     metricsLine = `Avg Corr: ${dim.avg_correlation ? dim.avg_correlation.toFixed(2) : '-'}`;
                 }
