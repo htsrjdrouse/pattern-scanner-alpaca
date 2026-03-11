@@ -973,70 +973,117 @@ def calculate_expected_move(symbol, current_price, pattern_target=None):
         delta_strikes = []
         target_deltas = [0.30, 0.20, 0.15, 0.10]
         
-        # Check if puts chain has delta column
-        has_delta = 'delta' in puts.columns and puts['delta'].notna().any()
-        
-        if has_delta:
-            # Use actual delta from yfinance (put deltas are negative)
-            puts_copy = puts.copy()
-            puts_copy['abs_delta'] = puts_copy['delta'].abs()
-            puts_copy = puts_copy.dropna(subset=['abs_delta'])
-            
-            for target_delta in target_deltas:
-                if not puts_copy.empty:
-                    idx = (puts_copy['abs_delta'] - target_delta).abs().idxmin()
-                    row = puts_copy.loc[idx]
-                    strike = float(row['strike'])
-                    actual_delta = float(row['abs_delta'])
-                    prob_otm = (1 - actual_delta) * 100
-                    distance_pct = ((strike - current_price) / current_price) * 100
-                    delta_strikes.append({
-                        'delta': target_delta,
-                        'strike': round(strike, 2),
-                        'prob_otm': round(prob_otm, 1),
-                        'distance_pct': round(distance_pct, 1)
-                    })
+        # CRITICAL: Check if chain has enough strikes for meaningful lookup
+        otm_puts = puts[puts['strike'] < current_price]
+        if len(otm_puts) < 5:
+            # Sparse chain — use fallback estimates immediately
+            delta_to_approx_pct = {0.30: -5.0, 0.20: -8.0, 0.15: -10.0, 0.10: -13.0}
+            for delta in target_deltas:
+                pct = delta_to_approx_pct[delta]
+                strike = round(current_price * (1 + pct / 100), 2)
+                prob_otm = round((1 - delta) * 100, 1)
+                delta_strikes.append({
+                    'delta': delta,
+                    'strike': strike,
+                    'prob_otm': prob_otm,
+                    'distance_pct': round(pct, 1),
+                    'estimated': True
+                })
         else:
-            # Fallback: approximate delta using Black-Scholes
-            import numpy as np
-            from scipy.stats import norm
-            from datetime import date
-            
-            def approx_put_delta(strike_val, iv_val):
-                try:
-                    S = current_price
-                    K = strike_val
-                    T = dte / 365.0
-                    sigma = iv_val
-                    r = 0.05
-                    if T <= 0 or sigma <= 0:
-                        return None
-                    d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
-                    put_delta = norm.cdf(d1) - 1
-                    return abs(put_delta)
-                except:
-                    return None
-            
-            puts_copy = puts.copy()
-            puts_copy['abs_delta'] = puts_copy.apply(
-                lambda row: approx_put_delta(row['strike'], row['impliedVolatility']), 
-                axis=1
+            # Check if puts chain has delta column with real values
+            has_delta = (
+                'delta' in puts.columns and 
+                puts['delta'].notna().sum() > 3 and
+                puts['delta'].abs().max() > 0.01
             )
-            puts_copy = puts_copy.dropna(subset=['abs_delta'])
             
-            for target_delta in target_deltas:
-                if not puts_copy.empty:
-                    idx = (puts_copy['abs_delta'] - target_delta).abs().idxmin()
-                    row = puts_copy.loc[idx]
+            if has_delta:
+                # Use actual delta from yfinance (put deltas are negative)
+                puts_copy = puts.copy()
+                puts_copy['abs_delta'] = puts_copy['delta'].abs()
+                puts_copy = puts_copy.dropna(subset=['abs_delta'])
+                puts_copy = puts_copy[puts_copy['strike'] < current_price]  # OTM only
+            else:
+                # Fallback: approximate delta using Black-Scholes
+                import numpy as np
+                from scipy.stats import norm
+                
+                def approx_put_delta(strike_val, iv_val):
+                    try:
+                        S = current_price
+                        K = strike_val
+                        T = dte / 365.0
+                        sigma = iv_val
+                        r = 0.05
+                        if T <= 0 or sigma <= 0:
+                            return None
+                        d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
+                        put_delta = norm.cdf(d1) - 1
+                        return abs(put_delta)
+                    except:
+                        return None
+                
+                puts_copy = puts.copy()
+                puts_copy['abs_delta'] = puts_copy.apply(
+                    lambda row: approx_put_delta(row['strike'], row['impliedVolatility']), 
+                    axis=1
+                )
+                puts_copy = puts_copy.dropna(subset=['abs_delta'])
+                puts_copy = puts_copy[puts_copy['strike'] < current_price]  # OTM only
+            
+            if len(puts_copy) < 3:
+                # Not enough valid data — use fallback
+                delta_to_approx_pct = {0.30: -5.0, 0.20: -8.0, 0.15: -10.0, 0.10: -13.0}
+                for delta in target_deltas:
+                    pct = delta_to_approx_pct[delta]
+                    strike = round(current_price * (1 + pct / 100), 2)
+                    prob_otm = round((1 - delta) * 100, 1)
+                    delta_strikes.append({
+                        'delta': delta,
+                        'strike': strike,
+                        'prob_otm': prob_otm,
+                        'distance_pct': round(pct, 1),
+                        'estimated': True
+                    })
+            else:
+                # Find unique strikes for each delta
+                used_strikes = set()
+                
+                for target_delta in target_deltas:
+                    # Filter out already-used strikes
+                    candidates = puts_copy[~puts_copy['strike'].isin(used_strikes)].copy()
+                    
+                    if candidates.empty:
+                        # All strikes used — fallback for remaining deltas
+                        pct = {0.30: -5.0, 0.20: -8.0, 0.15: -10.0, 0.10: -13.0}[target_delta]
+                        strike = round(current_price * (1 + pct / 100), 2)
+                        prob_otm = round((1 - target_delta) * 100, 1)
+                        delta_strikes.append({
+                            'delta': target_delta,
+                            'strike': strike,
+                            'prob_otm': prob_otm,
+                            'distance_pct': round(pct, 1),
+                            'estimated': True
+                        })
+                        continue
+                    
+                    idx = (candidates['abs_delta'] - target_delta).abs().idxmin()
+                    row = candidates.loc[idx]
                     strike = float(row['strike'])
+                    used_strikes.add(strike)
                     actual_delta = float(row['abs_delta'])
-                    prob_otm = (1 - actual_delta) * 100
+                    
+                    # FIXED: prob_otm = 1 - delta, clamped to 0-99%
+                    prob_otm = round((1 - actual_delta) * 100, 1)
+                    prob_otm = max(0.0, min(99.0, prob_otm))
+                    
                     distance_pct = ((strike - current_price) / current_price) * 100
                     delta_strikes.append({
                         'delta': target_delta,
                         'strike': round(strike, 2),
-                        'prob_otm': round(prob_otm, 1),
-                        'distance_pct': round(distance_pct, 1)
+                        'prob_otm': prob_otm,
+                        'distance_pct': round(distance_pct, 1),
+                        'estimated': False
                     })
         
         # If delta_strikes is still empty, use fallback estimates
@@ -2494,6 +2541,19 @@ def scan_for_patterns(tickers=None, progress_callback=None):
                 df.copy(), cup_pattern, asc_triangle, bull_flag)
 
             if analysis:
+                # HARD GATE: Volume spike must be >= 2.0x
+                # Stocks below this threshold are excluded from results
+                VOLUME_SPIKE_HARD_GATE = 2.0
+                vol_ratio_str = analysis.get('criteria', {}).get('volume_spike', {}).get('value', '0x')
+                try:
+                    vol_ratio = float(vol_ratio_str.replace('x', ''))
+                except:
+                    vol_ratio = 0.0
+                
+                if vol_ratio < VOLUME_SPIKE_HARD_GATE:
+                    app.logger.debug(f"[SCANNER] {symbol} excluded: volume {vol_ratio:.2f}x < {VOLUME_SPIKE_HARD_GATE}x gate")
+                    continue
+                
                 analysis['symbol'] = symbol
                 if cup_pattern:
                     analysis['cup_depth'] = round(
@@ -3344,6 +3404,12 @@ SCAN_RESULTS_TEMPLATE = """
         }
 
         function renderDrawerContent(data) {
+            // Null-safe formatter for all numeric values
+            const fmt = (val, decimals = 2, fallback = '—') => {
+                if (val === undefined || val === null || isNaN(val)) return fallback;
+                return Number(val).toFixed(decimals);
+            };
+
             const formatNumber = (num) => {
                 if (!num) return 'N/A';
                 if (num >= 1e9) return `$${(num/1e9).toFixed(1)}B`;
@@ -3351,38 +3417,49 @@ SCAN_RESULTS_TEMPLATE = """
                 return num.toLocaleString();
             };
 
-            const strategyHtml = data.recommended_options_strategy ? `
+            const strategy = data?.recommended_options_strategy?.strategy || data?.options_strategy?.strategy;
+            const isUnavailable = !strategy || strategy.includes('unavailable') || strategy.includes('Analysis');
+
+            const strategyHtml = data.recommended_options_strategy && !isUnavailable ? `
                 <div style="border-left: 4px solid ${data.recommended_options_strategy.color === 'blue' ? '#2196f3' : data.recommended_options_strategy.color === 'amber' ? '#ff9800' : '#4caf50'}; padding: 15px; background: #16213e; border-radius: 4px; margin-bottom: 20px;">
                     <h3 style="margin: 0 0 8px 0; color: #00d4ff; font-size: 18px;">${data.recommended_options_strategy.strategy}</h3>
                     <p style="margin: 0; color: #ccc; font-size: 14px;">${data.recommended_options_strategy.rationale}</p>
                 </div>
             ` : `
                 <div style="border-left: 4px solid #ff9800; padding: 15px; background: #16213e; border-radius: 4px; margin-bottom: 20px;">
-                    <p style="margin: 0; color: #ff9800;">IV data unavailable — cannot recommend strategy</p>
+                    <div style="font-size: 32px; margin-bottom: 8px;">📊</div>
+                    <h3 style="margin: 0 0 8px 0; color: #00d4ff; font-size: 18px;">Options Strategy: Analysis</h3>
+                    <p style="margin: 0 0 8px 0; color: #ccc; font-size: 14px;">
+                        ${data?.recommended_options_strategy?.rationale || data?.options_strategy?.rationale || 'Options data unavailable or no suitable strategy found for current conditions.'}
+                    </p>
+                    <p style="margin: 0; color: #888; font-size: 13px;">
+                        Consider checking back when options liquidity improves, or review the stock fundamentals for a direct equity position.
+                    </p>
                 </div>
             `;
 
-            const ivHtml = data.iv_rank ? `
+            const ivRankVal = data?.iv_rank?.iv_rank || data?.iv_rank?.iv_percentile;
+            const ivHtml = ivRankVal !== undefined && ivRankVal !== null ? `
                 <div style="margin-bottom: 8px;">
                     <div style="height: 20px; background: linear-gradient(to right, #2196f3 0%, #2196f3 30%, #ff9800 30%, #ff9800 60%, #4caf50 60%, #4caf50 100%); border-radius: 4px; position: relative;">
-                        <div style="position: absolute; left: ${data.iv_rank.iv_rank || data.iv_rank.iv_percentile}%; top: -5px; width: 3px; height: 30px; background: white;"></div>
+                        <div style="position: absolute; left: ${fmt(ivRankVal, 1, '0')}%; top: -5px; width: 3px; height: 30px; background: white;"></div>
                     </div>
-                    <p style="margin: 8px 0 0 0; font-size: 14px; color: #ccc;">IV Rank: ${(data.iv_rank.iv_rank || data.iv_rank.iv_percentile).toFixed(1)}%</p>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: #ccc;">IV Rank: ${fmt(ivRankVal, 1)}%</p>
                 </div>
             ` : `<p style="color: #ff9800; margin: 0;">Tastytrade data unavailable</p>`;
 
             const optionsHtml = data.options_summary ? `
-                <p style="margin: 0 0 8px 0; color: #888; font-size: 12px;">Expiry: ${data.options_summary.nearest_expiry} | ATM Strike: $${data.options_summary.atm_strike}</p>
+                <p style="margin: 0 0 8px 0; color: #888; font-size: 12px;">Expiry: ${data.options_summary.nearest_expiry || '—'} | ATM Strike: $${fmt(data.options_summary.atm_strike, 2)}</p>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <p style="margin: 0; color: #00d4ff; font-weight: bold;">Call</p>
-                        <p style="margin: 4px 0; font-size: 13px;">IV: ${(data.options_summary.atm_call_iv * 100).toFixed(1)}%</p>
-                        <p style="margin: 4px 0; font-size: 13px;">Bid/Ask: $${data.options_summary.atm_call_bid} / $${data.options_summary.atm_call_ask}</p>
+                        <p style="margin: 4px 0; font-size: 13px;">IV: ${fmt(data.options_summary.atm_call_iv * 100, 1)}%</p>
+                        <p style="margin: 4px 0; font-size: 13px;">Bid/Ask: $${fmt(data.options_summary.atm_call_bid, 2)} / $${fmt(data.options_summary.atm_call_ask, 2)}</p>
                     </div>
                     <div>
                         <p style="margin: 0; color: #00d4ff; font-weight: bold;">Put</p>
-                        <p style="margin: 4px 0; font-size: 13px;">IV: ${(data.options_summary.atm_put_iv * 100).toFixed(1)}%</p>
-                        <p style="margin: 4px 0; font-size: 13px;">Bid/Ask: $${data.options_summary.atm_put_bid} / $${data.options_summary.atm_put_ask}</p>
+                        <p style="margin: 4px 0; font-size: 13px;">IV: ${fmt(data.options_summary.atm_put_iv * 100, 1)}%</p>
+                        <p style="margin: 4px 0; font-size: 13px;">Bid/Ask: $${fmt(data.options_summary.atm_put_bid, 2)} / $${fmt(data.options_summary.atm_put_ask, 2)}</p>
                     </div>
                 </div>
             ` : `<p style="color: #888; margin: 0;">No options chain available</p>`;
