@@ -235,36 +235,13 @@ def get_risk_snapshot(force_refresh=False):
     config = load_config()
     daily_log = load_daily_log()
     
-    # Initialize start of day if needed
-    today = date.today().isoformat()
-    if daily_log.get('start_of_day_date') != today or daily_log.get('start_of_day_value') is None:
-        # Fetch current value to set as start of day
-        alpaca_account, _ = get_alpaca_positions()
-        if alpaca_account:
-            daily_log['start_of_day_value'] = alpaca_account['portfolio_value']
-            daily_log['start_of_day_date'] = today
-            
-            # Get VIX
-            try:
-                vix = yf.Ticker('^VIX')
-                vix_hist = vix.history(period='1d')
-                if not vix_hist.empty:
-                    daily_log['start_of_day_vix'] = float(vix_hist['Close'].iloc[-1])
-            except:
-                daily_log['start_of_day_vix'] = None
-            
-            save_daily_log(daily_log)
-    
     # Fetch live Alpaca data
     alpaca_account, alpaca_positions = get_alpaca_positions()
     
     # Load manual positions
     manual_positions = load_manual_positions()
     
-    # Combine all positions
-    all_positions = alpaca_positions + manual_positions
-    
-    # Calculate account summaries
+    # Calculate total portfolio value across all accounts
     accounts = {
         "alpaca_scanner": {
             "portfolio_value": alpaca_account['portfolio_value'] if alpaca_account else 0,
@@ -283,6 +260,36 @@ def get_risk_snapshot(force_refresh=False):
         }
     
     total_portfolio_value = sum(acc['portfolio_value'] for acc in accounts.values())
+    
+    # Initialize start of day if needed (use TOTAL portfolio value, not just Alpaca)
+    today = date.today().isoformat()
+    if daily_log.get('start_of_day_date') != today or daily_log.get('start_of_day_value') is None:
+        daily_log['start_of_day_value'] = total_portfolio_value
+        daily_log['start_of_day_date'] = today
+        
+        # Get VIX
+        try:
+            vix = yf.Ticker('^VIX')
+            vix_hist = vix.history(period='1d')
+            if not vix_hist.empty:
+                daily_log['start_of_day_vix'] = float(vix_hist['Close'].iloc[-1])
+        except:
+            daily_log['start_of_day_vix'] = None
+        
+        save_daily_log(daily_log)
+    # Combine all positions
+    all_positions = alpaca_positions + manual_positions
+    
+    for account_name in ['thinkorswim', 'sofi', 'robinhood']:
+        account_positions = [p for p in manual_positions if p.get('account') == account_name]
+    
+    for account_name in ['thinkorswim', 'sofi', 'robinhood']:
+        account_positions = [p for p in manual_positions if p.get('account') == account_name]
+        accounts[account_name] = {
+            "portfolio_value": sum(p.get('market_value', 0) for p in account_positions),
+            "positions_count": len(account_positions),
+            "source": "manual"
+        }
     
     # Calculate P&L
     start_of_day_value = daily_log.get('start_of_day_value', total_portfolio_value)
