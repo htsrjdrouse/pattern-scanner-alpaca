@@ -719,7 +719,9 @@ RESEARCH_DASHBOARD_HTML = """
             const previousTab = document.querySelector('.tab-content.active');
             if (previousTab) {
                 const prevTabName = previousTab.id.replace('-tab', '');
-                if (prevTabName === 'regime') onRegimeTabDeactivated();
+                if (prevTabName === 'regime' && typeof onRegimeTabDeactivated === 'function') {
+                    onRegimeTabDeactivated();
+                }
             }
             
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -728,15 +730,17 @@ RESEARCH_DASHBOARD_HTML = """
             document.getElementById(tabName + '-tab').classList.add('active');
             document.getElementById('tab-' + tabName).classList.add('active');
             
-            // Activate new tab
-            if (tabName === 'sector-scan') {
-                loadSchedulerStatus();
-                loadLatestResults();
-            } else if (tabName === 'regime') {
-                onRegimeTabActivated();
-            } else if (tabName === 'risk') {
-                loadRiskSnapshot();
-            }
+            // Activate new tab - use setTimeout to ensure functions are defined
+            setTimeout(() => {
+                if (tabName === 'sector-scan' && typeof loadSchedulerStatus === 'function') {
+                    loadSchedulerStatus();
+                    loadLatestResults();
+                } else if (tabName === 'regime' && typeof onRegimeTabActivated === 'function') {
+                    onRegimeTabActivated();
+                } else if (tabName === 'risk' && typeof loadRiskSnapshot === 'function') {
+                    loadRiskSnapshot();
+                }
+            }, 0);
         }
 
         async function loadSchedulerStatus() {
@@ -1220,9 +1224,11 @@ RESEARCH_DASHBOARD_HTML = """
         let regimeRefreshInterval = null;
         
         async function loadRegimeData(forceRefresh = false) {
+            console.log('loadRegimeData called, forceRefresh:', forceRefresh);
             try {
                 // Show loading state
                 const badge = document.getElementById('verdictBadge');
+                console.log('verdictBadge element:', badge);
                 if (badge) {
                     badge.textContent = 'LOADING...';
                     badge.style.background = '#6b7280';
@@ -1303,9 +1309,6 @@ RESEARCH_DASHBOARD_HTML = """
                 const dimensionsGrid = document.getElementById('dimensionsGrid');
                 if (!dimensionsGrid) return;
                 dimensionsGrid.innerHTML = '';
-            } catch (error) {
-                console.error('Error updating regime sections:', error);
-            }
             
             const dimensionNames = {
                 vix_regime: 'VIX Regime',
@@ -1398,6 +1401,9 @@ RESEARCH_DASHBOARD_HTML = """
             
             // Load history
             loadRegimeHistory();
+            } catch (error) {
+                console.error('Error updating regime sections:', error);
+            }
         }
         
         function getScoreColor(score) {
@@ -1522,6 +1528,7 @@ RESEARCH_DASHBOARD_HTML = """
         }
         
         function onRegimeTabActivated() {
+            console.log('onRegimeTabActivated called');
             loadRegimeData();
             if (regimeRefreshInterval) clearInterval(regimeRefreshInterval);
             regimeRefreshInterval = setInterval(() => loadRegimeData(), 5 * 60 * 1000);
