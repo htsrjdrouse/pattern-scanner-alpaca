@@ -672,6 +672,100 @@ def add_manual_position():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@research_bp.route('/risk/positions/import-schwab', methods=['POST'])
+def import_schwab_positions():
+    """Parse and import Schwab positions from pasted text"""
+    try:
+        import re
+        from datetime import datetime
+        
+        data = request.get_json()
+        text = data.get('text', '')
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
+        
+        holdings = []
+        i = 0
+        
+        while i < len(lines):
+            # Find symbol (2-10 uppercase letters)
+            if re.match(r'^[A-Z]{2,10}$', lines[i]):
+                symbol = lines[i]
+                qty, price, market_value, cost_basis, gain_loss = 0, 0, 0, 0, 0
+                
+                # Look ahead for data
+                for j in range(i+1, min(i+20, len(lines))):
+                    line = lines[j]
+                    
+                    # Quantity and Price on same line
+                    if 'Quantity' in line and 'Price' in line:
+                        qty_match = re.search(r'Quantity([0-9.]+)', line)
+                        price_match = re.search(r'Price\$([0-9.]+)', line)
+                        if qty_match: qty = float(qty_match.group(1))
+                        if price_match: price = float(price_match.group(1))
+                    
+                    # Market Value
+                    elif line.startswith('Market Value'):
+                        market_value = float(re.sub(r'[^0-9.]', '', line.replace('Market Value', '')))
+                    
+                    # Cost Basis
+                    elif line.startswith('Cost Basis'):
+                        cost_basis = float(re.sub(r'[^0-9.]', '', line.replace('Cost Basis', '')))
+                    
+                    # Gain/Loss
+                    elif line.startswith('Gain Loss'):
+                        gl_str = line.replace('Gain Loss', '').strip()
+                        gain_loss = float(re.sub(r'[^0-9.]', '', gl_str))
+                        if '-' in gl_str or '($' in gl_str:
+                            gain_loss = -gain_loss
+                        break
+                    
+                    # Stop if hit another symbol
+                    elif re.match(r'^[A-Z]{2,10}$', line):
+                        break
+                
+                if qty > 0:
+                    avg_cost = cost_basis / qty if cost_basis > 0 else 0
+                    holdings.append({
+                        'symbol': symbol,
+                        'qty': qty,
+                        'price': price,
+                        'average_cost': avg_cost,
+                        'market_value': market_value,
+                        'total_return': gain_loss
+                    })
+            
+            i += 1
+        
+        # Import all positions
+        imported = 0
+        for holding in holdings:
+            position = {
+                'symbol': holding['symbol'],
+                'account': 'schwab',
+                'position_type': 'equity',
+                'side': 'long',
+                'qty': holding['qty'],
+                'cost_basis': holding['average_cost'],
+                'current_price': holding['price'],
+                'notes': 'Imported from Schwab',
+                'date_entered': datetime.now().strftime('%Y-%m-%d'),
+                'market_value': holding['market_value'],
+                'unrealized_pl': holding['total_return'],
+                'unrealized_plpc': holding['total_return'] / (holding['average_cost'] * holding['qty']) if holding['average_cost'] > 0 else 0
+            }
+            risk_manager.add_manual_position(position)
+            imported += 1
+        
+        # Clear cache
+        import os
+        cache_file = 'data/risk_cache.json'
+        if os.path.exists(cache_file):
+            os.remove(cache_file)
+        
+        return jsonify({'found': len(holdings), 'imported': imported})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @research_bp.route('/risk/positions/manual/<position_id>', methods=['PUT'])
 def update_manual_position(position_id):
     """Update manual position"""

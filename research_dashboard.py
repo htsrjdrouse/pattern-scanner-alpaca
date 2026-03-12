@@ -702,9 +702,8 @@ RESEARCH_DASHBOARD_HTML = """
                 <details style="margin-top: 20px;">
                     <summary style="cursor: pointer; color: #8b5cf6; font-weight: 600; padding: 10px; background: #1e1e2e; border-radius: 5px;">📊 Bulk Import: Schwab (Paste Text)</summary>
                     <div style="margin-top: 15px; padding: 20px; background: #1e1e2e; border-radius: 8px;">
-                        <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Copy your positions from Schwab and paste here</p>
-                        <p style="color: #6b7280; margin-bottom: 10px; font-size: 0.8em;">Include: Symbol, Quantity, Price, Market Value, Cost Basis, Gain/Loss</p>
-                        <textarea id="schwabText" rows="10" placeholder="TSLA&#10;TESLA INC&#10;Quantity70 Price$400.87&#10;Market Value$28,060.91&#10;Cost Basis$24,445.17&#10;Gain Loss+$3,615.74&#10;..." style="width: 100%; padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px; font-family: monospace; font-size: 0.85em;"></textarea>
+                        <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Copy ALL your positions from Schwab and paste here</p>
+                        <textarea id="schwabText" rows="10" style="width: 100%; padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px; font-family: monospace; font-size: 0.85em;"></textarea>
                         <button id="importSchwabBtn" style="margin-top: 10px; padding: 10px 20px; background: #8b5cf6; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import Schwab Positions</button>
                     </div>
                 </details>
@@ -1958,95 +1957,24 @@ RESEARCH_DASHBOARD_HTML = """
             }
             
             try {
-                const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
+                const response = await fetch('/signals/risk/positions/import-schwab', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({text: text})
+                });
                 
-                const cleanNumber = (s) => {
-                    return parseFloat(s.replace(/[$,+()]/g, '').replace(/Gain Loss|Market Value|Cost Basis|Quantity|Price/g, '')) || 0;
-                };
+                const result = await response.json();
                 
-                const holdings = [];
-                
-                for (let i = 0; i < lines.length; i++) {
-                    // Look for symbol (all caps, 2-6 chars, possibly with numbers)
-                    if (/^[A-Z]{2,6}[0-9]?$/.test(lines[i])) {
-                        const symbol = lines[i];
-                        let qty = 0, price = 0, marketValue = 0, costBasis = 0, gainLoss = 0;
-                        let foundData = false;
-                        
-                        // Parse next 15 lines for data
-                        for (let j = i + 1; j < Math.min(i + 15, lines.length); j++) {
-                            const line = lines[j];
-                            
-                            if (line.includes('Quantity') && line.includes('Price')) {
-                                const parts = line.split('Price');
-                                qty = cleanNumber(parts[0]);
-                                price = cleanNumber(parts[1]);
-                                foundData = true;
-                            } else if (line.startsWith('Market Value')) {
-                                marketValue = cleanNumber(line);
-                            } else if (line.startsWith('Cost Basis')) {
-                                costBasis = cleanNumber(line);
-                            } else if (line.startsWith('Gain Loss')) {
-                                const glStr = line.replace('Gain Loss', '').trim();
-                                gainLoss = cleanNumber(glStr);
-                                if (glStr.includes('-') || glStr.startsWith('($')) {
-                                    gainLoss = -Math.abs(gainLoss);
-                                }
-                                break; // End of this position
-                            }
-                        }
-                        
-                        if (foundData && qty > 0 && symbol) {
-                            const avgCost = costBasis > 0 ? costBasis / qty : 0;
-                            holdings.push({
-                                symbol: symbol,
-                                shares: qty,
-                                price: price,
-                                average_cost: avgCost,
-                                total_return: gainLoss,
-                                equity: marketValue
-                            });
-                        }
-                    }
+                if (response.ok) {
+                    alert(`Imported ${result.imported} of ${result.found} positions`);
+                    document.getElementById('schwabText').value = '';
+                    await loadRiskSnapshot();
+                } else {
+                    alert('Error: ' + result.error);
                 }
-                
-                if (holdings.length === 0) {
-                    alert('No positions found. Make sure you copied the full text from Schwab.');
-                    return;
-                }
-                
-                let imported = 0;
-                for (const holding of holdings) {
-                    const position = {
-                        symbol: holding.symbol,
-                        account: 'schwab',
-                        position_type: 'equity',
-                        side: 'long',
-                        qty: holding.shares,
-                        cost_basis: holding.average_cost,
-                        current_price: holding.price,
-                        notes: 'Imported from Schwab',
-                        date_entered: new Date().toISOString().split('T')[0],
-                        market_value: holding.equity,
-                        unrealized_pl: holding.total_return,
-                        unrealized_plpc: holding.average_cost > 0 ? holding.total_return / (holding.average_cost * holding.shares) : 0
-                    };
-                    
-                    const response = await fetch('/signals/risk/positions/manual', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify(position)
-                    });
-                    
-                    if (response.ok) imported++;
-                }
-                
-                alert(`Imported ${imported} of ${holdings.length} positions`);
-                document.getElementById('schwabText').value = '';
-                await loadRiskSnapshot();
             } catch (error) {
                 console.error('Error importing:', error);
-                alert('Error parsing Schwab text: ' + error.message);
+                alert('Error importing: ' + error.message);
             }
         }
         
