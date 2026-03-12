@@ -184,6 +184,14 @@ RESEARCH_DASHBOARD_HTML = """
                 TT LIVE
             </span>
             <script>
+                // Define showTab early so onclick handlers work
+                function showTab(tabName) {
+                    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+                    document.getElementById(tabName + '-tab').classList.add('active');
+                    document.getElementById('tab-' + tabName).classList.add('active');
+                }
+                
                 // Update badge immediately
                 fetch('/signals/tastytrade/status')
                     .then(r => r.json())
@@ -705,6 +713,7 @@ RESEARCH_DASHBOARD_HTML = """
         let currentJobId = null;
         let regimeChart = null;
 
+        // Override showTab with full version that handles tab-specific logic
         function showTab(tabName) {
             // Deactivate previous tab
             const previousTab = document.querySelector('.tab-content.active');
@@ -1213,8 +1222,11 @@ RESEARCH_DASHBOARD_HTML = """
         async function loadRegimeData(forceRefresh = false) {
             try {
                 // Show loading state
-                document.getElementById('verdictBadge').textContent = 'LOADING...';
-                document.getElementById('verdictBadge').style.background = '#6b7280';
+                const badge = document.getElementById('verdictBadge');
+                if (badge) {
+                    badge.textContent = 'LOADING...';
+                    badge.style.background = '#6b7280';
+                }
                 
                 const url = forceRefresh ? '/signals/regime/refresh' : '/signals/regime/analysis';
                 const method = forceRefresh ? 'POST' : 'GET';
@@ -1224,6 +1236,10 @@ RESEARCH_DASHBOARD_HTML = """
                 
                 if (data.error) {
                     console.error('Regime analysis error:', data.error);
+                    if (badge) {
+                        badge.textContent = 'ERROR';
+                        badge.style.background = '#ef4444';
+                    }
                     return;
                 }
                 
@@ -1231,43 +1247,65 @@ RESEARCH_DASHBOARD_HTML = """
                 
             } catch (error) {
                 console.error('Failed to load regime data:', error);
-                document.getElementById('verdictBadge').textContent = 'ERROR';
-                document.getElementById('verdictBadge').style.background = '#ef4444';
+                const badge = document.getElementById('verdictBadge');
+                if (badge) {
+                    badge.textContent = 'ERROR';
+                    badge.style.background = '#ef4444';
+                }
             }
         }
         
         function updateAllSections(data) {
-            // Update verdict banner
-            const verdictColors = {GREEN: '#22c55e', YELLOW: '#f59e0b', RED: '#ef4444'};
-            const verdictText = {
-                GREEN: '● GREEN — SELL PREMIUM',
-                YELLOW: '● YELLOW — SELL CONSERVATIVELY',
-                RED: '● RED — SIT IN CASH'
-            };
-            
-            const banner = document.getElementById('verdictBanner');
-            banner.style.background = verdictColors[data.verdict];
-            banner.style.color = 'white';
-            
-            document.getElementById('verdictBadge').textContent = verdictText[data.verdict];
-            document.getElementById('spxPrice').textContent = data.spx_price ? `$${data.spx_price.toFixed(2)}` : '-';
-            document.getElementById('vixLevel').textContent = data.vix_level || '-';
-            
-            const displayScore = Math.round((data.composite_score + 1) / 2 * 100);
-            document.getElementById('compositeScore').textContent = displayScore;
-            document.getElementById('regimeTimestamp').textContent = new Date(data.timestamp).toLocaleString();
-            
-            // Update hard override warning
-            if (data.hard_override_triggered) {
-                document.getElementById('overrideWarning').style.display = 'block';
-                document.getElementById('overrideReason').textContent = data.override_reason;
-            } else {
-                document.getElementById('overrideWarning').style.display = 'none';
+            try {
+                // Update verdict banner
+                const verdictColors = {GREEN: '#22c55e', YELLOW: '#f59e0b', RED: '#ef4444'};
+                const verdictText = {
+                    GREEN: '● GREEN — SELL PREMIUM',
+                    YELLOW: '● YELLOW — SELL CONSERVATIVELY',
+                    RED: '● RED — SIT IN CASH'
+                };
+                
+                const banner = document.getElementById('verdictBanner');
+                if (banner) {
+                    banner.style.background = verdictColors[data.verdict];
+                    banner.style.color = 'white';
+                }
+                
+                const badge = document.getElementById('verdictBadge');
+                if (badge) badge.textContent = verdictText[data.verdict];
+                
+                const spx = document.getElementById('spxPrice');
+                if (spx) spx.textContent = data.spx_price ? `$${data.spx_price.toFixed(2)}` : '-';
+                
+                const vix = document.getElementById('vixLevel');
+                if (vix) vix.textContent = data.vix_level || '-';
+                
+                const displayScore = Math.round((data.composite_score + 1) / 2 * 100);
+                const score = document.getElementById('compositeScore');
+                if (score) score.textContent = displayScore;
+                
+                const timestamp = document.getElementById('regimeTimestamp');
+                if (timestamp) timestamp.textContent = new Date(data.timestamp).toLocaleString();
+                
+                // Update hard override warning
+                const warning = document.getElementById('overrideWarning');
+                if (warning) {
+                    if (data.hard_override_triggered) {
+                        warning.style.display = 'block';
+                        const reason = document.getElementById('overrideReason');
+                        if (reason) reason.textContent = data.override_reason;
+                    } else {
+                        warning.style.display = 'none';
+                    }
+                }
+                
+                // Update 7-dimension cards
+                const dimensionsGrid = document.getElementById('dimensionsGrid');
+                if (!dimensionsGrid) return;
+                dimensionsGrid.innerHTML = '';
+            } catch (error) {
+                console.error('Error updating regime sections:', error);
             }
-            
-            // Update 7-dimension cards
-            const dimensionsGrid = document.getElementById('dimensionsGrid');
-            dimensionsGrid.innerHTML = '';
             
             const dimensionNames = {
                 vix_regime: 'VIX Regime',

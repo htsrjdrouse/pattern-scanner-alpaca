@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-03-11T16:53:50.179119",
+  "timestamp": "2026-03-12T04:05:52.340972",
   "cache_age_minutes": 0,
-  "spx_price": 6769.93,
-  "vix_level": 25.29,
-  "vix_3m": 25.61,
+  "spx_price": 6775.8,
+  "vix_level": 24.23,
+  "vix_3m": 24.97,
   "term_structure_source": "yfinance_fallback",
   "pcr_source": "cboe_equity_csv",
   "dimensions": {
@@ -14,7 +14,7 @@
     },
     "term_structure": {
       "value": "CONTANGO",
-      "spread": 0.32,
+      "spread": 0.74,
       "score": 1.0,
       "description": "Normal, favorable for sellers"
     },
@@ -27,8 +27,8 @@
     "vol_spread": {
       "value": "STRONG",
       "realized_vol": 0.1165,
-      "implied_vol": 0.2529,
-      "spread": 0.1364,
+      "implied_vol": 0.2423,
+      "spread": 0.1258,
       "score": 1.0,
       "description": "IV significantly overpricing, clear seller edge"
     },
@@ -47,7 +47,7 @@
     },
     "correlation_regime": {
       "value": "LOW",
-      "avg_correlation": 0.244,
+      "avg_correlation": 0.245,
       "score": 0.8,
       "description": "Stock-picking environment, individual names work"
     }
