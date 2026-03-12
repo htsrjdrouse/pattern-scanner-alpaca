@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-12T15:39:07.853393",
+  "timestamp": "2026-03-12T15:46:10.675743",
   "cache_age_minutes": 0,
   "market_open": true,
   "accounts": {
@@ -23,12 +23,17 @@
       "portfolio_value": 16271.47,
       "positions_count": 15,
       "source": "manual"
+    },
+    "schwab": {
+      "portfolio_value": 96282.72,
+      "positions_count": 29,
+      "source": "manual"
     }
   },
-  "total_portfolio_value": 116271.47,
+  "total_portfolio_value": 212554.19,
   "pnl": {
-    "daily": -96282.72,
-    "daily_pct": -0.4529796378043641,
+    "daily": 0.0,
+    "daily_pct": 0.0,
     "weekly": 0,
     "weekly_pct": 0.0,
     "monthly": 0,
@@ -37,9 +42,9 @@
   },
   "limits": {
     "daily_loss": {
-      "status": "BREACHED",
-      "usage_pct": 192.56544,
-      "current": -96282.72,
+      "status": "OK",
+      "usage_pct": 0.0,
+      "current": 0.0,
       "limit": -500
     },
     "weekly_loss": {
@@ -71,39 +76,39 @@
     "net_delta_dollars": 112554.95408999998,
     "directional_bias": "SIGNIFICANT_LONG",
     "buying_power_usage_pct": 0,
-    "largest_position_pct": 23.923228974399308,
+    "largest_position_pct": 13.08649337846504,
     "sector_concentrations": [
       {
         "sector": "Other",
-        "pct": 37.39764363519271,
+        "pct": 20.457272566586433,
         "flagged": true
       },
       {
         "sector": "Technology",
-        "pct": 5.123079634238735,
+        "pct": 2.8024288770783583,
         "flagged": false
       },
       {
         "sector": "Semiconductors",
-        "pct": 21.205606156007146,
-        "flagged": true
+        "pct": 11.599898360037034,
+        "flagged": false
       },
       {
         "sector": "Healthcare",
-        "pct": 2.5416209152597795,
+        "pct": 1.390318393629408,
         "flagged": false
       },
       {
         "sector": "Automotive",
-        "pct": 30.534979905216648,
-        "flagged": true
+        "pct": 16.70325576738807,
+        "flagged": false
       }
     ]
   },
   "vix": {
-    "current": 27.059999465942383,
+    "current": 26.729999542236328,
     "start_of_day": 27.209999084472656,
-    "change_pct": -0.005512665328087809,
+    "change_pct": -0.0176405570888181,
     "spike_detected": false
   },
   "pdt": {
@@ -478,7 +483,7 @@
       "id": "3769858a-c43d-44e4-bf4f-f633bde70dd5",
       "last_updated": "2026-03-12T15:31:12.682308",
       "rolling_vs_closing": null,
-      "concentration_flag": true
+      "concentration_flag": false
     },
     {
       "symbol": "ON",
@@ -622,7 +627,7 @@
       "id": "6ae1e8ba-cb43-495c-8a96-eeb0c6d23898",
       "last_updated": "2026-03-12T15:31:12.694777",
       "rolling_vs_closing": null,
-      "concentration_flag": true
+      "concentration_flag": false
     },
     {
       "symbol": "VRTX",
@@ -915,28 +920,13 @@
   ],
   "alerts": [
     {
-      "level": "CRITICAL",
-      "type": "DAILY_LOSS_LIMIT",
-      "message": "Daily loss limit BREACHED \u2014 $96283 lost vs $500 limit. ACTIVATE RECOVERY MODE: close all new entries, reduce size to 50% until 2 consecutive winning days."
-    },
-    {
       "level": "WARNING",
       "type": "RECOVERY_MODE",
       "message": "RECOVERY MODE ACTIVE \u2014 position size capped at 50% (max $125/trade). 0 of 2 winning days completed. 2 more winning day(s) required to exit recovery mode."
-    },
-    {
-      "level": "WARNING",
-      "type": "CONCENTRATION",
-      "message": "Concentration risk: NVDA represents 18.7% of portfolio \u2014 above 15% threshold."
-    },
-    {
-      "level": "WARNING",
-      "type": "CONCENTRATION",
-      "message": "Concentration risk: TSLA represents 23.9% of portfolio \u2014 above 15% threshold."
     }
   ],
-  "alert_count_critical": 1,
-  "alert_count_warning": 3,
+  "alert_count_critical": 0,
+  "alert_count_warning": 1,
   "risk_config": {
     "account_size_total": 50000,
     "daily_loss_limit_dollars": 500,

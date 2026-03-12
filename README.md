@@ -35,6 +35,22 @@ A Flask-based stock pattern scanner with **live trading capabilities** powered b
   - 30-day regime history with visualization
   - 60-minute caching to prevent API rate limiting
 
+### Wolverine Risk Management System
+- **Multi-Account Portfolio Tracking**: Aggregate view across Alpaca, Robinhood, Schwab, ThinkorSwim, SoFi
+- **Bulk Position Import**: 
+  - Paste Robinhood portfolio text directly
+  - Upload ThinkorSwim CSV position statements
+  - Paste Schwab equity positions
+- **Real-Time Risk Monitoring**:
+  - Daily/Weekly/Monthly P&L tracking
+  - Position concentration alerts (>15% threshold)
+  - Buying power usage monitoring
+  - VIX spike detection
+  - PDT (Pattern Day Trader) tracking
+- **Recovery Mode**: Automatic position size reduction after daily loss limit breach
+- **Circuit Breakers**: Hard stops at daily/monthly loss limits
+- **30-Day P&L History**: Visual performance tracking
+
 ## 📊 Hybrid Data Approach
 
 **Best of three worlds:**
