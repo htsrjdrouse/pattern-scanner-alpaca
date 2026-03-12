@@ -717,8 +717,10 @@ def import_schwab_positions():
                     # Market Value
                     elif line.startswith('Market Value'):
                         try:
-                            mv_str = line.replace('Market Value', '').replace('$', '').replace(',', '').strip()
-                            # Handle multiple decimals by taking only first decimal point
+                            # Split by tab to get just the market value part
+                            mv_part = line.split('\t')[0] if '\t' in line else line
+                            mv_str = mv_part.replace('Market Value', '').replace('$', '').replace(',', '').strip()
+                            # Handle multiple decimals
                             if mv_str.count('.') > 1:
                                 parts = mv_str.split('.')
                                 mv_str = parts[0] + '.' + ''.join(parts[1:])
@@ -729,12 +731,27 @@ def import_schwab_positions():
                     # Cost Basis
                     elif line.startswith('Cost Basis'):
                         try:
-                            cb_str = line.replace('Cost Basis', '').replace('$', '').replace(',', '').strip()
+                            # Split by tab to get just the cost basis part
+                            cb_part = line.split('\t')[0] if '\t' in line else line
+                            cb_str = cb_part.replace('Cost Basis', '').replace('$', '').replace(',', '').strip()
                             # Handle multiple decimals
                             if cb_str.count('.') > 1:
                                 parts = cb_str.split('.')
                                 cb_str = parts[0] + '.' + ''.join(parts[1:])
                             cost_basis = float(cb_str) if cb_str else 0
+                            
+                            # Check if Gain Loss is on the same line (after tab)
+                            if '\t' in line and 'Gain Loss' in line:
+                                gl_part = line.split('Gain Loss')[1] if 'Gain Loss' in line else ''
+                                gl_str = gl_part.replace('$', '').replace(',', '').strip()
+                                is_negative = gl_str.startswith('-') or gl_str.startswith('(')
+                                gl_str = gl_str.replace('+', '').replace('-', '').replace('(', '').replace(')', '')
+                                if gl_str.count('.') > 1:
+                                    parts = gl_str.split('.')
+                                    gl_str = parts[0] + '.' + ''.join(parts[1:])
+                                gain_loss = float(gl_str) if gl_str else 0
+                                if is_negative:
+                                    gain_loss = -gain_loss
                         except Exception as e:
                             print(f"[SCHWAB IMPORT] Error parsing cost basis from '{line}': {e}")
                     
