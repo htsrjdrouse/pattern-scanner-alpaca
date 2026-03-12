@@ -36,6 +36,17 @@ import os
 app = Flask(__name__)
 app.secret_key = 'your-unique-secret-key-here-change-in-production'  # Required for sessions/flash
 
+# Add custom Jinja2 filter to handle None/Undefined values
+@app.template_filter('safe_round')
+def safe_round_filter(value, decimals=2):
+    """Safely round a value, returning 0 if None or Undefined"""
+    try:
+        if value is None or str(type(value)) == "<class 'jinja2.runtime.Undefined'>":
+            return 0
+        return round(float(value), decimals)
+    except (ValueError, TypeError):
+        return 0
+
 TRACKED_FILE = 'data/tracked_stocks.json'
 
 def load_tracked_stocks():
@@ -4544,21 +4555,21 @@ def chart(symbol):
         return render_template_string(html,
                                       symbol=symbol,
                                       chart=chart_base64,
-                                      company=company_info,
-                                      cup_pattern=cup_pattern,
-                                      asc_triangle=asc_triangle,
-                                      bull_flag=bull_flag,
-                                      double_bottom=double_bottom,
-                                      analysis=analysis,
-                                      dcf_data=dcf_data,
+                                      company=company_info or {},
+                                      cup_pattern=cup_pattern or {},
+                                      asc_triangle=asc_triangle or {},
+                                      bull_flag=bull_flag or {},
+                                      double_bottom=double_bottom or {},
+                                      analysis=analysis or {},
+                                      dcf_data=dcf_data or {},
                                       show_smas=show_smas,
                                       show_cto=show_cto,
                                       show_supertrend=show_supertrend,
                                       show_smc=show_smc,
-                                      options=options_strategy,
+                                      options=options_strategy or {},
                                       options_budget=options_budget,
-                                      expected_move=expected_move,
-                                      edgar_financials=edgar_financials,
+                                      expected_move=expected_move or {},
+                                      edgar_financials=edgar_financials or {},
                                       alpaca_mode=os.getenv('ALPACA_MODE', 'paper').upper())
 
     except Exception as e:
