@@ -698,6 +698,17 @@ RESEARCH_DASHBOARD_HTML = """
                     </div>
                 </details>
 
+                <!-- Bulk Import: Generic CSV -->
+                <details style="margin-top: 20px;">
+                    <summary style="cursor: pointer; color: #8b5cf6; font-weight: 600; padding: 10px; background: #1e1e2e; border-radius: 5px;">📊 Bulk Import: Generic CSV (Perplexity/AI Generated)</summary>
+                    <div style="margin-top: 15px; padding: 20px; background: #1e1e2e; border-radius: 8px;">
+                        <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Upload CSV with columns: Symbol, Shares, Price, Average Cost, Total Return, Equity</p>
+                        <p style="color: #6b7280; margin-bottom: 10px; font-size: 0.8em;">Example: TSLA,19.352,417.44,386.79,593.13,8078.13</p>
+                        <input type="file" id="genericCsvFile" accept=".csv" style="margin-bottom: 10px; color: #fff;">
+                        <button id="importGenericCsvBtn" style="padding: 10px 20px; background: #8b5cf6; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import CSV Positions</button>
+                    </div>
+                </details>
+
                 <!-- 30-Day P&L History -->
                 <h3 style="color: #4fc3f7; margin-top: 30px;">30-Day P&L History</h3>
                 <div style="margin-top: 15px;">
@@ -1939,6 +1950,75 @@ RESEARCH_DASHBOARD_HTML = """
             await loadRiskSnapshot();
         }
         
+        async function importGenericCsv() {
+            const fileInput = document.getElementById('genericCsvFile');
+            if (!fileInput.files || !fileInput.files[0]) {
+                alert('Please select a CSV file');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const text = await file.text();
+            const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
+            
+            if (lines.length < 2) {
+                alert('CSV file is empty or invalid');
+                return;
+            }
+            
+            // Skip header if present
+            let startIdx = 0;
+            if (lines[0].toLowerCase().includes('symbol')) {
+                startIdx = 1;
+            }
+            
+            const cleanNumber = (s) => {
+                return parseFloat(s.replace(/[$,]/g, '')) || 0;
+            };
+            
+            let imported = 0;
+            for (let i = startIdx; i < lines.length; i++) {
+                const parts = lines[i].split(',').map(p => p.trim());
+                if (parts.length < 6) continue;
+                
+                const symbol = parts[0];
+                const shares = cleanNumber(parts[1]);
+                const price = cleanNumber(parts[2]);
+                const avgCost = cleanNumber(parts[3]);
+                const totalReturn = cleanNumber(parts[4]);
+                const equity = cleanNumber(parts[5]);
+                
+                if (!symbol || shares === 0) continue;
+                
+                const position = {
+                    symbol: symbol,
+                    account: 'imported',
+                    position_type: 'equity',
+                    side: 'long',
+                    qty: shares,
+                    cost_basis: avgCost,
+                    current_price: price,
+                    notes: 'Imported from CSV',
+                    date_entered: new Date().toISOString().split('T')[0],
+                    market_value: equity,
+                    unrealized_pl: totalReturn,
+                    unrealized_plpc: totalReturn / (avgCost * shares)
+                };
+                
+                const response = await fetch('/signals/risk/positions/manual', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(position)
+                });
+                
+                if (response.ok) imported++;
+            }
+            
+            alert(`Imported ${imported} positions from CSV`);
+            fileInput.value = '';
+            await loadRiskSnapshot();
+        }
+        
         async function bulkDeleteAllPositions() {
             if (!confirm('⚠️ WARNING: This will delete ALL manual positions from ALL accounts (Robinhood, ThinkorSwim, SoFi). This cannot be undone. Continue?')) {
                 return;
@@ -1965,6 +2045,7 @@ RESEARCH_DASHBOARD_HTML = """
         // Attach event listeners after functions are defined
         document.getElementById('importRobinhoodBtn')?.addEventListener('click', importRobinhoodJson);
         document.getElementById('importTosBtn')?.addEventListener('click', importTosFile);
+        document.getElementById('importGenericCsvBtn')?.addEventListener('click', importGenericCsv);
         document.getElementById('bulkDeleteBtn')?.addEventListener('click', bulkDeleteAllPositions);
         
         async function deleteManualPosition(positionId) {
