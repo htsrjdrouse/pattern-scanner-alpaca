@@ -705,17 +705,22 @@ def import_schwab_positions():
                     
                     # Market Value
                     elif line.startswith('Market Value'):
-                        market_value = float(re.sub(r'[^0-9.]', '', line.replace('Market Value', '')))
+                        mv_str = line.replace('Market Value', '').replace('$', '').replace(',', '').strip()
+                        market_value = float(mv_str) if mv_str else 0
                     
                     # Cost Basis
                     elif line.startswith('Cost Basis'):
-                        cost_basis = float(re.sub(r'[^0-9.]', '', line.replace('Cost Basis', '')))
+                        cb_str = line.replace('Cost Basis', '').replace('$', '').replace(',', '').strip()
+                        cost_basis = float(cb_str) if cb_str else 0
                     
                     # Gain/Loss
                     elif line.startswith('Gain Loss'):
-                        gl_str = line.replace('Gain Loss', '').strip()
-                        gain_loss = float(re.sub(r'[^0-9.]', '', gl_str))
-                        if '-' in gl_str or '($' in gl_str:
+                        gl_str = line.replace('Gain Loss', '').replace('$', '').replace(',', '').strip()
+                        # Remove + or - prefix for parsing
+                        is_negative = gl_str.startswith('-') or gl_str.startswith('(')
+                        gl_str = gl_str.replace('+', '').replace('-', '').replace('(', '').replace(')', '')
+                        gain_loss = float(gl_str) if gl_str else 0
+                        if is_negative:
                             gain_loss = -gain_loss
                         break
                     
