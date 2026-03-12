@@ -166,6 +166,7 @@ RESEARCH_DASHBOARD_HTML = """
     </style>
 </head>
 <body>
+    <!-- Version: 2026-03-11-20:55 - Force cache refresh -->
     <div class="container">
         <h1>🔬 Alpha Research Platform</h1>
         <p class="subtitle">Systematic signal analysis and backtesting</p>
@@ -179,9 +180,30 @@ RESEARCH_DASHBOARD_HTML = """
         </div>
         
         <div style="text-align: center; margin-bottom: 20px;">
-            <span id="tastytrade-badge" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                TT CHECKING...
+            <span id="tastytrade-badge" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; background: #4caf50; color: #fff;">
+                TT LIVE
             </span>
+            <script>
+                // Update badge immediately
+                fetch('/signals/tastytrade/status')
+                    .then(r => r.json())
+                    .then(d => {
+                        const b = document.getElementById('tastytrade-badge');
+                        if (!d.connected) {
+                            b.textContent = 'TT OFFLINE';
+                            b.style.background = '#f44336';
+                        } else if (d.env !== 'production') {
+                            b.textContent = 'TT SANDBOX';
+                            b.style.background = '#ff9800';
+                            b.style.color = '#000';
+                        }
+                    })
+                    .catch(() => {
+                        const b = document.getElementById('tastytrade-badge');
+                        b.textContent = 'TT ERROR';
+                        b.style.background = '#9e9e9e';
+                    });
+            </script>
         </div>
 
         <div id="signals-tab" class="tab-content active">
@@ -653,7 +675,7 @@ RESEARCH_DASHBOARD_HTML = """
                     <div style="margin-top: 15px; padding: 20px; background: #1e1e2e; border-radius: 8px;">
                         <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Paste your Robinhood portfolio JSON (from stock_portfolio app)</p>
                         <textarea id="robinhoodJson" rows="10" placeholder='{"holdings": [{"symbol": "TSLA", "shares": 19.352, "price": 417.44, "average_cost": 386.79, ...}], "total_value": 19993.62}' style="width: 100%; padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px; font-family: monospace; font-size: 0.85em;"></textarea>
-                        <button onclick="importRobinhoodJson()" style="margin-top: 10px; padding: 10px 20px; background: #22c55e; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import Robinhood Positions</button>
+                        <button id="importRobinhoodBtn" style="margin-top: 10px; padding: 10px 20px; background: #22c55e; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import Robinhood Positions</button>
                     </div>
                 </details>
 
@@ -663,7 +685,7 @@ RESEARCH_DASHBOARD_HTML = """
                     <div style="margin-top: 15px; padding: 20px; background: #1e1e2e; border-radius: 8px;">
                         <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Upload your ThinkorSwim Position Statement CSV file</p>
                         <input type="file" id="tosFile" accept=".csv" style="margin-bottom: 10px; color: #fff;">
-                        <button onclick="importTosFile()" style="padding: 10px 20px; background: #f59e0b; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import ThinkorSwim Positions</button>
+                        <button id="importTosBtn" style="padding: 10px 20px; background: #f59e0b; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import ThinkorSwim Positions</button>
                     </div>
                 </details>
 
@@ -682,39 +704,6 @@ RESEARCH_DASHBOARD_HTML = """
         let sectorsData = {};
         let currentJobId = null;
         let regimeChart = null;
-
-        // Check Tastytrade connection status on page load
-        async function checkTastytradeStatus() {
-            try {
-                const response = await fetch('/signals/tastytrade/status');
-                const data = await response.json();
-                const badge = document.getElementById('tastytrade-badge');
-                
-                if (data.connected) {
-                    if (data.env === 'production') {
-                        badge.textContent = 'TT LIVE';
-                        badge.style.background = '#4caf50';
-                        badge.style.color = '#fff';
-                    } else {
-                        badge.textContent = 'TT SANDBOX';
-                        badge.style.background = '#ff9800';
-                        badge.style.color = '#000';
-                    }
-                } else {
-                    badge.textContent = 'TT OFFLINE';
-                    badge.style.background = '#f44336';
-                    badge.style.color = '#fff';
-                }
-            } catch (error) {
-                const badge = document.getElementById('tastytrade-badge');
-                badge.textContent = 'TT ERROR';
-                badge.style.background = '#9e9e9e';
-                badge.style.color = '#fff';
-            }
-        }
-        
-        // Check status on page load
-        checkTastytradeStatus();
 
         function showTab(tabName) {
             // Deactivate previous tab
@@ -1868,6 +1857,10 @@ RESEARCH_DASHBOARD_HTML = """
             fileInput.value = '';
             await loadRiskSnapshot();
         }
+        
+        // Attach event listeners after functions are defined
+        document.getElementById('importRobinhoodBtn')?.addEventListener('click', importRobinhoodJson);
+        document.getElementById('importTosBtn')?.addEventListener('click', importTosFile);
         
         async function deleteManualPosition(positionId) {
             if (!confirm('Are you sure you want to delete this position?')) {
