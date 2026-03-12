@@ -870,6 +870,20 @@ def bulk_delete_manual_positions():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@research_bp.route('/risk/positions/manual/delete-by-account/<account>', methods=['DELETE'])
+def delete_positions_by_account(account):
+    """Delete all positions for a specific account"""
+    try:
+        deleted_count = risk_manager.delete_positions_by_account(account)
+        # Clear cache
+        import os
+        cache_file = 'data/risk_cache.json'
+        if os.path.exists(cache_file):
+            os.remove(cache_file)
+        return jsonify({'success': True, 'deleted_count': deleted_count})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @research_bp.route('/risk/recovery/reset', methods=['POST'])
 def reset_recovery_mode():
     """Reset recovery mode"""

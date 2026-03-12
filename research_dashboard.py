@@ -674,7 +674,6 @@ RESEARCH_DASHBOARD_HTML = """
                             <textarea id="manualNotes" rows="2" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;"></textarea>
                         </div>
                         <button onclick="addManualPosition()" style="margin-top: 15px; padding: 10px 20px; background: #4fc3f7; color: #1e1e2e; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Add Position</button>
-                        <button id="bulkDeleteBtn" style="margin-top: 15px; margin-left: 10px; padding: 10px 20px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Delete All Manual Positions</button>
                     </div>
                 </details>
 
@@ -685,6 +684,7 @@ RESEARCH_DASHBOARD_HTML = """
                         <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Copy your portfolio from Robinhood app and paste here (Name, Symbol, Shares, Price, etc.)</p>
                         <textarea id="robinhoodText" rows="10" placeholder="Tesla&#10;TSLA&#10;19.352&#10;$417.44&#10;$386.79&#10;$593.13&#10;$8,078.13&#10;..." style="width: 100%; padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px; font-family: monospace; font-size: 0.85em;"></textarea>
                         <button id="importRobinhoodBtn" style="margin-top: 10px; padding: 10px 20px; background: #22c55e; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import Robinhood Positions</button>
+                        <button onclick="deleteByAccount('robinhood')" style="margin-top: 10px; margin-left: 10px; padding: 10px 20px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Delete All Robinhood</button>
                     </div>
                 </details>
 
@@ -695,6 +695,7 @@ RESEARCH_DASHBOARD_HTML = """
                         <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Upload your ThinkorSwim Position Statement CSV file</p>
                         <input type="file" id="tosFile" accept=".csv" style="margin-bottom: 10px; color: #fff;">
                         <button id="importTosBtn" style="padding: 10px 20px; background: #f59e0b; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import ThinkorSwim Positions</button>
+                        <button onclick="deleteByAccount('thinkorswim')" style="margin-left: 10px; padding: 10px 20px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Delete All ThinkorSwim</button>
                     </div>
                 </details>
 
@@ -705,6 +706,7 @@ RESEARCH_DASHBOARD_HTML = """
                         <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Copy ALL your positions from Schwab and paste here</p>
                         <textarea id="schwabText" rows="10" style="width: 100%; padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px; font-family: monospace; font-size: 0.85em;"></textarea>
                         <button id="importSchwabBtn" style="margin-top: 10px; padding: 10px 20px; background: #8b5cf6; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import Schwab Positions</button>
+                        <button onclick="deleteByAccount('schwab')" style="margin-top: 10px; margin-left: 10px; padding: 10px 20px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Delete All Schwab</button>
                     </div>
                 </details>
 
@@ -1975,6 +1977,35 @@ RESEARCH_DASHBOARD_HTML = """
             } catch (error) {
                 console.error('Error importing:', error);
                 alert('Error importing: ' + error.message);
+            }
+        }
+        
+        async function deleteByAccount(account) {
+            const accountNames = {
+                'robinhood': 'Robinhood',
+                'schwab': 'Schwab',
+                'thinkorswim': 'ThinkorSwim'
+            };
+            
+            if (!confirm(`⚠️ WARNING: This will delete ALL ${accountNames[account]} positions. This cannot be undone. Continue?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/signals/risk/positions/manual/delete-by-account/${account}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`Deleted ${result.deleted_count} ${accountNames[account]} positions`);
+                    await loadRiskSnapshot();
+                } else {
+                    alert('Failed to delete positions');
+                }
+            } catch (error) {
+                console.error('Error deleting:', error);
+                alert('Error: ' + error.message);
             }
         }
         

@@ -617,6 +617,14 @@ def bulk_delete_manual_positions():
     save_manual_positions([])
     return count
 
+def delete_positions_by_account(account):
+    """Delete all positions for a specific account"""
+    positions = load_manual_positions()
+    original_count = len(positions)
+    filtered = [p for p in positions if p.get('account', '').lower() != account.lower()]
+    save_manual_positions(filtered)
+    return original_count - len(filtered)
+
 def reset_recovery_mode():
     """Manually reset recovery mode"""
     daily_log = load_daily_log()
