@@ -1,8 +1,8 @@
 {
   "growth_regime": "SLOWING",
-  "inflation_regime": "HIGH",
+  "inflation_regime": "RISING",
   "quadrant": "STAGFLATION",
-  "geopolitical_risk": "UNKNOWN",
+  "geopolitical_risk": "HIGH",
   "commodity_disruption": {
     "oil": "HIGH"
   },
@@ -19,11 +19,12 @@
     "real_estate"
   ],
   "regime_confidence": 0.7,
-  "last_updated": "2026-03-12T17:43:02.127437",
+  "last_updated": "2026-03-12T17:45:49.002551",
   "sources": [
     "yfinance:SPY",
     "yfinance:TLT",
     "yfinance:DBC",
-    "ERROR"
+    "yfinance:VIX",
+    "yahoo_finance_rss"
   ]
 }

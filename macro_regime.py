@@ -322,17 +322,21 @@ def _score_geopolitical_risk() -> tuple:
         vix = yf.Ticker("^VIX")
         vix_hist = vix.history(period="5d")
         
-        if len(vix_hist) > 0:
-            vix_level = vix_hist['Close'][-1]
-            sources.append('yfinance:VIX')
-            
-            # VIX thresholds
-            if vix_level > 30:
-                vix_risk = "HIGH"
-            elif vix_level > 20:
-                vix_risk = "ELEVATED"
+        if vix_hist is not None and len(vix_hist) > 0 and 'Close' in vix_hist.columns:
+            vix_close = vix_hist['Close'].dropna()
+            if len(vix_close) > 0:
+                vix_level = vix_close.iloc[-1]
+                sources.append('yfinance:VIX')
+                
+                # VIX thresholds
+                if vix_level > 30:
+                    vix_risk = "HIGH"
+                elif vix_level > 20:
+                    vix_risk = "ELEVATED"
+                else:
+                    vix_risk = "LOW"
             else:
-                vix_risk = "LOW"
+                vix_risk = "UNKNOWN"
         else:
             vix_risk = "UNKNOWN"
         
