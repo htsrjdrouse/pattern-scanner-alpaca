@@ -1961,38 +1961,43 @@ RESEARCH_DASHBOARD_HTML = """
                 const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
                 
                 const cleanNumber = (s) => {
-                    return parseFloat(s.replace(/[$,+()]/g, '').replace('Gain Loss', '').replace('Market Value', '').replace('Cost Basis', '').replace('Quantity', '').replace('Price', '')) || 0;
+                    return parseFloat(s.replace(/[$,+()]/g, '').replace(/Gain Loss|Market Value|Cost Basis|Quantity|Price/g, '')) || 0;
                 };
                 
                 const holdings = [];
-                let i = 0;
                 
-                while (i < lines.length) {
-                    // Look for symbol (all caps, 2-5 chars)
-                    if (/^[A-Z]{2,5}$/.test(lines[i])) {
+                for (let i = 0; i < lines.length; i++) {
+                    // Look for symbol (all caps, 2-6 chars, possibly with numbers)
+                    if (/^[A-Z]{2,6}[0-9]?$/.test(lines[i])) {
                         const symbol = lines[i];
                         let qty = 0, price = 0, marketValue = 0, costBasis = 0, gainLoss = 0;
+                        let foundData = false;
                         
-                        // Parse next few lines for data
-                        for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
+                        // Parse next 15 lines for data
+                        for (let j = i + 1; j < Math.min(i + 15, lines.length); j++) {
                             const line = lines[j];
+                            
                             if (line.includes('Quantity') && line.includes('Price')) {
                                 const parts = line.split('Price');
                                 qty = cleanNumber(parts[0]);
                                 price = cleanNumber(parts[1]);
-                            } else if (line.includes('Market Value')) {
+                                foundData = true;
+                            } else if (line.startsWith('Market Value')) {
                                 marketValue = cleanNumber(line);
-                            } else if (line.includes('Cost Basis')) {
+                            } else if (line.startsWith('Cost Basis')) {
                                 costBasis = cleanNumber(line);
-                            } else if (line.includes('Gain Loss')) {
-                                gainLoss = cleanNumber(line.replace('Gain Loss', ''));
-                                if (line.includes('-$') || line.includes('($')) gainLoss = -Math.abs(gainLoss);
+                            } else if (line.startsWith('Gain Loss')) {
+                                const glStr = line.replace('Gain Loss', '').trim();
+                                gainLoss = cleanNumber(glStr);
+                                if (glStr.includes('-') || glStr.startsWith('($')) {
+                                    gainLoss = -Math.abs(gainLoss);
+                                }
                                 break; // End of this position
                             }
                         }
                         
-                        if (qty > 0 && symbol) {
-                            const avgCost = costBasis / qty;
+                        if (foundData && qty > 0 && symbol) {
+                            const avgCost = costBasis > 0 ? costBasis / qty : 0;
                             holdings.push({
                                 symbol: symbol,
                                 shares: qty,
@@ -2002,10 +2007,6 @@ RESEARCH_DASHBOARD_HTML = """
                                 equity: marketValue
                             });
                         }
-                        
-                        i += 10; // Skip ahead
-                    } else {
-                        i++;
                     }
                 }
                 
@@ -2028,7 +2029,7 @@ RESEARCH_DASHBOARD_HTML = """
                         date_entered: new Date().toISOString().split('T')[0],
                         market_value: holding.equity,
                         unrealized_pl: holding.total_return,
-                        unrealized_plpc: holding.total_return / (holding.average_cost * holding.shares)
+                        unrealized_plpc: holding.average_cost > 0 ? holding.total_return / (holding.average_cost * holding.shares) : 0
                     };
                     
                     const response = await fetch('/signals/risk/positions/manual', {
