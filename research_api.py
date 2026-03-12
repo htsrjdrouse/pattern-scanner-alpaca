@@ -686,10 +686,13 @@ def import_schwab_positions():
         holdings = []
         i = 0
         
+        print(f"[SCHWAB IMPORT] Starting parse, total lines: {len(lines)}")
+        
         while i < len(lines):
             # Find symbol (2-10 uppercase letters)
             if re.match(r'^[A-Z]{2,10}$', lines[i]):
                 symbol = lines[i]
+                print(f"[SCHWAB IMPORT] Found symbol at line {i}: {symbol}")
                 qty, price, market_value, cost_basis, gain_loss = 0, 0, 0, 0, 0
                 
                 # Look ahead for data
@@ -700,28 +703,57 @@ def import_schwab_positions():
                     if 'Quantity' in line and 'Price' in line:
                         qty_match = re.search(r'Quantity([0-9.]+)', line)
                         price_match = re.search(r'Price\$([0-9.]+)', line)
-                        if qty_match: qty = float(qty_match.group(1))
-                        if price_match: price = float(price_match.group(1))
+                        if qty_match: 
+                            try:
+                                qty = float(qty_match.group(1))
+                            except:
+                                print(f"[SCHWAB IMPORT] Error parsing qty from: {line}")
+                        if price_match: 
+                            try:
+                                price = float(price_match.group(1))
+                            except:
+                                print(f"[SCHWAB IMPORT] Error parsing price from: {line}")
                     
                     # Market Value
                     elif line.startswith('Market Value'):
-                        mv_str = line.replace('Market Value', '').replace('$', '').replace(',', '').strip()
-                        market_value = float(mv_str) if mv_str else 0
+                        try:
+                            mv_str = line.replace('Market Value', '').replace('$', '').replace(',', '').strip()
+                            # Handle multiple decimals by taking only first decimal point
+                            if mv_str.count('.') > 1:
+                                parts = mv_str.split('.')
+                                mv_str = parts[0] + '.' + ''.join(parts[1:])
+                            market_value = float(mv_str) if mv_str else 0
+                        except Exception as e:
+                            print(f"[SCHWAB IMPORT] Error parsing market value from '{line}': {e}")
                     
                     # Cost Basis
                     elif line.startswith('Cost Basis'):
-                        cb_str = line.replace('Cost Basis', '').replace('$', '').replace(',', '').strip()
-                        cost_basis = float(cb_str) if cb_str else 0
+                        try:
+                            cb_str = line.replace('Cost Basis', '').replace('$', '').replace(',', '').strip()
+                            # Handle multiple decimals
+                            if cb_str.count('.') > 1:
+                                parts = cb_str.split('.')
+                                cb_str = parts[0] + '.' + ''.join(parts[1:])
+                            cost_basis = float(cb_str) if cb_str else 0
+                        except Exception as e:
+                            print(f"[SCHWAB IMPORT] Error parsing cost basis from '{line}': {e}")
                     
                     # Gain/Loss
                     elif line.startswith('Gain Loss'):
-                        gl_str = line.replace('Gain Loss', '').replace('$', '').replace(',', '').strip()
-                        # Remove + or - prefix for parsing
-                        is_negative = gl_str.startswith('-') or gl_str.startswith('(')
-                        gl_str = gl_str.replace('+', '').replace('-', '').replace('(', '').replace(')', '')
-                        gain_loss = float(gl_str) if gl_str else 0
-                        if is_negative:
-                            gain_loss = -gain_loss
+                        try:
+                            gl_str = line.replace('Gain Loss', '').replace('$', '').replace(',', '').strip()
+                            # Remove + or - prefix for parsing
+                            is_negative = gl_str.startswith('-') or gl_str.startswith('(')
+                            gl_str = gl_str.replace('+', '').replace('-', '').replace('(', '').replace(')', '')
+                            # Handle multiple decimals
+                            if gl_str.count('.') > 1:
+                                parts = gl_str.split('.')
+                                gl_str = parts[0] + '.' + ''.join(parts[1:])
+                            gain_loss = float(gl_str) if gl_str else 0
+                            if is_negative:
+                                gain_loss = -gain_loss
+                        except Exception as e:
+                            print(f"[SCHWAB IMPORT] Error parsing gain/loss from '{line}': {e}")
                         break
                     
                     # Stop if hit another symbol
@@ -738,8 +770,13 @@ def import_schwab_positions():
                         'market_value': market_value,
                         'total_return': gain_loss
                     })
+                    print(f"[SCHWAB IMPORT] Added {symbol}: {qty} shares @ ${avg_cost:.2f}, MV=${market_value:.2f}, G/L=${gain_loss:.2f}")
+                else:
+                    print(f"[SCHWAB IMPORT] Skipped {symbol}: qty={qty}")
             
             i += 1
+        
+        print(f"[SCHWAB IMPORT] Parse complete. Found {len(holdings)} positions")
         
         # Import all positions
         imported = 0
