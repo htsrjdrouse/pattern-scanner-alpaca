@@ -3,12 +3,13 @@ Pattern scanner result screener with tier-based filtering.
 Applies systematic filters to identify high-conviction setups.
 """
 
-def screen_pattern_results(results):
+def screen_pattern_results(results, macro_context=None):
     """
     Screen pattern scanner results into tiers.
     
     Args:
         results: List of dicts with pattern scanner output
+        macro_context: Optional MacroRegime object for macro overlay
         
     Returns:
         Dict with tier1, tier2, tier3, exceptions, excluded
@@ -34,13 +35,39 @@ def screen_pattern_results(results):
         death_cross = stock.get('death_cross', False)
         golden_cross = stock.get('golden_cross', False)
         price = stock.get('price', 0)
+        sector = stock.get('sector', '')
+        
+        # Macro overlay flags
+        macro_tailwind = False
+        macro_headwind = False
+        geo_risk_high = False
+        commodity_shock = False
+        
+        if macro_context:
+            from macro_regime import get_sector_macro_alignment, COMMODITY_SECTOR_MAP
+            
+            alignment = get_sector_macro_alignment(sector, macro_context)
+            macro_tailwind = (alignment == "TAILWIND")
+            macro_headwind = (alignment == "HEADWIND")
+            geo_risk_high = (macro_context.geopolitical_risk == "HIGH")
+            
+            # Check commodity shock alignment
+            for commodity, severity in macro_context.commodity_disruption.items():
+                if severity == "HIGH":
+                    affected_sectors = COMMODITY_SECTOR_MAP.get(commodity, [])
+                    if sector in affected_sectors:
+                        commodity_shock = True
+                        break
+        
+        # RSI ceiling adjustment for commodity shocks
+        rsi_ceiling = 82 if commodity_shock else 80
         
         # Automatic disqualifiers
-        if (rsi > 80 or rsi < 45 or adx < 10 or u_shape < 0.05 or 
+        if (rsi > rsi_ceiling or rsi < 45 or adx < 10 or u_shape < 0.05 or 
             risk_reward < 1.0 or death_cross or
             (status == "FORMING" and score < 50)):
             reason = []
-            if rsi > 80: reason.append("RSI > 80 (overbought)")
+            if rsi > rsi_ceiling: reason.append(f"RSI > {rsi_ceiling} (overbought)")
             if rsi < 45: reason.append("RSI < 45 (weak momentum)")
             if adx < 10: reason.append("ADX < 10 (no trend)")
             if u_shape < 0.05: reason.append("U-shape < 0.05 (distorted)")
@@ -59,31 +86,51 @@ def screen_pattern_results(results):
         if dcf_margin and dcf_margin > 200: flags.append("💰 DEEP VALUE")
         if u_shape >= 0.80: flags.append("📐 PERFECT CUP")
         
+        # Macro flags
+        if macro_tailwind: flags.append("🌍 MACRO TAILWIND")
+        if macro_headwind: flags.append("⚠️ MACRO HEADWIND")
+        if geo_risk_high: flags.append("🚨 GEO RISK HIGH")
+        if commodity_shock: flags.append("🛢️ COMMODITY SHOCK")
+        
         stock_with_flags = {**stock, 'flags': flags}
         
         # Check DCF validity
         dcf_valid = dcf_margin is not None and dcf_margin > 0
         
+        # Determine initial tier
+        initial_tier = None
+        
         # TIER 1: HIGH CONVICTION
         if (volume_mult >= 2.0 and adx >= 25 and 50 <= rsi <= 70 and
             u_shape >= 0.40 and risk_reward >= 1.5 and dcf_valid and macd_bullish):
-            tier1.append(stock_with_flags)
-            continue
-        
+            initial_tier = 1
         # TIER 2: STRONG SETUP
-        if (volume_mult >= 1.0 and adx >= 25 and 50 <= rsi <= 70 and
+        elif (volume_mult >= 1.0 and adx >= 25 and 50 <= rsi <= 70 and
             u_shape >= 0.35 and risk_reward >= 1.5 and dcf_valid and macd_bullish):
-            tier2.append(stock_with_flags)
-            continue
-        
+            initial_tier = 2
         # TIER 3: WATCHLIST
-        if (volume_mult >= 0.5 and adx >= 25 and 50 <= rsi <= 70 and
+        elif (volume_mult >= 0.5 and adx >= 25 and 50 <= rsi <= 70 and
             u_shape >= 0.40 and risk_reward >= 1.5 and macd_bullish):
-            tier3.append(stock_with_flags)
-            continue
+            initial_tier = 3
         
-        # NOTABLE EXCEPTIONS: Strong ADX but fails 1-2 criteria
-        if adx >= 35:
+        # Macro boost/downgrade logic
+        if initial_tier and macro_context:
+            # Upgrade: MACRO TAILWIND + commodity shock
+            if macro_tailwind and commodity_shock and initial_tier > 1:
+                initial_tier -= 1  # Tier 2 → 1, Tier 3 → 2
+            # Downgrade: MACRO HEADWIND
+            elif macro_headwind and initial_tier < 3:
+                initial_tier += 1  # Tier 1 → 2, Tier 2 → 3
+        
+        # Assign to tier
+        if initial_tier == 1:
+            tier1.append(stock_with_flags)
+        elif initial_tier == 2:
+            tier2.append(stock_with_flags)
+        elif initial_tier == 3:
+            tier3.append(stock_with_flags)
+        elif adx >= 35:
+            # NOTABLE EXCEPTIONS: Strong ADX but fails 1-2 criteria
             fails = []
             if volume_mult < 2.0: fails.append("Volume < 2.0x")
             if not (50 <= rsi <= 70): fails.append(f"RSI {rsi:.0f} (need 50-70)")
@@ -108,7 +155,8 @@ def screen_pattern_results(results):
             'tier3_count': len(tier3),
             'exceptions_count': len(exceptions),
             'excluded_count': len(excluded)
-        }
+        },
+        'macro_context': macro_context
     }
 
 
@@ -200,6 +248,18 @@ def format_screener_output(screened):
         output.append("✅ MARKET OBSERVATION:")
         output.append("Multiple high-quality setups available with strong volume and trend")
         output.append("confirmation. Market conditions support pattern-based entries.")
+    
+    # Macro regime summary
+    macro_context = screened.get('macro_context')
+    if macro_context:
+        output.append("")
+        output.append("🌍 MACRO REGIME CONTEXT")
+        output.append("-" * 80)
+        output.append(f"Quadrant: {macro_context.quadrant}  |  Geopolitical Risk: {macro_context.geopolitical_risk}")
+        if macro_context.commodity_disruption:
+            disruptions = ', '.join([f"{k.upper()}:{v}" for k, v in macro_context.commodity_disruption.items()])
+            output.append(f"Commodity Disruptions: {disruptions}")
+        output.append(f"Favored Sectors: {', '.join(macro_context.favored_sectors[:5])}")
     
     output.append("=" * 80)
     

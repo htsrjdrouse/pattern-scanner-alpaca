@@ -1,0 +1,27 @@
+{
+  "growth_regime": "UNKNOWN",
+  "inflation_regime": "UNKNOWN",
+  "quadrant": "GOLDILOCKS",
+  "geopolitical_risk": "UNKNOWN",
+  "commodity_disruption": {},
+  "favored_sectors": [
+    "semiconductors",
+    "saas",
+    "consumer_discretionary",
+    "industrials",
+    "financials"
+  ],
+  "suppressed_sectors": [
+    "energy",
+    "gold_miners",
+    "utilities"
+  ],
+  "regime_confidence": 0.0,
+  "last_updated": "2026-03-12T17:22:32.494141",
+  "sources": [
+    "yfinance:SPY",
+    "yfinance:TLT",
+    "yfinance:DBC",
+    "ERROR"
+  ]
+}

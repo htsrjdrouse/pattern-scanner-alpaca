@@ -176,6 +176,7 @@ RESEARCH_DASHBOARD_HTML = """
             <button onclick="showTab('signals')" id="tab-signals" class="active">Signal Analysis</button>
             <button onclick="showTab('sector-scan')" id="tab-sector-scan">Sector Scan</button>
             <button onclick="showTab('regime')" id="tab-regime">Regime Classifier</button>
+            <button onclick="showTab('macro')" id="tab-macro">Macro Regime</button>
             <button onclick="showTab('risk')" id="tab-risk">Risk Manager</button>
         </div>
         
@@ -520,6 +521,21 @@ RESEARCH_DASHBOARD_HTML = """
                         <!-- Populated by JavaScript -->
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- MACRO REGIME TAB -->
+        <div id="macro-tab" class="tab-content">
+            <div class="section">
+                <h2>🌍 Macro Regime Overlay</h2>
+                <p style="color: #9e9e9e;">Geopolitical and macro context for pattern scanner</p>
+                
+                <div style="display: flex; gap: 20px; margin-top: 20px;">
+                    <button onclick="loadMacroRegime()" style="padding: 10px 20px; background: #4fc3f7; color: #1e1e2e; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Load Regime</button>
+                    <button onclick="loadMacroRegime(true)" style="padding: 10px 20px; background: #ff9800; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Force Refresh</button>
+                </div>
+                
+                <div id="macroRegimeContent" style="margin-top: 30px;"></div>
             </div>
         </div>
 
@@ -1561,6 +1577,98 @@ RESEARCH_DASHBOARD_HTML = """
         
         let riskHistoryChart = null;
         let riskRefreshInterval = null;
+        
+        async function loadMacroRegime(force = false) {
+            try {
+                const url = force ? '/signals/api/macro-regime?force=true' : '/signals/api/macro-regime';
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('macroRegimeContent').innerHTML = `<p style="color: #ef4444;">Error: ${data.error}</p>`;
+                    return;
+                }
+                
+                const quadrantColors = {
+                    'GOLDILOCKS': '#4caf50',
+                    'REFLATION': '#ff9800',
+                    'STAGFLATION': '#ff5722',
+                    'DEFLATION': '#f44336'
+                };
+                
+                const geoColors = {
+                    'LOW': '#4caf50',
+                    'ELEVATED': '#ff9800',
+                    'HIGH': '#f44336',
+                    'UNKNOWN': '#9e9e9e'
+                };
+                
+                let html = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                        <div style="background: #1e1e2e; padding: 20px; border-radius: 8px;">
+                            <h3 style="margin-top: 0;">Macro Quadrant</h3>
+                            <div style="font-size: 24px; font-weight: bold; padding: 15px; background: ${quadrantColors[data.quadrant] || '#9e9e9e'}; color: #fff; border-radius: 8px; text-align: center;">
+                                ${data.quadrant}
+                            </div>
+                            <p style="margin-top: 10px; color: #9e9e9e; font-size: 0.9em;">
+                                Growth: ${data.growth_regime}<br>
+                                Inflation: ${data.inflation_regime}
+                            </p>
+                        </div>
+                        
+                        <div style="background: #1e1e2e; padding: 20px; border-radius: 8px;">
+                            <h3 style="margin-top: 0;">Geopolitical Risk</h3>
+                            <div style="font-size: 24px; font-weight: bold; padding: 15px; background: ${geoColors[data.geopolitical_risk]}; color: #fff; border-radius: 8px; text-align: center;">
+                                ${data.geopolitical_risk}
+                            </div>
+                            <p style="margin-top: 10px; color: #9e9e9e; font-size: 0.9em;">
+                                Confidence: ${(data.regime_confidence * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                    </div>
+                    
+                    ${Object.keys(data.commodity_disruption).length > 0 ? `
+                    <div style="background: #1e1e2e; padding: 20px; border-radius: 8px; margin-top: 20px;">
+                        <h3 style="margin-top: 0;">🛢️ Commodity Disruptions</h3>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            ${Object.entries(data.commodity_disruption).map(([commodity, severity]) => {
+                                const severityColor = severity === 'HIGH' ? '#f44336' : '#ff9800';
+                                return `<span style="padding: 8px 16px; background: ${severityColor}; color: #fff; border-radius: 4px; font-weight: bold;">${commodity.toUpperCase()}: ${severity}</span>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                        <div style="background: #1e1e2e; padding: 20px; border-radius: 8px;">
+                            <h3 style="margin-top: 0; color: #4caf50;">✅ Favored Sectors</h3>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                ${data.favored_sectors.map(s => `<span style="padding: 6px 12px; background: #4caf50; color: #fff; border-radius: 4px; font-size: 0.9em;">${s}</span>`).join('')}
+                            </div>
+                        </div>
+                        
+                        <div style="background: #1e1e2e; padding: 20px; border-radius: 8px;">
+                            <h3 style="margin-top: 0; color: #f44336;">❌ Suppressed Sectors</h3>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                ${data.suppressed_sectors.map(s => `<span style="padding: 6px 12px; background: #f44336; color: #fff; border-radius: 4px; font-size: 0.9em;">${s}</span>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="background: #1e1e2e; padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 0.85em; color: #9e9e9e;">
+                        <strong>Last Updated:</strong> ${new Date(data.last_updated).toLocaleString()}<br>
+                        <strong>Cache Age:</strong> ${data.cache_age_minutes} minutes (refreshes every 4 hours)<br>
+                        <strong>Sources:</strong> ${data.sources.join(', ')}
+                    </div>
+                `;
+                
+                document.getElementById('macroRegimeContent').innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading macro regime:', error);
+                document.getElementById('macroRegimeContent').innerHTML = `<p style="color: #ef4444;">Error: ${error.message}</p>`;
+            }
+        }
         
         async function loadRiskSnapshot() {
             try {

@@ -893,6 +893,35 @@ def reset_recovery_mode():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@research_bp.route('/api/macro-regime', methods=['GET'])
+def get_macro_regime():
+    """Get current macro regime context"""
+    try:
+        from macro_regime import build_macro_context
+        from dataclasses import asdict
+        from datetime import datetime
+        import os
+        
+        # Check for force refresh
+        force = request.args.get('force', 'false').lower() == 'true'
+        if force:
+            cache_file = 'data/macro_regime_cache.json'
+            if os.path.exists(cache_file):
+                os.remove(cache_file)
+        
+        regime = build_macro_context()
+        
+        # Calculate cache age
+        last_updated = datetime.fromisoformat(regime.last_updated)
+        cache_age_minutes = (datetime.now() - last_updated).total_seconds() / 60
+        
+        return jsonify({
+            **asdict(regime),
+            'cache_age_minutes': round(cache_age_minutes, 1)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @research_bp.route('/risk/reset-baseline', methods=['POST'])
 def reset_start_of_day():
     """Reset start of day baseline to current portfolio value"""
