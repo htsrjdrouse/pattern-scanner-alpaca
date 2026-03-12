@@ -647,6 +647,26 @@ RESEARCH_DASHBOARD_HTML = """
                     </div>
                 </details>
 
+                <!-- Bulk Import: Robinhood JSON -->
+                <details style="margin-top: 20px;">
+                    <summary style="cursor: pointer; color: #22c55e; font-weight: 600; padding: 10px; background: #1e1e2e; border-radius: 5px;">📋 Bulk Import: Robinhood JSON</summary>
+                    <div style="margin-top: 15px; padding: 20px; background: #1e1e2e; border-radius: 8px;">
+                        <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Paste your Robinhood portfolio JSON (from stock_portfolio app)</p>
+                        <textarea id="robinhoodJson" rows="10" placeholder='{"holdings": [{"symbol": "TSLA", "shares": 19.352, "price": 417.44, "average_cost": 386.79, ...}], "total_value": 19993.62}' style="width: 100%; padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px; font-family: monospace; font-size: 0.85em;"></textarea>
+                        <button onclick="importRobinhoodJson()" style="margin-top: 10px; padding: 10px 20px; background: #22c55e; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import Robinhood Positions</button>
+                    </div>
+                </details>
+
+                <!-- Bulk Import: ThinkorSwim CSV -->
+                <details style="margin-top: 20px;">
+                    <summary style="cursor: pointer; color: #f59e0b; font-weight: 600; padding: 10px; background: #1e1e2e; border-radius: 5px;">📁 Bulk Import: ThinkorSwim CSV</summary>
+                    <div style="margin-top: 15px; padding: 20px; background: #1e1e2e; border-radius: 8px;">
+                        <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Upload your ThinkorSwim Position Statement CSV file</p>
+                        <input type="file" id="tosFile" accept=".csv" style="margin-bottom: 10px; color: #fff;">
+                        <button onclick="importTosFile()" style="padding: 10px 20px; background: #f59e0b; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import ThinkorSwim Positions</button>
+                    </div>
+                </details>
+
                 <!-- 30-Day P&L History -->
                 <h3 style="color: #4fc3f7; margin-top: 30px;">30-Day P&L History</h3>
                 <div style="margin-top: 15px;">
@@ -1723,6 +1743,130 @@ RESEARCH_DASHBOARD_HTML = """
                 console.error('Error adding position:', error);
                 alert('Error adding position');
             }
+        }
+        
+        async function importRobinhoodJson() {
+            const jsonText = document.getElementById('robinhoodJson').value.trim();
+            if (!jsonText) {
+                alert('Please paste Robinhood JSON');
+                return;
+            }
+            
+            try {
+                const data = JSON.parse(jsonText);
+                if (!data.holdings || !Array.isArray(data.holdings)) {
+                    alert('Invalid format: missing holdings array');
+                    return;
+                }
+                
+                let imported = 0;
+                for (const holding of data.holdings) {
+                    const position = {
+                        symbol: holding.symbol,
+                        account: 'robinhood',
+                        position_type: 'equity',
+                        side: 'long',
+                        qty: holding.shares,
+                        cost_basis: holding.average_cost,
+                        current_price: holding.price,
+                        notes: `Imported from Robinhood - ${holding.name}`,
+                        date_entered: new Date().toISOString().split('T')[0],
+                        market_value: holding.equity,
+                        unrealized_pl: holding.total_return,
+                        unrealized_plpc: holding.total_return / (holding.average_cost * holding.shares)
+                    };
+                    
+                    const response = await fetch('/signals/risk/positions/manual', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(position)
+                    });
+                    
+                    if (response.ok) imported++;
+                }
+                
+                alert(`Imported ${imported} of ${data.holdings.length} positions`);
+                document.getElementById('robinhoodJson').value = '';
+                await loadRiskSnapshot();
+            } catch (error) {
+                console.error('Error importing:', error);
+                alert('Error parsing JSON: ' + error.message);
+            }
+        }
+        
+        async function importTosFile() {
+            const fileInput = document.getElementById('tosFile');
+            if (!fileInput.files || !fileInput.files[0]) {
+                alert('Please select a CSV file');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const text = await file.text();
+            const lines = text.split('\n');
+            
+            // Find the header line (starts with "Symbol,")
+            let headerIndex = -1;
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].startsWith('Symbol,')) {
+                    headerIndex = i;
+                    break;
+                }
+            }
+            
+            if (headerIndex === -1) {
+                alert('Could not find position data in CSV');
+                return;
+            }
+            
+            const headers = lines[headerIndex].split(',');
+            let imported = 0;
+            
+            for (let i = headerIndex + 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line || line.startsWith('Total') || line.startsWith('Cash')) continue;
+                
+                const values = line.split(',');
+                if (values.length < headers.length) continue;
+                
+                const symbol = values[0].trim();
+                if (!symbol) continue;
+                
+                // Parse P/L Open (remove $ and parentheses for negative)
+                const plOpenStr = values[4].replace(/[$,()]/g, '').trim();
+                const plOpen = plOpenStr.startsWith('(') ? -parseFloat(plOpenStr) : parseFloat(plOpenStr);
+                
+                // Parse BP Effect to estimate position value
+                const bpStr = values[6].replace(/[$,()]/g, '').trim();
+                const bpEffect = parseFloat(bpStr) || 0;
+                
+                const position = {
+                    symbol: symbol,
+                    account: 'thinkorswim',
+                    position_type: 'equity',
+                    side: 'long',
+                    qty: parseFloat(values[1]) || 1, // Delta as proxy for shares
+                    cost_basis: null,
+                    current_price: null,
+                    notes: `Imported from TOS - BP Effect: $${bpEffect.toFixed(2)}`,
+                    date_entered: new Date().toISOString().split('T')[0],
+                    market_value: bpEffect,
+                    unrealized_pl: plOpen,
+                    unrealized_plpc: null
+                };
+                
+                const response = await fetch('/signals/risk/positions/manual', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(position)
+                });
+                
+                if (response.ok) imported++;
+            }
+            
+            alert(`Imported ${imported} positions from ThinkorSwim`);
+            fileInput.value = '';
+            await loadRiskSnapshot();
         }
         
         async function deleteManualPosition(positionId) {
