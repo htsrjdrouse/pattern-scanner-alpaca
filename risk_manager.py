@@ -251,7 +251,7 @@ def get_risk_snapshot(force_refresh=False):
         }
     }
     
-    for account_name in ['thinkorswim', 'sofi', 'robinhood']:
+    for account_name in ['thinkorswim', 'sofi', 'robinhood', 'schwab']:
         account_positions = [p for p in manual_positions if p.get('account') == account_name]
         accounts[account_name] = {
             "portfolio_value": sum(p.get('market_value', 0) for p in account_positions),
@@ -293,7 +293,7 @@ def get_risk_snapshot(force_refresh=False):
     # Combine all positions
     all_positions = alpaca_positions + manual_positions
     
-    for account_name in ['thinkorswim', 'sofi', 'robinhood']:
+    for account_name in ['thinkorswim', 'sofi', 'robinhood', 'schwab']:
         account_positions = [p for p in manual_positions if p.get('account') == account_name]
         accounts[account_name] = {
             "portfolio_value": sum(p.get('market_value', 0) for p in account_positions),
