@@ -1,23 +1,25 @@
 {
-  "growth_regime": "UNKNOWN",
-  "inflation_regime": "UNKNOWN",
-  "quadrant": "GOLDILOCKS",
+  "growth_regime": "SLOWING",
+  "inflation_regime": "HIGH",
+  "quadrant": "STAGFLATION",
   "geopolitical_risk": "UNKNOWN",
-  "commodity_disruption": {},
+  "commodity_disruption": {
+    "oil": "HIGH"
+  },
   "favored_sectors": [
+    "energy",
+    "minerals_mining",
+    "agriculture",
+    "gold_miners"
+  ],
+  "suppressed_sectors": [
     "semiconductors",
     "saas",
     "consumer_discretionary",
-    "industrials",
-    "financials"
+    "real_estate"
   ],
-  "suppressed_sectors": [
-    "energy",
-    "gold_miners",
-    "utilities"
-  ],
-  "regime_confidence": 0.0,
-  "last_updated": "2026-03-12T17:22:32.494141",
+  "regime_confidence": 0.7,
+  "last_updated": "2026-03-12T17:43:02.127437",
   "sources": [
     "yfinance:SPY",
     "yfinance:TLT",

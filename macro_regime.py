@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Macro Regime Module - Geopolitical/Macro Overlay for Pattern Scanner Suite
 
@@ -10,10 +11,11 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import json
 import os
+import pandas as pd
 import yfinance as yf
 import feedparser
 
-# Regime→Sector Mapping Table
+# Regime->Sector Mapping Table
 REGIME_SECTOR_MAP = {
     "STAGFLATION": {  # high inflation, slowing growth
         "favored": ["energy", "minerals_mining", "agriculture", "gold_miners"],
@@ -33,7 +35,7 @@ REGIME_SECTOR_MAP = {
     }
 }
 
-# Commodity→Sector Mapping
+# Commodity->Sector Mapping
 COMMODITY_SECTOR_MAP = {
     "oil": ["energy", "transportation", "chemicals"],
     "lng": ["energy", "utilities", "chemicals"],
@@ -88,6 +90,23 @@ def build_macro_context() -> MacroRegime:
         # Fetch market data
         growth_regime, growth_conf = _classify_growth()
         inflation_regime, inflation_conf = _classify_inflation()
+        
+        # Check if we got valid data
+        if growth_regime == "UNKNOWN" or inflation_regime == "UNKNOWN":
+            print(f"Insufficient data: growth={growth_regime}, inflation={inflation_regime}")
+            return MacroRegime(
+                growth_regime=growth_regime,
+                inflation_regime=inflation_regime,
+                quadrant="UNKNOWN",
+                geopolitical_risk="UNKNOWN",
+                commodity_disruption={},
+                favored_sectors=[],
+                suppressed_sectors=[],
+                regime_confidence=0.0,
+                last_updated=datetime.now().isoformat(),
+                sources=["INSUFFICIENT_DATA"]
+            )
+        
         regime_confidence = min(growth_conf, inflation_conf)
         sources.extend(['yfinance:SPY', 'yfinance:TLT', 'yfinance:DBC'])
         
@@ -161,17 +180,43 @@ def _classify_growth() -> tuple:
     """Classify growth regime from SPY momentum and trend"""
     try:
         spy = yf.Ticker("SPY")
-        hist = spy.history(period="6mo")
+        hist = spy.history(period="1y")  # Get more history
         
-        if len(hist) < 50:
+        if hist is None or len(hist) < 50:
+            print("Growth: Insufficient SPY data")
+            return "UNKNOWN", 0.0
+        
+        # Ensure we have Close column
+        if 'Close' not in hist.columns:
+            print("Growth: No Close column in SPY data")
+            return "UNKNOWN", 0.0
+        
+        close_prices = hist['Close'].dropna()
+        if len(close_prices) < 50:
+            print("Growth: Insufficient non-NaN prices")
             return "UNKNOWN", 0.0
         
         # 20-day momentum
-        momentum_20 = (hist['Close'][-1] / hist['Close'][-20] - 1) * 100
+        if len(close_prices) >= 20:
+            momentum_20 = (close_prices.iloc[-1] / close_prices.iloc[-20] - 1) * 100
+        else:
+            momentum_20 = 0
         
         # 50/200 SMA
-        sma_50 = hist['Close'][-50:].mean()
-        sma_200 = hist['Close'][-200:].mean() if len(hist) >= 200 else sma_50
+        if len(close_prices) >= 50:
+            sma_50 = close_prices.iloc[-50:].mean()
+        else:
+            sma_50 = close_prices.mean()
+            
+        if len(close_prices) >= 200:
+            sma_200 = close_prices.iloc[-200:].mean()
+        else:
+            sma_200 = sma_50
+        
+        # Check for NaN
+        if pd.isna(momentum_20) or pd.isna(sma_50) or pd.isna(sma_200):
+            print(f"Growth: NaN values - momentum={momentum_20}, sma_50={sma_50}, sma_200={sma_200}")
+            return "UNKNOWN", 0.0
         
         if momentum_20 > 5 and sma_50 > sma_200:
             return "EXPANDING", 0.9
@@ -186,6 +231,8 @@ def _classify_growth() -> tuple:
             
     except Exception as e:
         print(f"Growth classification error: {e}")
+        import traceback
+        traceback.print_exc()
         return "UNKNOWN", 0.0
 
 
@@ -199,14 +246,36 @@ def _classify_inflation() -> tuple:
         dbc_hist = dbc.history(period="3mo")
         tlt_hist = tlt.history(period="3mo")
         
+        if dbc_hist is None or tlt_hist is None:
+            print("Inflation: No data returned")
+            return "UNKNOWN", 0.0
+        
         if len(dbc_hist) < 20 or len(tlt_hist) < 20:
+            print(f"Inflation: Insufficient data - DBC={len(dbc_hist)}, TLT={len(tlt_hist)}")
+            return "UNKNOWN", 0.0
+        
+        # Ensure Close column exists
+        if 'Close' not in dbc_hist.columns or 'Close' not in tlt_hist.columns:
+            print("Inflation: No Close column")
+            return "UNKNOWN", 0.0
+        
+        dbc_close = dbc_hist['Close'].dropna()
+        tlt_close = tlt_hist['Close'].dropna()
+        
+        if len(dbc_close) < 20 or len(tlt_close) < 20:
+            print("Inflation: Insufficient non-NaN prices")
             return "UNKNOWN", 0.0
         
         # Commodity momentum (inflation proxy)
-        dbc_momentum = (dbc_hist['Close'][-1] / dbc_hist['Close'][-20] - 1) * 100
+        dbc_momentum = (dbc_close.iloc[-1] / dbc_close.iloc[-20] - 1) * 100
         
         # Bond price momentum (inverse inflation)
-        tlt_momentum = (tlt_hist['Close'][-1] / tlt_hist['Close'][-20] - 1) * 100
+        tlt_momentum = (tlt_close.iloc[-1] / tlt_close.iloc[-20] - 1) * 100
+        
+        # Check for NaN
+        if pd.isna(dbc_momentum) or pd.isna(tlt_momentum):
+            print(f"Inflation: NaN values - dbc={dbc_momentum}, tlt={tlt_momentum}")
+            return "UNKNOWN", 0.0
         
         if dbc_momentum > 5 and tlt_momentum < -2:
             return "RISING", 0.8
@@ -221,11 +290,17 @@ def _classify_inflation() -> tuple:
             
     except Exception as e:
         print(f"Inflation classification error: {e}")
+        import traceback
+        traceback.print_exc()
         return "UNKNOWN", 0.0
 
 
 def _derive_quadrant(growth: str, inflation: str) -> str:
     """Map growth + inflation to macro quadrant"""
+    # Return UNKNOWN if either input is UNKNOWN
+    if growth == "UNKNOWN" or inflation == "UNKNOWN":
+        return "UNKNOWN"
+    
     if growth in ["EXPANDING", "RECOVERING"] and inflation in ["LOW", "FALLING"]:
         return "GOLDILOCKS"
     elif growth in ["EXPANDING", "RECOVERING"] and inflation in ["RISING", "HIGH"]:
@@ -330,15 +405,19 @@ def _detect_commodity_disruption() -> Dict[str, str]:
                 etf = yf.Ticker(ticker)
                 hist = etf.history(period="1mo")
                 
-                if len(hist) >= 20:
-                    # 20-day momentum
-                    momentum = (hist['Close'][-1] / hist['Close'][-20] - 1) * 100
-                    
-                    if momentum > 15:
-                        disruptions[commodity] = "HIGH"
-                    elif momentum > 8:
-                        disruptions[commodity] = "ELEVATED"
-            except:
+                if hist is not None and len(hist) >= 20 and 'Close' in hist.columns:
+                    close_prices = hist['Close'].dropna()
+                    if len(close_prices) >= 20:
+                        # 20-day momentum
+                        momentum = (close_prices.iloc[-1] / close_prices.iloc[-20] - 1) * 100
+                        
+                        if not pd.isna(momentum):
+                            if momentum > 15:
+                                disruptions[commodity] = "HIGH"
+                            elif momentum > 8:
+                                disruptions[commodity] = "ELEVATED"
+            except Exception as e:
+                print(f"Commodity {commodity} error: {e}")
                 pass
                 
     except Exception as e:
