@@ -674,6 +674,7 @@ RESEARCH_DASHBOARD_HTML = """
                             <textarea id="manualNotes" rows="2" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;"></textarea>
                         </div>
                         <button onclick="addManualPosition()" style="margin-top: 15px; padding: 10px 20px; background: #4fc3f7; color: #1e1e2e; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Add Position</button>
+                        <button id="bulkDeleteBtn" style="margin-top: 15px; margin-left: 10px; padding: 10px 20px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Delete All Manual Positions</button>
                     </div>
                 </details>
 
@@ -1903,9 +1904,33 @@ RESEARCH_DASHBOARD_HTML = """
             await loadRiskSnapshot();
         }
         
+        async function bulkDeleteAllPositions() {
+            if (!confirm('⚠️ WARNING: This will delete ALL manual positions from ALL accounts (Robinhood, ThinkorSwim, SoFi). This cannot be undone. Continue?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/signals/risk/positions/manual/bulk-delete', {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`Deleted ${result.deleted_count} positions`);
+                    await loadRiskSnapshot();
+                } else {
+                    alert('Failed to delete positions');
+                }
+            } catch (error) {
+                console.error('Error deleting positions:', error);
+                alert('Error deleting positions');
+            }
+        }
+        
         // Attach event listeners after functions are defined
         document.getElementById('importRobinhoodBtn')?.addEventListener('click', importRobinhoodJson);
         document.getElementById('importTosBtn')?.addEventListener('click', importTosFile);
+        document.getElementById('bulkDeleteBtn')?.addEventListener('click', bulkDeleteAllPositions);
         
         async function deleteManualPosition(positionId) {
             if (!confirm('Are you sure you want to delete this position?')) {

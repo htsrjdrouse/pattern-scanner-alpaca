@@ -610,6 +610,13 @@ def delete_manual_position(position_id):
     save_manual_positions(positions)
     return True
 
+def bulk_delete_manual_positions():
+    """Delete all manual positions"""
+    positions = load_manual_positions()
+    count = len(positions)
+    save_manual_positions([])
+    return count
+
 def reset_recovery_mode():
     """Manually reset recovery mode"""
     daily_log = load_daily_log()

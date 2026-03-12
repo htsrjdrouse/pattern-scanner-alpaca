@@ -703,6 +703,20 @@ def delete_manual_position(position_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@research_bp.route('/risk/positions/manual/bulk-delete', methods=['DELETE'])
+def bulk_delete_manual_positions():
+    """Delete all manual positions"""
+    try:
+        deleted_count = risk_manager.bulk_delete_manual_positions()
+        # Clear cache
+        import os
+        cache_file = 'data/risk_cache.json'
+        if os.path.exists(cache_file):
+            os.remove(cache_file)
+        return jsonify({'success': True, 'deleted_count': deleted_count})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @research_bp.route('/risk/recovery/reset', methods=['POST'])
 def reset_recovery_mode():
     """Reset recovery mode"""
