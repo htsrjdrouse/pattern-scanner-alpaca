@@ -166,7 +166,7 @@ RESEARCH_DASHBOARD_HTML = """
     </style>
 </head>
 <body>
-    <!-- Version: 2026-03-11-20:55 - Force cache refresh -->
+    <!-- Version: 2026-03-12-06:50 - Robinhood text import + bulk delete -->
     <div class="container">
         <h1>🔬 Alpha Research Platform</h1>
         <p class="subtitle">Systematic signal analysis and backtesting</p>
@@ -1789,7 +1789,7 @@ RESEARCH_DASHBOARD_HTML = """
             
             try {
                 // Parse Robinhood text format (same as stock_portfolio app)
-                const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+                const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
                 
                 // Remove header lines if present
                 while (lines.length && ['Name', 'Symbol', 'Shares', 'Price', 'Average cost', 'Total return', 'Equity'].includes(lines[0])) {
