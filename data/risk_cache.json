@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-12T05:24:16.760569",
+  "timestamp": "2026-03-12T13:28:14.834180",
   "cache_age_minutes": 0,
   "market_open": true,
   "accounts": {
@@ -101,9 +101,9 @@
     ]
   },
   "vix": {
-    "current": 24.229999542236328,
+    "current": 25.600000381469727,
     "start_of_day": 24.229999542236328,
-    "change_pct": 0.0,
+    "change_pct": 0.05654151321155795,
     "spike_detected": false
   },
   "pdt": {
@@ -113,11 +113,11 @@
     "pdt_exempt": true
   },
   "recovery_mode": {
-    "active": false,
-    "triggered_date": "2026-03-12T00:16:15.392908",
+    "active": true,
+    "triggered_date": "2026-03-12T05:24:16.759176",
     "consecutive_winning_days": 0,
     "days_required": 2,
-    "current_size_multiplier": 1.0
+    "current_size_multiplier": 0.5
   },
   "positions": [
     {
@@ -8460,10 +8460,15 @@
       "level": "CRITICAL",
       "type": "DAILY_LOSS_LIMIT",
       "message": "Daily loss limit BREACHED \u2014 $11601 lost vs $500 limit. ACTIVATE RECOVERY MODE: close all new entries, reduce size to 50% until 2 consecutive winning days."
+    },
+    {
+      "level": "WARNING",
+      "type": "RECOVERY_MODE",
+      "message": "RECOVERY MODE ACTIVE \u2014 position size capped at 50% (max $125/trade). 0 of 2 winning days completed. 2 more winning day(s) required to exit recovery mode."
     }
   ],
   "alert_count_critical": 1,
-  "alert_count_warning": 0,
+  "alert_count_warning": 1,
   "risk_config": {
     "account_size_total": 50000,
     "daily_loss_limit_dollars": 500,

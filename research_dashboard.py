@@ -678,12 +678,12 @@ RESEARCH_DASHBOARD_HTML = """
                     </div>
                 </details>
 
-                <!-- Bulk Import: Robinhood JSON -->
+                <!-- Bulk Import: Robinhood Text -->
                 <details style="margin-top: 20px;">
-                    <summary style="cursor: pointer; color: #22c55e; font-weight: 600; padding: 10px; background: #1e1e2e; border-radius: 5px;">📋 Bulk Import: Robinhood JSON</summary>
+                    <summary style="cursor: pointer; color: #22c55e; font-weight: 600; padding: 10px; background: #1e1e2e; border-radius: 5px;">📋 Bulk Import: Robinhood (Paste Text)</summary>
                     <div style="margin-top: 15px; padding: 20px; background: #1e1e2e; border-radius: 8px;">
-                        <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Paste your Robinhood portfolio JSON (from stock_portfolio app)</p>
-                        <textarea id="robinhoodJson" rows="10" placeholder='{"holdings": [{"symbol": "TSLA", "shares": 19.352, "price": 417.44, "average_cost": 386.79, ...}], "total_value": 19993.62}' style="width: 100%; padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px; font-family: monospace; font-size: 0.85em;"></textarea>
+                        <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Copy your portfolio from Robinhood app and paste here (Name, Symbol, Shares, Price, etc.)</p>
+                        <textarea id="robinhoodText" rows="10" placeholder="Tesla&#10;TSLA&#10;19.352&#10;$417.44&#10;$386.79&#10;$593.13&#10;$8,078.13&#10;..." style="width: 100%; padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px; font-family: monospace; font-size: 0.85em;"></textarea>
                         <button id="importRobinhoodBtn" style="margin-top: 10px; padding: 10px 20px; background: #22c55e; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import Robinhood Positions</button>
                     </div>
                 </details>
@@ -1781,21 +1781,56 @@ RESEARCH_DASHBOARD_HTML = """
         }
         
         async function importRobinhoodJson() {
-            const jsonText = document.getElementById('robinhoodJson').value.trim();
-            if (!jsonText) {
-                alert('Please paste Robinhood JSON');
+            const text = document.getElementById('robinhoodText').value.trim();
+            if (!text) {
+                alert('Please paste Robinhood portfolio text');
                 return;
             }
             
             try {
-                const data = JSON.parse(jsonText);
-                if (!data.holdings || !Array.isArray(data.holdings)) {
-                    alert('Invalid format: missing holdings array');
+                // Parse Robinhood text format (same as stock_portfolio app)
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+                
+                // Remove header lines if present
+                while (lines.length && ['Name', 'Symbol', 'Shares', 'Price', 'Average cost', 'Total return', 'Equity'].includes(lines[0])) {
+                    lines.shift();
+                }
+                
+                const cleanNumber = (s) => {
+                    s = s.replace(/[$,]/g, '').trim();
+                    if (s.startsWith('(') && s.endsWith(')')) {
+                        s = '-' + s.slice(1, -1);
+                    }
+                    return parseFloat(s);
+                };
+                
+                const holdings = [];
+                for (let i = 0; i + 6 < lines.length; i += 7) {
+                    try {
+                        const shares = cleanNumber(lines[i+2]);
+                        const avgCost = cleanNumber(lines[i+4]);
+                        const equity = cleanNumber(lines[i+6]);
+                        holdings.push({
+                            name: lines[i],
+                            symbol: lines[i+1],
+                            shares: shares,
+                            price: cleanNumber(lines[i+3]),
+                            average_cost: avgCost,
+                            total_return: equity - (shares * avgCost),
+                            equity: equity
+                        });
+                    } catch (e) {
+                        console.error('Error parsing position:', e);
+                    }
+                }
+                
+                if (holdings.length === 0) {
+                    alert('No positions found. Make sure you copied the full portfolio text from Robinhood.');
                     return;
                 }
                 
                 let imported = 0;
-                for (const holding of data.holdings) {
+                for (const holding of holdings) {
                     const position = {
                         symbol: holding.symbol,
                         account: 'robinhood',
@@ -1820,12 +1855,12 @@ RESEARCH_DASHBOARD_HTML = """
                     if (response.ok) imported++;
                 }
                 
-                alert(`Imported ${imported} of ${data.holdings.length} positions`);
-                document.getElementById('robinhoodJson').value = '';
+                alert(`Imported ${imported} of ${holdings.length} positions`);
+                document.getElementById('robinhoodText').value = '';
                 await loadRiskSnapshot();
             } catch (error) {
                 console.error('Error importing:', error);
-                alert('Error parsing JSON: ' + error.message);
+                alert('Error parsing Robinhood text: ' + error.message);
             }
         }
         
