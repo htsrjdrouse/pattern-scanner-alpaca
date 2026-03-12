@@ -698,14 +698,14 @@ RESEARCH_DASHBOARD_HTML = """
                     </div>
                 </details>
 
-                <!-- Bulk Import: Generic CSV -->
+                <!-- Bulk Import: Schwab Positions -->
                 <details style="margin-top: 20px;">
-                    <summary style="cursor: pointer; color: #8b5cf6; font-weight: 600; padding: 10px; background: #1e1e2e; border-radius: 5px;">📊 Bulk Import: Generic CSV (Perplexity/AI Generated)</summary>
+                    <summary style="cursor: pointer; color: #8b5cf6; font-weight: 600; padding: 10px; background: #1e1e2e; border-radius: 5px;">📊 Bulk Import: Schwab (Paste Text)</summary>
                     <div style="margin-top: 15px; padding: 20px; background: #1e1e2e; border-radius: 8px;">
-                        <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Upload CSV with columns: Symbol, Shares, Price, Average Cost, Total Return, Equity</p>
-                        <p style="color: #6b7280; margin-bottom: 10px; font-size: 0.8em;">Example: TSLA,19.352,417.44,386.79,593.13,8078.13</p>
-                        <input type="file" id="genericCsvFile" accept=".csv" style="margin-bottom: 10px; color: #fff;">
-                        <button id="importGenericCsvBtn" style="padding: 10px 20px; background: #8b5cf6; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import CSV Positions</button>
+                        <p style="color: #9e9e9e; margin-bottom: 10px; font-size: 0.9em;">Copy your positions from Schwab and paste here</p>
+                        <p style="color: #6b7280; margin-bottom: 10px; font-size: 0.8em;">Include: Symbol, Quantity, Price, Market Value, Cost Basis, Gain/Loss</p>
+                        <textarea id="schwabText" rows="10" placeholder="TSLA&#10;TESLA INC&#10;Quantity70 Price$400.87&#10;Market Value$28,060.91&#10;Cost Basis$24,445.17&#10;Gain Loss+$3,615.74&#10;..." style="width: 100%; padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px; font-family: monospace; font-size: 0.85em;"></textarea>
+                        <button id="importSchwabBtn" style="margin-top: 10px; padding: 10px 20px; background: #8b5cf6; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Import Schwab Positions</button>
                     </div>
                 </details>
 
@@ -1950,73 +1950,103 @@ RESEARCH_DASHBOARD_HTML = """
             await loadRiskSnapshot();
         }
         
-        async function importGenericCsv() {
-            const fileInput = document.getElementById('genericCsvFile');
-            if (!fileInput.files || !fileInput.files[0]) {
-                alert('Please select a CSV file');
+        async function importSchwabText() {
+            const text = document.getElementById('schwabText').value.trim();
+            if (!text) {
+                alert('Please paste Schwab positions text');
                 return;
             }
             
-            const file = fileInput.files[0];
-            const text = await file.text();
-            const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
-            
-            if (lines.length < 2) {
-                alert('CSV file is empty or invalid');
-                return;
-            }
-            
-            // Skip header if present
-            let startIdx = 0;
-            if (lines[0].toLowerCase().includes('symbol')) {
-                startIdx = 1;
-            }
-            
-            const cleanNumber = (s) => {
-                return parseFloat(s.replace(/[$,]/g, '')) || 0;
-            };
-            
-            let imported = 0;
-            for (let i = startIdx; i < lines.length; i++) {
-                const parts = lines[i].split(',').map(p => p.trim());
-                if (parts.length < 6) continue;
+            try {
+                const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
                 
-                const symbol = parts[0];
-                const shares = cleanNumber(parts[1]);
-                const price = cleanNumber(parts[2]);
-                const avgCost = cleanNumber(parts[3]);
-                const totalReturn = cleanNumber(parts[4]);
-                const equity = cleanNumber(parts[5]);
-                
-                if (!symbol || shares === 0) continue;
-                
-                const position = {
-                    symbol: symbol,
-                    account: 'imported',
-                    position_type: 'equity',
-                    side: 'long',
-                    qty: shares,
-                    cost_basis: avgCost,
-                    current_price: price,
-                    notes: 'Imported from CSV',
-                    date_entered: new Date().toISOString().split('T')[0],
-                    market_value: equity,
-                    unrealized_pl: totalReturn,
-                    unrealized_plpc: totalReturn / (avgCost * shares)
+                const cleanNumber = (s) => {
+                    return parseFloat(s.replace(/[$,+()]/g, '').replace('Gain Loss', '').replace('Market Value', '').replace('Cost Basis', '').replace('Quantity', '').replace('Price', '')) || 0;
                 };
                 
-                const response = await fetch('/signals/risk/positions/manual', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(position)
-                });
+                const holdings = [];
+                let i = 0;
                 
-                if (response.ok) imported++;
+                while (i < lines.length) {
+                    // Look for symbol (all caps, 2-5 chars)
+                    if (/^[A-Z]{2,5}$/.test(lines[i])) {
+                        const symbol = lines[i];
+                        let qty = 0, price = 0, marketValue = 0, costBasis = 0, gainLoss = 0;
+                        
+                        // Parse next few lines for data
+                        for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
+                            const line = lines[j];
+                            if (line.includes('Quantity') && line.includes('Price')) {
+                                const parts = line.split('Price');
+                                qty = cleanNumber(parts[0]);
+                                price = cleanNumber(parts[1]);
+                            } else if (line.includes('Market Value')) {
+                                marketValue = cleanNumber(line);
+                            } else if (line.includes('Cost Basis')) {
+                                costBasis = cleanNumber(line);
+                            } else if (line.includes('Gain Loss')) {
+                                gainLoss = cleanNumber(line.replace('Gain Loss', ''));
+                                if (line.includes('-$') || line.includes('($')) gainLoss = -Math.abs(gainLoss);
+                                break; // End of this position
+                            }
+                        }
+                        
+                        if (qty > 0 && symbol) {
+                            const avgCost = costBasis / qty;
+                            holdings.push({
+                                symbol: symbol,
+                                shares: qty,
+                                price: price,
+                                average_cost: avgCost,
+                                total_return: gainLoss,
+                                equity: marketValue
+                            });
+                        }
+                        
+                        i += 10; // Skip ahead
+                    } else {
+                        i++;
+                    }
+                }
+                
+                if (holdings.length === 0) {
+                    alert('No positions found. Make sure you copied the full text from Schwab.');
+                    return;
+                }
+                
+                let imported = 0;
+                for (const holding of holdings) {
+                    const position = {
+                        symbol: holding.symbol,
+                        account: 'schwab',
+                        position_type: 'equity',
+                        side: 'long',
+                        qty: holding.shares,
+                        cost_basis: holding.average_cost,
+                        current_price: holding.price,
+                        notes: 'Imported from Schwab',
+                        date_entered: new Date().toISOString().split('T')[0],
+                        market_value: holding.equity,
+                        unrealized_pl: holding.total_return,
+                        unrealized_plpc: holding.total_return / (holding.average_cost * holding.shares)
+                    };
+                    
+                    const response = await fetch('/signals/risk/positions/manual', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(position)
+                    });
+                    
+                    if (response.ok) imported++;
+                }
+                
+                alert(`Imported ${imported} of ${holdings.length} positions`);
+                document.getElementById('schwabText').value = '';
+                await loadRiskSnapshot();
+            } catch (error) {
+                console.error('Error importing:', error);
+                alert('Error parsing Schwab text: ' + error.message);
             }
-            
-            alert(`Imported ${imported} positions from CSV`);
-            fileInput.value = '';
-            await loadRiskSnapshot();
         }
         
         async function bulkDeleteAllPositions() {
@@ -2045,7 +2075,7 @@ RESEARCH_DASHBOARD_HTML = """
         // Attach event listeners after functions are defined
         document.getElementById('importRobinhoodBtn')?.addEventListener('click', importRobinhoodJson);
         document.getElementById('importTosBtn')?.addEventListener('click', importTosFile);
-        document.getElementById('importGenericCsvBtn')?.addEventListener('click', importGenericCsv);
+        document.getElementById('importSchwabBtn')?.addEventListener('click', importSchwabText);
         document.getElementById('bulkDeleteBtn')?.addEventListener('click', bulkDeleteAllPositions);
         
         async function deleteManualPosition(positionId) {
