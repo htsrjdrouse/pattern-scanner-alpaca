@@ -342,7 +342,8 @@ def get_risk_snapshot(force_refresh=False):
     for pos in all_positions:
         if pos.get('asset_class') == 'us_equity' or pos.get('position_type') == 'equity':
             # Equity: delta = 1 per share
-            net_delta_dollars += pos['qty'] * pos.get('current_price', 0) * (1 if pos['side'] == 'long' else -1)
+            current_price = pos.get('current_price') or 0
+            net_delta_dollars += pos['qty'] * current_price * (1 if pos['side'] == 'long' else -1)
         elif pos.get('delta'):
             # Options with delta
             net_delta_dollars += pos['delta'] * pos['qty'] * 100

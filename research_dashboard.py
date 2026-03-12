@@ -1837,7 +1837,7 @@ RESEARCH_DASHBOARD_HTML = """
             
             const file = fileInput.files[0];
             const text = await file.text();
-            const lines = text.split('\n');
+            const lines = text.split('\\n');
             
             // Find the header line (starts with "Symbol,")
             let headerIndex = -1;
