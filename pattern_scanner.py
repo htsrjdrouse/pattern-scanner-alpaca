@@ -2720,124 +2720,87 @@ def home():
             
             <!-- Card Body (collapsible) -->
             <div id="observation-card-body" style="display: none; padding: 20px;">
-                <!-- Section 1: Regime Summary -->
-                <div id="obs-regime-summary" style="padding: 15px; background: #0f0f23; border-radius: 8px; margin-bottom: 20px; font-size: 14px; color: #9e9e9e;"></div>
+                <!-- Loading State -->
+                <div id="obs-loading" style="text-align: center; padding: 40px; color: #9e9e9e;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">⏳</div>
+                    <div>Fetching live market data...</div>
+                </div>
                 
-                <!-- Section 2: Observation Form -->
-                <div style="background: #16213e; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <h3 style="margin-top: 0; color: #4fc3f7;">Log Today's Observation</h3>
-                    
-                    <!-- Group A: 9:45 AM Conditions -->
-                    <div style="margin-bottom: 20px;">
-                        <h4 style="color: #9e9e9e; font-size: 14px; margin-bottom: 10px;">9:45 AM Market Conditions</h4>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">SPX at 9:45</label>
-                                <input type="number" id="obs-spx-945" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">VIX at 9:45</label>
-                                <input type="number" id="obs-vix-945" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">ATM Strike</label>
-                                <input type="number" id="obs-atm-strike" step="1" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">ATM Straddle Price</label>
-                                <input type="number" id="obs-straddle" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                <!-- Section A: Live Market Snapshot -->
+                <div id="obs-prefill-section" style="display: none;">
+                    <div id="obs-market-snapshot" style="background: #16213e; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #4fc3f7;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="margin: 0; color: #4fc3f7;">📊 Live Market Data</h3>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <span id="obs-timestamp" style="font-size: 12px; color: #9e9e9e;"></span>
+                                <button onclick="loadPrefillData()" style="padding: 6px 12px; background: #4fc3f7; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">🔄 Refresh</button>
                             </div>
                         </div>
+                        <div id="obs-market-data" style="font-size: 14px; line-height: 1.8;"></div>
+                        <div id="obs-suggested-setup" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;"></div>
                     </div>
                     
-                    <!-- Group B: Hypothetical Trade -->
-                    <div style="margin-bottom: 20px;">
-                        <h4 style="color: #9e9e9e; font-size: 14px; margin-bottom: 10px;">Hypothetical Trade</h4>
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-size: 13px;">Would you trade today?</label>
-                            <div style="display: flex; gap: 15px;">
-                                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                    <input type="radio" name="would-trade" value="yes"> Yes
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                    <input type="radio" name="would-trade" value="no"> No
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                    <input type="radio" name="would-trade" value="maybe"> Maybe
-                                </label>
+                    <!-- Section B: Your Judgment -->
+                    <div style="background: #16213e; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                        <h3 style="margin-top: 0; color: #4fc3f7;">Your Judgment</h3>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 10px; font-weight: bold;">Would you trade this setup today?</label>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button class="would-trade-btn" data-value="yes" onclick="selectWouldTrade('yes')" style="padding: 12px 24px; background: #0f0f23; color: #fff; border: 2px solid #333; border-radius: 4px; cursor: pointer; font-weight: bold;">✅ Yes — I'd take it</button>
+                                <button class="would-trade-btn" data-value="no" onclick="selectWouldTrade('no')" style="padding: 12px 24px; background: #0f0f23; color: #fff; border: 2px solid #333; border-radius: 4px; cursor: pointer; font-weight: bold;">❌ No — sitting out</button>
+                                <button class="would-trade-btn" data-value="maybe" onclick="selectWouldTrade('maybe')" style="padding: 12px 24px; background: #0f0f23; color: #fff; border: 2px solid #333; border-radius: 4px; cursor: pointer; font-weight: bold;">🤔 Maybe — watching</button>
                             </div>
                         </div>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Strategy</label>
-                                <select id="obs-strategy" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
-                                    <option value="">Select...</option>
-                                    <option value="iron_condor">Iron Condor</option>
-                                    <option value="put_spread">Put Spread</option>
-                                    <option value="call_spread">Call Spread</option>
-                                    <option value="none">None</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Short Put Strike</label>
-                                <input type="number" id="obs-put-strike" step="1" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Short Call Strike</label>
-                                <input type="number" id="obs-call-strike" step="1" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Spread Width (pts)</label>
-                                <input type="number" id="obs-width" step="1" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Est. Premium</label>
-                                <input type="number" id="obs-premium" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                        <div id="obs-strategy-section" style="display: none; margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 10px; font-weight: bold;">If Yes or Maybe, which strategy?</label>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button class="strategy-btn" data-value="iron_condor" onclick="selectStrategy('iron_condor')" style="padding: 10px 20px; background: #0f0f23; color: #fff; border: 2px solid #333; border-radius: 4px; cursor: pointer;">Iron Condor</button>
+                                <button class="strategy-btn" data-value="put_spread" onclick="selectStrategy('put_spread')" style="padding: 10px 20px; background: #0f0f23; color: #fff; border: 2px solid #333; border-radius: 4px; cursor: pointer;">Put Spread Only</button>
+                                <button class="strategy-btn" data-value="call_spread" onclick="selectStrategy('call_spread')" style="padding: 10px 20px; background: #0f0f23; color: #fff; border: 2px solid #333; border-radius: 4px; cursor: pointer;">Call Spread Only</button>
                             </div>
                         </div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Notes / Reasoning:</label>
+                            <textarea id="obs-notes" rows="3" placeholder="What's your read? Any catalyst risk? Why trade or sit out?" style="width: 100%; padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px; font-size: 14px;"></textarea>
+                        </div>
+                        <button onclick="saveObservation()" style="padding: 12px 24px; background: #4fc3f7; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px;">💾 Save Observation</button>
                     </div>
                     
-                    <!-- Group C: Notes -->
-                    <div style="margin-bottom: 20px;">
-                        <label style="display: block; margin-bottom: 5px; font-size: 13px;">Notes</label>
-                        <textarea id="obs-notes" rows="3" placeholder="Catalyst risk, market feel, why you would/wouldn't trade..." style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;"></textarea>
-                    </div>
-                    
-                    <!-- Buttons -->
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button onclick="saveObservation()" style="padding: 10px 20px; background: #4fc3f7; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">💾 Save Observation</button>
-                        <button id="obs-update-outcome-btn" onclick="showOutcomeFields()" style="display: none; padding: 10px 20px; background: #ff9800; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📊 Update Outcome</button>
-                    </div>
-                    
-                    <!-- Outcome Fields (hidden initially) -->
-                    <div id="obs-outcome-fields" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid #333;">
-                        <h4 style="color: #9e9e9e; font-size: 14px; margin-bottom: 10px;">End of Day Outcome</h4>
+                    <!-- Section C: Outcome Update -->
+                    <div id="obs-outcome-section" style="display: none; background: #16213e; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                        <h3 style="margin-top: 0; color: #ff9800;">📊 Update Today's Outcome</h3>
+                        <p style="color: #9e9e9e; font-size: 14px; margin-bottom: 15px;">Fill in after market close</p>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
                             <div>
-                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">SPX Close</label>
+                                <label style="display: block; margin-bottom: 5px;">SPX Close</label>
                                 <input type="number" id="obs-spx-close" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
                             </div>
                             <div>
-                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Outcome</label>
+                                <label style="display: block; margin-bottom: 5px;">Result</label>
                                 <select id="obs-outcome" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
                                     <option value="">Select...</option>
-                                    <option value="winner">Winner</option>
-                                    <option value="loser">Loser</option>
-                                    <option value="scratch">Scratch</option>
-                                    <option value="not_taken">Not Taken</option>
+                                    <option value="winner">🟢 Winner</option>
+                                    <option value="loser">🔴 Loser</option>
+                                    <option value="scratch">⬜ Scratch</option>
+                                    <option value="not_taken">— Not Taken</option>
                                 </select>
                             </div>
                             <div>
-                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Hypothetical P&L</label>
-                                <input type="number" id="obs-pnl" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                                <label style="display: block; margin-bottom: 5px;">P&L</label>
+                                <input type="number" id="obs-pnl" step="0.01" placeholder="$" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
                             </div>
                             <div>
-                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Max Adverse Move (pts)</label>
+                                <label style="display: block; margin-bottom: 5px;">Max Adverse Move (pts)</label>
                                 <input type="number" id="obs-max-move" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
                             </div>
                         </div>
                         <button onclick="saveOutcome()" style="padding: 10px 20px; background: #22c55e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">✅ Save Outcome</button>
                     </div>
+                </div>
+                
+                <!-- Manual Entry Fallback (hidden by default) -->
+                <div id="obs-manual-fallback" style="display: none;">
+                    <p style="text-align: center; color: #9e9e9e; margin-bottom: 15px;">Market data unavailable. <a href="#" onclick="showManualEntry(); return false;" style="color: #4fc3f7;">✏️ Enter manually</a></p>
                 </div>
                 
                 <!-- Section 3: History Table -->
@@ -5519,6 +5482,135 @@ def get_spx_summary():
     except Exception as e:
         session.close()
         return {'error': str(e)}, 500
+
+@app.route('/api/observations/spx/prefill', methods=['GET'])
+def get_spx_observation_prefill():
+    """Fetch all auto-populatable fields for 0DTE observation"""
+    from datetime import date
+    import yfinance as yf
+    
+    result = {
+        'timestamp': datetime.now().isoformat(),
+        'market_open': False,
+        'errors': [],
+        'spx_price': None,
+        'vix': None,
+        'atm_strike': None,
+        'atm_straddle_price': None,
+        'atm_call_mid': None,
+        'atm_put_mid': None,
+        'short_put_strike': None,
+        'short_put_delta': None,
+        'short_put_premium': None,
+        'short_call_strike': None,
+        'short_call_delta': None,
+        'short_call_premium': None,
+        'spread_width': 5,
+        'est_total_premium': None,
+        'regime_verdict': None,
+        'regime_score': None,
+        'recommended_strategy': None,
+        'term_structure': None,
+        'adx': None,
+        'vol_edge': None,
+        'target_expiry': None,
+        'dte': None,
+    }
+    
+    # 1. Regime context (from cache)
+    try:
+        from regime_classifier import run_regime_analysis
+        regime = run_regime_analysis()
+        result['spx_price'] = regime.get('spx_price')
+        result['vix'] = regime.get('vix_level')
+        result['regime_verdict'] = regime.get('verdict')
+        result['regime_score'] = round((regime.get('composite_score', 0) + 1) / 2 * 100, 1)
+        result['recommended_strategy'] = regime.get('recommended_strategy')
+        dims = regime.get('dimensions', {})
+        result['term_structure'] = dims.get('term_structure', {}).get('value')
+        result['adx'] = dims.get('trend_assessment', {}).get('adx')
+        result['vol_edge'] = dims.get('vol_spread', {}).get('spread')
+    except Exception as e:
+        result['errors'].append(f'Regime: {str(e)}')
+    
+    # 2. Determine 0DTE expiry
+    try:
+        spx_ticker = yf.Ticker('^SPX')
+        expirations = spx_ticker.options
+        if expirations:
+            today_str = date.today().strftime('%Y-%m-%d')
+            if today_str in expirations:
+                result['target_expiry'] = today_str
+            else:
+                result['target_expiry'] = expirations[0]
+            
+            from datetime import datetime as dt
+            exp_date = dt.strptime(result['target_expiry'], '%Y-%m-%d').date()
+            result['dte'] = (exp_date - date.today()).days
+    except Exception as e:
+        result['errors'].append(f'Expiry: {str(e)}')
+    
+    # 3. ATM strike and straddle from yfinance
+    try:
+        if result['target_expiry'] and result['spx_price']:
+            chain = spx_ticker.option_chain(result['target_expiry'])
+            calls = chain.calls
+            puts = chain.puts
+            current_price = result['spx_price']
+            
+            atm_idx = (calls['strike'] - current_price).abs().idxmin()
+            atm_strike = float(calls.loc[atm_idx, 'strike'])
+            result['atm_strike'] = atm_strike
+            
+            atm_call = calls[calls['strike'] == atm_strike].iloc[0]
+            atm_put = puts[puts['strike'] == atm_strike].iloc[0]
+            
+            call_bid = float(atm_call.get('bid', 0) or 0)
+            call_ask = float(atm_call.get('ask', 0) or 0)
+            put_bid = float(atm_put.get('bid', 0) or 0)
+            put_ask = float(atm_put.get('ask', 0) or 0)
+            
+            atm_call_mid = round((call_bid + call_ask) / 2, 2) if call_ask > 0 else None
+            atm_put_mid = round((put_bid + put_ask) / 2, 2) if put_ask > 0 else None
+            
+            result['atm_call_mid'] = atm_call_mid
+            result['atm_put_mid'] = atm_put_mid
+            
+            if atm_call_mid and atm_put_mid:
+                result['atm_straddle_price'] = round(atm_call_mid + atm_put_mid, 2)
+    except Exception as e:
+        result['errors'].append(f'ATM: {str(e)}')
+    
+    # 4. Delta-targeted strikes from Tastytrade
+    try:
+        from tastytrade_data import get_strike_by_delta
+        from tastytrade_client import get_session as get_tt_session
+        from datetime import datetime as dt
+        
+        session = get_tt_session()
+        if session and result['target_expiry']:
+            exp_date = dt.strptime(result['target_expiry'], '%Y-%m-%d').date()
+            
+            put_data = get_strike_by_delta('^SPX', exp_date, 0.12, option_type='put', session=session)
+            if put_data:
+                result['short_put_strike'] = put_data.get('strike')
+                result['short_put_delta'] = put_data.get('delta')
+                result['short_put_premium'] = put_data.get('mid')
+            
+            call_data = get_strike_by_delta('^SPX', exp_date, 0.12, option_type='call', session=session)
+            if call_data:
+                result['short_call_strike'] = call_data.get('strike')
+                result['short_call_delta'] = call_data.get('delta')
+                result['short_call_premium'] = call_data.get('mid')
+            
+            if result['short_put_premium'] and result['short_call_premium']:
+                result['est_total_premium'] = round(result['short_put_premium'] + result['short_call_premium'], 2)
+    except Exception as e:
+        result['errors'].append(f'Tastytrade: {str(e)}')
+    
+    result['market_open'] = result['spx_price'] is not None
+    
+    return result
 
 # Register research API blueprint
 try:
