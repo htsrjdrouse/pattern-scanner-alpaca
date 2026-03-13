@@ -217,7 +217,6 @@ def get_strike_by_delta(symbol: str, expiration: date, target_delta: float,
 
 # ── IV Rank ──────────────────────────────────────────────────────────────────
 
-@_require_session  
 def _validate_iv_rank(symbol: str, iv_rank_value: float) -> tuple[float | None, str]:
     """Cross-validate IV rank against ATM IV from yfinance."""
     import yfinance as yf

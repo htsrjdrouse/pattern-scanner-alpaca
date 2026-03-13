@@ -361,5 +361,16 @@
     "email": "rjdrouse@gmail.com",
     "added_at": "2026-03-12T16:49:24.584239",
     "notified": false
+  },
+  {
+    "ticker": "GFS",
+    "buy_point": 40.46,
+    "rsi_min": 50.0,
+    "rsi_max": 70.0,
+    "volume_multiple": 2.0,
+    "breakeven_move": 22.0,
+    "email": "rjdrouse@gmail.com",
+    "added_at": "2026-03-12T17:52:34.328272",
+    "notified": false
   }
 ]
