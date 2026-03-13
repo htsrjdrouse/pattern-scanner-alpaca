@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-03-13T19:13:53.142849",
+  "timestamp": "2026-03-13T20:32:43.595088",
   "cache_age_minutes": 0,
-  "spx_price": 6645.6,
-  "vix_level": 27.02,
-  "vix_3m": 26.84,
+  "spx_price": 6632.19,
+  "vix_level": 27.19,
+  "vix_3m": 27.28,
   "term_structure_source": "yfinance_fallback",
   "pcr_source": "cboe_equity_csv",
   "dimensions": {
@@ -13,10 +13,10 @@
       "description": "Good premium but wider strikes required"
     },
     "term_structure": {
-      "value": "FLAT",
-      "spread": -0.18,
-      "score": 0.0,
-      "description": "Neutral, caution"
+      "value": "CONTANGO",
+      "spread": 0.09,
+      "score": 1.0,
+      "description": "Normal, favorable for sellers"
     },
     "trend_assessment": {
       "value": "TRENDING",
@@ -26,9 +26,9 @@
     },
     "vol_spread": {
       "value": "STRONG",
-      "realized_vol": 0.1161,
-      "implied_vol": 0.2702,
-      "spread": 0.1541,
+      "realized_vol": 0.1169,
+      "implied_vol": 0.2719,
+      "spread": 0.155,
       "score": 1.0,
       "description": "IV significantly overpricing, clear seller edge"
     },
@@ -47,17 +47,17 @@
     },
     "correlation_regime": {
       "value": "LOW",
-      "avg_correlation": 0.27,
+      "avg_correlation": 0.274,
       "score": 0.8,
       "description": "Stock-picking environment, individual names work"
     }
   },
-  "composite_score": 0.325,
+  "composite_score": 0.525,
   "hard_override_triggered": false,
   "override_reason": null,
-  "verdict": "YELLOW",
-  "recommended_strategy": "Single-side credit spread \u2014 put spread only if bullish breadth, call spread only if bearish; avoid iron condor",
-  "position_sizing": "Half size \u2014 max $250 per spread",
-  "entry_timing": "Wait for 10:30 AM \u2014 confirm direction before entering",
+  "verdict": "GREEN",
+  "recommended_strategy": "Iron Condor \u2014 sell 0.10-0.15 delta on both sides, standard 5-wide spreads",
+  "position_sizing": "Full size \u2014 up to $500 per spread",
+  "entry_timing": "9:45-10:30 AM after opening volatility settles",
   "errors": []
 }

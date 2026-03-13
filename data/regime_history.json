@@ -110,5 +110,26 @@
     "vix_level": 27.02,
     "composite_score": 0.325,
     "verdict": "YELLOW"
+  },
+  {
+    "timestamp": "2026-03-13T20:16:17.831286",
+    "spx_price": NaN,
+    "vix_level": 27.24,
+    "composite_score": 0.325,
+    "verdict": "YELLOW"
+  },
+  {
+    "timestamp": "2026-03-13T20:32:17.434703",
+    "spx_price": 6632.19,
+    "vix_level": 27.19,
+    "composite_score": 0.525,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-03-13T20:32:43.595088",
+    "spx_price": 6632.19,
+    "vix_level": 27.19,
+    "composite_score": 0.525,
+    "verdict": "GREEN"
   }
 ]

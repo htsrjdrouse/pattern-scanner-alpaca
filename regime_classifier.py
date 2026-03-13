@@ -39,7 +39,7 @@ def _save_cache(data):
     """Save regime analysis to cache"""
     CACHE_FILE.parent.mkdir(exist_ok=True)
     with open(CACHE_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
+        json.dump(data, f, indent=2, allow_nan=False)
 
 def _append_history(data):
     """Append regime verdict to history, keep last 30"""
@@ -101,7 +101,10 @@ def run_regime_analysis(force_refresh=False):
         spx = yf.Ticker('^GSPC')
         spx_hist = spx.history(period='60d')
         if not spx_hist.empty:
-            result['spx_price'] = round(spx_hist['Close'].iloc[-1], 2)
+            last_price = spx_hist['Close'].iloc[-1]
+            if pd.isna(last_price):
+                last_price = spx_hist['Close'].dropna().iloc[-1] if not spx_hist['Close'].dropna().empty else None
+            result['spx_price'] = round(last_price, 2) if last_price else None
             spx_closes = spx_hist['Close']
         else:
             result['errors'].append('SPX data unavailable')
@@ -530,6 +533,10 @@ def run_regime_analysis(force_refresh=False):
         result['entry_timing'] = 'N/A'
     
     # Save cache and history
+    # Replace NaN with None for JSON serialization
+    if pd.isna(result.get('spx_price')):
+        result['spx_price'] = None
+    
     _save_cache(result)
     _append_history(result)
     
