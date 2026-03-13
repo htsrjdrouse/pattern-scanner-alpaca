@@ -2720,90 +2720,9 @@ def home():
             
             <!-- Card Body (collapsible) -->
             <div id="observation-card-body" style="display: none; padding: 20px;">
-                <!-- Loading State -->
-                <div id="obs-loading" style="text-align: center; padding: 40px; color: #9e9e9e;">
-                    <div style="font-size: 24px; margin-bottom: 10px;">⏳</div>
-                    <div>Fetching live market data...</div>
-                </div>
+                <div id="obs-prefill-container"></div>
                 
-                <!-- Section A: Live Market Snapshot -->
-                <div id="obs-prefill-section" style="display: none;">
-                    <div id="obs-market-snapshot" style="background: #16213e; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #4fc3f7;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <h3 style="margin: 0; color: #4fc3f7;">📊 Live Market Data</h3>
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <span id="obs-timestamp" style="font-size: 12px; color: #9e9e9e;"></span>
-                                <button onclick="loadPrefillData()" style="padding: 6px 12px; background: #4fc3f7; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">🔄 Refresh</button>
-                            </div>
-                        </div>
-                        <div id="obs-market-data" style="font-size: 14px; line-height: 1.8;"></div>
-                        <div id="obs-suggested-setup" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;"></div>
-                    </div>
-                    
-                    <!-- Section B: Your Judgment -->
-                    <div style="background: #16213e; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                        <h3 style="margin-top: 0; color: #4fc3f7;">Your Judgment</h3>
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 10px; font-weight: bold;">Would you trade this setup today?</label>
-                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                <button class="would-trade-btn" data-value="yes" onclick="selectWouldTrade('yes')" style="padding: 12px 24px; background: #0f0f23; color: #fff; border: 2px solid #333; border-radius: 4px; cursor: pointer; font-weight: bold;">✅ Yes — I'd take it</button>
-                                <button class="would-trade-btn" data-value="no" onclick="selectWouldTrade('no')" style="padding: 12px 24px; background: #0f0f23; color: #fff; border: 2px solid #333; border-radius: 4px; cursor: pointer; font-weight: bold;">❌ No — sitting out</button>
-                                <button class="would-trade-btn" data-value="maybe" onclick="selectWouldTrade('maybe')" style="padding: 12px 24px; background: #0f0f23; color: #fff; border: 2px solid #333; border-radius: 4px; cursor: pointer; font-weight: bold;">🤔 Maybe — watching</button>
-                            </div>
-                        </div>
-                        <div id="obs-strategy-section" style="display: none; margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 10px; font-weight: bold;">If Yes or Maybe, which strategy?</label>
-                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                <button class="strategy-btn" data-value="iron_condor" onclick="selectStrategy('iron_condor')" style="padding: 10px 20px; background: #0f0f23; color: #fff; border: 2px solid #333; border-radius: 4px; cursor: pointer;">Iron Condor</button>
-                                <button class="strategy-btn" data-value="put_spread" onclick="selectStrategy('put_spread')" style="padding: 10px 20px; background: #0f0f23; color: #fff; border: 2px solid #333; border-radius: 4px; cursor: pointer;">Put Spread Only</button>
-                                <button class="strategy-btn" data-value="call_spread" onclick="selectStrategy('call_spread')" style="padding: 10px 20px; background: #0f0f23; color: #fff; border: 2px solid #333; border-radius: 4px; cursor: pointer;">Call Spread Only</button>
-                            </div>
-                        </div>
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Notes / Reasoning:</label>
-                            <textarea id="obs-notes" rows="3" placeholder="What's your read? Any catalyst risk? Why trade or sit out?" style="width: 100%; padding: 10px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px; font-size: 14px;"></textarea>
-                        </div>
-                        <button onclick="saveObservation()" style="padding: 12px 24px; background: #4fc3f7; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px;">💾 Save Observation</button>
-                    </div>
-                    
-                    <!-- Section C: Outcome Update -->
-                    <div id="obs-outcome-section" style="display: none; background: #16213e; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                        <h3 style="margin-top: 0; color: #ff9800;">📊 Update Today's Outcome</h3>
-                        <p style="color: #9e9e9e; font-size: 14px; margin-bottom: 15px;">Fill in after market close</p>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px;">SPX Close</label>
-                                <input type="number" id="obs-spx-close" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px;">Result</label>
-                                <select id="obs-outcome" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
-                                    <option value="">Select...</option>
-                                    <option value="winner">🟢 Winner</option>
-                                    <option value="loser">🔴 Loser</option>
-                                    <option value="scratch">⬜ Scratch</option>
-                                    <option value="not_taken">— Not Taken</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px;">P&L</label>
-                                <input type="number" id="obs-pnl" step="0.01" placeholder="$" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px;">Max Adverse Move (pts)</label>
-                                <input type="number" id="obs-max-move" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
-                            </div>
-                        </div>
-                        <button onclick="saveOutcome()" style="padding: 10px 20px; background: #22c55e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">✅ Save Outcome</button>
-                    </div>
-                </div>
-                
-                <!-- Manual Entry Fallback (hidden by default) -->
-                <div id="obs-manual-fallback" style="display: none;">
-                    <p style="text-align: center; color: #9e9e9e; margin-bottom: 15px;">Market data unavailable. <a href="#" onclick="showManualEntry(); return false;" style="color: #4fc3f7;">✏️ Enter manually</a></p>
-                </div>
-                
-                <!-- Section 3: History Table -->
+                <!-- History Table -->
                 <div style="background: #16213e; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <h3 style="margin-top: 0; color: #4fc3f7;">Observation History</h3>
                     <div id="obs-history-table" style="overflow-x: auto;"></div>
@@ -2878,6 +2797,7 @@ def home():
         if (body.style.display === 'none') {
             body.style.display = 'block';
             icon.textContent = '▲';
+            loadPrefillData();
         } else {
             body.style.display = 'none';
             icon.textContent = '▼';
