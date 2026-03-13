@@ -2885,23 +2885,128 @@ def home():
     }
     
     function openObservationForm() {
-        document.getElementById('observation-card-body').style.display = 'block';
-        document.getElementById('obs-expand-icon').textContent = '▲';
-        document.getElementById('obs-spx-945').scrollIntoView({behavior: 'smooth', block: 'center'});
+        const body = document.getElementById('observation-card-body');
+        if (body) {
+            body.style.display = 'block';
+            document.getElementById('obs-expand-icon').textContent = '▲';
+            body.scrollIntoView({behavior: 'smooth', block: 'center'});
+            loadPrefillData();
+        }
     }
     
-    async function saveObservation() {
+    let currentPrefillData = null;
+    
+    async function loadPrefillData() {
+        const container = document.getElementById('obs-prefill-container');
+        container.innerHTML = '<p style="text-align: center; color: #9e9e9e;">⏳ Fetching live market data...</p>';
+        
+        try {
+            const resp = await fetch('/api/observations/spx/prefill');
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            currentPrefillData = await resp.json();
+            renderPrefillData(currentPrefillData);
+        } catch (e) {
+            container.innerHTML = `<p style="color: #ef4444;">❌ Error loading data: ${e.message}</p>`;
+        }
+    }
+    
+    function renderPrefillData(data) {
+        const html = `
+            <div style="background: #16213e; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h4 style="margin: 0;">📊 Live Market Snapshot</h4>
+                    <button onclick="loadPrefillData()" style="padding: 4px 8px; background: #667eea; border: none; border-radius: 4px; cursor: pointer; color: #fff; font-size: 12px;">🔄 Refresh</button>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; font-size: 14px;">
+                    <div><strong>SPX:</strong> $${data.spx_price || 'N/A'}</div>
+                    <div><strong>VIX:</strong> ${data.vix || 'N/A'}</div>
+                    <div><strong>Expiry:</strong> ${data.target_expiry || 'N/A'} (${data.dte}DTE)</div>
+                    <div><strong>ATM Strike:</strong> ${data.atm_strike || 'N/A'}</div>
+                    <div><strong>Straddle:</strong> $${data.atm_straddle_price || 'N/A'}</div>
+                    <div><strong>Vol Edge:</strong> ${data.vol_edge ? (data.vol_edge * 100).toFixed(1) + '%' : 'N/A'}</div>
+                </div>
+                ${data.short_put_strike ? `
+                <div style="margin-top: 15px; padding: 10px; background: #1e1e2e; border-radius: 6px;">
+                    <strong>💡 Suggested Iron Condor:</strong><br>
+                    Put: ${data.short_put_strike} ($${data.short_put_premium}) | Call: ${data.short_call_strike} ($${data.short_call_premium})<br>
+                    Width: ${data.spread_width} | Total Premium: $${data.est_total_premium}
+                </div>` : '<p style="color: #f59e0b; margin-top: 10px;">⚠️ Delta strikes unavailable (Tastytrade)</p>'}
+            </div>
+            
+            <div style="background: #16213e; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h4 style="margin: 0 0 10px 0;">🤔 Your Judgment</h4>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">Would you trade this setup?</label>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="selectWouldTrade('yes')" id="btn-yes" style="flex: 1; padding: 10px; background: #2e2e3e; border: 2px solid #4fc3f7; border-radius: 6px; cursor: pointer; color: #fff; font-weight: bold;">✅ Yes</button>
+                        <button onclick="selectWouldTrade('no')" id="btn-no" style="flex: 1; padding: 10px; background: #2e2e3e; border: 2px solid #4fc3f7; border-radius: 6px; cursor: pointer; color: #fff; font-weight: bold;">❌ No</button>
+                        <button onclick="selectWouldTrade('maybe')" id="btn-maybe" style="flex: 1; padding: 10px; background: #2e2e3e; border: 2px solid #4fc3f7; border-radius: 6px; cursor: pointer; color: #fff; font-weight: bold;">🤷 Maybe</button>
+                    </div>
+                </div>
+                
+                <div id="strategy-section" style="display: none; margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">Strategy:</label>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button onclick="selectStrategy('iron_condor')" class="strategy-btn" style="padding: 8px 12px; background: #2e2e3e; border: 2px solid #667eea; border-radius: 6px; cursor: pointer; color: #fff;">Iron Condor</button>
+                        <button onclick="selectStrategy('put_spread')" class="strategy-btn" style="padding: 8px 12px; background: #2e2e3e; border: 2px solid #667eea; border-radius: 6px; cursor: pointer; color: #fff;">Put Spread</button>
+                        <button onclick="selectStrategy('call_spread')" class="strategy-btn" style="padding: 8px 12px; background: #2e2e3e; border: 2px solid #667eea; border-radius: 6px; cursor: pointer; color: #fff;">Call Spread</button>
+                    </div>
+                </div>
+                
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">Notes:</label>
+                    <textarea id="obs-notes" rows="3" style="width: 100%; background: #2e2e3e; border: 1px solid #667eea; border-radius: 6px; padding: 8px; color: #fff; font-family: inherit;"></textarea>
+                </div>
+                
+                <button onclick="saveObservationWithPrefill()" style="margin-top: 15px; padding: 10px 20px; background: #4fc3f7; color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%;">💾 Save Observation</button>
+            </div>
+        `;
+        document.getElementById('obs-prefill-container').innerHTML = html;
+    }
+    
+    let selectedWouldTrade = null;
+    let selectedStrategy = null;
+    
+    function selectWouldTrade(choice) {
+        selectedWouldTrade = choice;
+        ['btn-yes', 'btn-no', 'btn-maybe'].forEach(id => {
+            const btn = document.getElementById(id);
+            btn.style.background = id === `btn-${choice}` ? '#4fc3f7' : '#2e2e3e';
+            btn.style.color = id === `btn-${choice}` ? '#000' : '#fff';
+        });
+        document.getElementById('strategy-section').style.display = (choice === 'yes' || choice === 'maybe') ? 'block' : 'none';
+    }
+    
+    function selectStrategy(strategy) {
+        selectedStrategy = strategy;
+        document.querySelectorAll('.strategy-btn').forEach(btn => {
+            btn.style.background = '#2e2e3e';
+            btn.style.color = '#fff';
+        });
+        event.target.style.background = '#667eea';
+    }
+    
+    async function saveObservationWithPrefill() {
+        if (!currentPrefillData) {
+            alert('No market data loaded');
+            return;
+        }
+        if (!selectedWouldTrade) {
+            alert('Please select: Would you trade?');
+            return;
+        }
+        
         const payload = {
-            spx_price_945: parseFloat(document.getElementById('obs-spx-945').value) || null,
-            vix_945: parseFloat(document.getElementById('obs-vix-945').value) || null,
-            atm_strike: parseFloat(document.getElementById('obs-atm-strike').value) || null,
-            atm_straddle_price: parseFloat(document.getElementById('obs-straddle').value) || null,
-            would_trade: document.querySelector('input[name="would-trade"]:checked')?.value || null,
-            strategy: document.getElementById('obs-strategy').value || null,
-            short_put_strike: parseFloat(document.getElementById('obs-put-strike').value) || null,
-            short_call_strike: parseFloat(document.getElementById('obs-call-strike').value) || null,
-            spread_width: parseFloat(document.getElementById('obs-width').value) || null,
-            premium_collected: parseFloat(document.getElementById('obs-premium').value) || null,
+            spx_price_945: currentPrefillData.spx_price,
+            vix_945: currentPrefillData.vix,
+            atm_strike: currentPrefillData.atm_strike,
+            atm_straddle_price: currentPrefillData.atm_straddle_price,
+            would_trade: selectedWouldTrade,
+            strategy: selectedStrategy,
+            short_put_strike: currentPrefillData.short_put_strike,
+            short_call_strike: currentPrefillData.short_call_strike,
+            spread_width: currentPrefillData.spread_width,
+            premium_collected: currentPrefillData.est_total_premium,
             notes: document.getElementById('obs-notes').value || null
         };
         
@@ -2913,12 +3018,13 @@ def home():
             });
             const data = await resp.json();
             if (data.success) {
-                alert('Observation saved ✅');
+                alert('✅ Observation saved!');
                 currentObservationId = data.id;
-                document.getElementById('obs-update-outcome-btn').style.display = 'inline-block';
-                document.getElementById('obs-log-today-btn').textContent = '✏️ Edit Today';
                 loadObservationHistory();
                 loadObservationProgress();
+                loadObservationCount();
+                document.getElementById('observation-card-body').style.display = 'none';
+                document.getElementById('obs-expand-icon').textContent = '▼';
             } else {
                 alert('Error: ' + (data.error || 'Unknown error'));
             }
@@ -2926,6 +3032,7 @@ def home():
             alert('Error saving: ' + e.message);
         }
     }
+    
     
     function showOutcomeFields() {
         document.getElementById('obs-outcome-fields').style.display = 'block';
