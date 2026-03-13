@@ -3907,14 +3907,14 @@ def chart(symbol):
                     <input type="hidden" name="rsi_min" value="50">
                     <input type="hidden" name="rsi_max" value="70">
                     <input type="hidden" name="volume_multiple" value="2.0">
-                    <input type="hidden" name="breakeven_move" value="{% if options.breakeven_move_pct %}{{ options.breakeven_move_pct|round(1) }}{% elif cup_pattern %}{{ cup_pattern.cup_depth_pct|round(1) }}{% else %}0{% endif %}">
+                    <input type="hidden" name="breakeven_move" value="{% if options.breakeven_move_pct %}{{ options.breakeven_move_pct|default(0)|round(1) }}{% elif cup_pattern %}{{ cup_pattern.cup_depth_pct|default(0)|round(1) }}{% else %}0{% endif %}">
                     <label for="email">Email (required): </label>
                     <input type="email" name="email" id="email" required placeholder="your@email.com" value="{{ analysis.email if analysis.email else '' }}">
                     <button type="submit">Start Tracking</button>
                 </form>
                 <p style="font-size: 12px; color: #888; margin-top: 10px;">
                     Will track for breakout above ${{ analysis.buy_point }}, RSI 50-70, 2x volume, and email alerts.
-                    Breakeven move: {% if options.breakeven_move_pct %}{{ options.breakeven_move_pct|round(1) }}%{% elif cup_pattern %}{{ cup_pattern.cup_depth_pct|round(1) }}% (cup depth){% else %}0%{% endif %}.
+                    Breakeven move: {% if options.breakeven_move_pct %}{{ options.breakeven_move_pct|default(0)|round(1) }}%{% elif cup_pattern %}{{ cup_pattern.cup_depth_pct|default(0)|round(1) }}% (cup depth){% else %}0%{% endif %}.
                 </p>
             </div>
             {% endif %}
@@ -4555,21 +4555,21 @@ def chart(symbol):
         return render_template_string(html,
                                       symbol=symbol,
                                       chart=chart_base64,
-                                      company=company_info or {},
-                                      cup_pattern=cup_pattern or {},
-                                      asc_triangle=asc_triangle or {},
-                                      bull_flag=bull_flag or {},
-                                      double_bottom=double_bottom or {},
-                                      analysis=analysis or {},
-                                      dcf_data=dcf_data or {},
+                                      company=company_info if company_info else {},
+                                      cup_pattern=cup_pattern if cup_pattern else {},
+                                      asc_triangle=asc_triangle if asc_triangle else {},
+                                      bull_flag=bull_flag if bull_flag else {},
+                                      double_bottom=double_bottom if double_bottom else {},
+                                      analysis=analysis if analysis else {},
+                                      dcf_data=dcf_data if dcf_data else {},
                                       show_smas=show_smas,
                                       show_cto=show_cto,
                                       show_supertrend=show_supertrend,
                                       show_smc=show_smc,
-                                      options=options_strategy or {},
-                                      options_budget=options_budget,
-                                      expected_move=expected_move or {},
-                                      edgar_financials=edgar_financials or {},
+                                      options=options_strategy if options_strategy else {},
+                                      options_budget=options_budget if options_budget else 0,
+                                      expected_move=expected_move if expected_move else {},
+                                      edgar_financials=edgar_financials if edgar_financials else {},
                                       alpaca_mode=os.getenv('ALPACA_MODE', 'paper').upper())
 
     except Exception as e:
