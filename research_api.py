@@ -515,8 +515,10 @@ def get_scan_status(job_id):
 
 @research_bp.route('/sector/cancel/<job_id>', methods=['POST'])
 def cancel_scan(job_id):
-    """Cancel running scan (not implemented - scans run to completion)."""
-    return jsonify({'success': False, 'message': 'Cancellation not supported'})
+    """Force-cancel a stuck scan by clearing the job reference."""
+    global current_scan_job
+    current_scan_job = None
+    return jsonify({'success': True, 'message': 'Scan cancelled'})
 
 @research_bp.route('/sector/schedule', methods=['GET'])
 def get_schedule_status():
