@@ -2895,8 +2895,9 @@ def home():
             const vix = data.vix_level || 'N/A';
             const term = data.dimensions?.term_structure?.value || 'N/A';
             const adx = data.dimensions?.trend_assessment?.adx || 'N/A';
-            const edge = data.dimensions?.vol_spread?.spread || 'N/A';
-            const strat = data.strategy_recommendation || 'N/A';
+            const edgeRaw = data.dimensions?.vol_spread?.spread;
+            const edge = edgeRaw ? (edgeRaw * 100).toFixed(1) : 'N/A';
+            const strat = data.recommended_strategy || 'N/A';
             summary.innerHTML = `SPX: $${spx} | VIX: ${vix} | Term: ${term} | ADX: ${adx} | Vol Edge: ${edge}% | Strategy: ${strat}`;
         } catch (e) {
             document.getElementById('obs-regime-badge').textContent = '● LOADING...';
