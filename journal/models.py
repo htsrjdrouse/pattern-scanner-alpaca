@@ -286,6 +286,44 @@ class Trade(Base):
             reward = abs(self.planned_target - self.entry_price)
             self.planned_rr = reward / risk if risk > 0 else 0
 
+
+class SPXObservation(Base):
+    __tablename__ = 'spx_observations'
+    
+    id = Column(Integer, primary_key=True)
+    date = Column(String(10), nullable=False)  # YYYY-MM-DD
+    logged_at = Column(String(30), nullable=False)  # ISO timestamp
+    
+    # Regime context (auto-populated)
+    regime_verdict = Column(String(10))  # GREEN / YELLOW / RED
+    regime_score = Column(Float)  # 0-100
+    vix_level = Column(Float)
+    spx_price = Column(Float)
+    term_structure = Column(String(20))  # CONTANGO / FLAT / BACKWARDATION
+    adx_value = Column(Float)
+    vol_spread_edge = Column(Float)
+    
+    # Manual observations
+    spx_price_945 = Column(Float)
+    vix_945 = Column(Float)
+    atm_straddle_price = Column(Float)
+    atm_strike = Column(Float)
+    
+    # Hypothetical trade
+    would_trade = Column(String(10))  # yes / no / maybe
+    strategy = Column(String(20))  # iron_condor / put_spread / call_spread / none
+    short_put_strike = Column(Float)
+    short_call_strike = Column(Float)
+    spread_width = Column(Float)
+    premium_collected = Column(Float)
+    
+    # Outcome
+    spx_close = Column(Float)
+    outcome = Column(String(15))  # winner / loser / scratch / not_taken
+    outcome_pnl = Column(Float)
+    max_adverse_move = Column(Float)
+    notes = Column(Text)
+
 # Database setup
 engine = create_engine('sqlite:///trade_journal.db')
 SessionLocal = sessionmaker(bind=engine)

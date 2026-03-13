@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-03-13T12:35:16.358827",
+  "timestamp": "2026-03-13T19:13:53.142849",
   "cache_age_minutes": 0,
-  "spx_price": 6672.62,
-  "vix_level": 25.91,
-  "vix_3m": 26.95,
+  "spx_price": 6645.6,
+  "vix_level": 27.02,
+  "vix_3m": 26.84,
   "term_structure_source": "yfinance_fallback",
   "pcr_source": "cboe_equity_csv",
   "dimensions": {
@@ -13,22 +13,22 @@
       "description": "Good premium but wider strikes required"
     },
     "term_structure": {
-      "value": "CONTANGO",
-      "spread": 1.04,
-      "score": 1.0,
-      "description": "Normal, favorable for sellers"
+      "value": "FLAT",
+      "spread": -0.18,
+      "score": 0.0,
+      "description": "Neutral, caution"
     },
     "trend_assessment": {
       "value": "TRENDING",
-      "adx": 30.5,
+      "adx": 31.4,
       "score": -0.5,
       "description": "Bad for iron condors, use directional spreads"
     },
     "vol_spread": {
       "value": "STRONG",
-      "realized_vol": 0.1267,
-      "implied_vol": 0.2591,
-      "spread": 0.1324,
+      "realized_vol": 0.1161,
+      "implied_vol": 0.2702,
+      "spread": 0.1541,
       "score": 1.0,
       "description": "IV significantly overpricing, clear seller edge"
     },
@@ -47,17 +47,17 @@
     },
     "correlation_regime": {
       "value": "LOW",
-      "avg_correlation": 0.288,
+      "avg_correlation": 0.27,
       "score": 0.8,
       "description": "Stock-picking environment, individual names work"
     }
   },
-  "composite_score": 0.525,
+  "composite_score": 0.325,
   "hard_override_triggered": false,
   "override_reason": null,
-  "verdict": "GREEN",
-  "recommended_strategy": "Iron Condor \u2014 sell 0.10-0.15 delta on both sides, standard 5-wide spreads",
-  "position_sizing": "Full size \u2014 up to $500 per spread",
-  "entry_timing": "9:45-10:30 AM after opening volatility settles",
+  "verdict": "YELLOW",
+  "recommended_strategy": "Single-side credit spread \u2014 put spread only if bullish breadth, call spread only if bearish; avoid iron condor",
+  "position_sizing": "Half size \u2014 max $250 per spread",
+  "entry_timing": "Wait for 10:30 AM \u2014 confirm direction before entering",
   "errors": []
 }

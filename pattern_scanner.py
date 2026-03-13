@@ -2702,6 +2702,161 @@ def home():
             </form>
         </div>
 
+        <!-- 0DTE OBSERVATION LOG CARD -->
+        <div id="observation-card" style="margin: 30px 0; background: #1e1e2e; border-radius: 12px; overflow: hidden;">
+            <!-- Card Header (always visible) -->
+            <div style="padding: 15px 20px; background: #16213e; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleObservationCard()">
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <span style="font-size: 18px; font-weight: 600;">📅 0DTE Morning Observation Log</span>
+                    <span id="obs-today-date" style="color: #9e9e9e; font-size: 14px;"></span>
+                    <span id="obs-regime-badge" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold;"></span>
+                    <span id="obs-count" style="color: #9e9e9e; font-size: 14px;"></span>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button id="obs-log-today-btn" onclick="event.stopPropagation(); openObservationForm()" style="padding: 6px 12px; background: #4fc3f7; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;">+ Log Today</button>
+                    <span id="obs-expand-icon" style="font-size: 20px;">▼</span>
+                </div>
+            </div>
+            
+            <!-- Card Body (collapsible) -->
+            <div id="observation-card-body" style="display: none; padding: 20px;">
+                <!-- Section 1: Regime Summary -->
+                <div id="obs-regime-summary" style="padding: 15px; background: #0f0f23; border-radius: 8px; margin-bottom: 20px; font-size: 14px; color: #9e9e9e;"></div>
+                
+                <!-- Section 2: Observation Form -->
+                <div style="background: #16213e; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="margin-top: 0; color: #4fc3f7;">Log Today's Observation</h3>
+                    
+                    <!-- Group A: 9:45 AM Conditions -->
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="color: #9e9e9e; font-size: 14px; margin-bottom: 10px;">9:45 AM Market Conditions</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">SPX at 9:45</label>
+                                <input type="number" id="obs-spx-945" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">VIX at 9:45</label>
+                                <input type="number" id="obs-vix-945" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">ATM Strike</label>
+                                <input type="number" id="obs-atm-strike" step="1" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">ATM Straddle Price</label>
+                                <input type="number" id="obs-straddle" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Group B: Hypothetical Trade -->
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="color: #9e9e9e; font-size: 14px; margin-bottom: 10px;">Hypothetical Trade</h4>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-size: 13px;">Would you trade today?</label>
+                            <div style="display: flex; gap: 15px;">
+                                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                    <input type="radio" name="would-trade" value="yes"> Yes
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                    <input type="radio" name="would-trade" value="no"> No
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                    <input type="radio" name="would-trade" value="maybe"> Maybe
+                                </label>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Strategy</label>
+                                <select id="obs-strategy" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                                    <option value="">Select...</option>
+                                    <option value="iron_condor">Iron Condor</option>
+                                    <option value="put_spread">Put Spread</option>
+                                    <option value="call_spread">Call Spread</option>
+                                    <option value="none">None</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Short Put Strike</label>
+                                <input type="number" id="obs-put-strike" step="1" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Short Call Strike</label>
+                                <input type="number" id="obs-call-strike" step="1" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Spread Width (pts)</label>
+                                <input type="number" id="obs-width" step="1" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Est. Premium</label>
+                                <input type="number" id="obs-premium" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Group C: Notes -->
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 13px;">Notes</label>
+                        <textarea id="obs-notes" rows="3" placeholder="Catalyst risk, market feel, why you would/wouldn't trade..." style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;"></textarea>
+                    </div>
+                    
+                    <!-- Buttons -->
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button onclick="saveObservation()" style="padding: 10px 20px; background: #4fc3f7; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">💾 Save Observation</button>
+                        <button id="obs-update-outcome-btn" onclick="showOutcomeFields()" style="display: none; padding: 10px 20px; background: #ff9800; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📊 Update Outcome</button>
+                    </div>
+                    
+                    <!-- Outcome Fields (hidden initially) -->
+                    <div id="obs-outcome-fields" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid #333;">
+                        <h4 style="color: #9e9e9e; font-size: 14px; margin-bottom: 10px;">End of Day Outcome</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">SPX Close</label>
+                                <input type="number" id="obs-spx-close" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Outcome</label>
+                                <select id="obs-outcome" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                                    <option value="">Select...</option>
+                                    <option value="winner">Winner</option>
+                                    <option value="loser">Loser</option>
+                                    <option value="scratch">Scratch</option>
+                                    <option value="not_taken">Not Taken</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Hypothetical P&L</label>
+                                <input type="number" id="obs-pnl" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-size: 13px;">Max Adverse Move (pts)</label>
+                                <input type="number" id="obs-max-move" step="0.01" style="width: 100%; padding: 8px; background: #0f0f23; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                            </div>
+                        </div>
+                        <button onclick="saveOutcome()" style="padding: 10px 20px; background: #22c55e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">✅ Save Outcome</button>
+                    </div>
+                </div>
+                
+                <!-- Section 3: History Table -->
+                <div style="background: #16213e; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="margin-top: 0; color: #4fc3f7;">Observation History</h3>
+                    <div id="obs-history-table" style="overflow-x: auto;"></div>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div style="background: #16213e; padding: 20px; border-radius: 8px;">
+                    <h4 style="margin-top: 0; color: #9e9e9e;">Observation Baseline Progress</h4>
+                    <div style="background: #0f0f23; height: 30px; border-radius: 15px; overflow: hidden; margin-bottom: 10px;">
+                        <div id="obs-progress-bar" style="height: 100%; background: #22c55e; width: 0%; transition: width 0.3s;"></div>
+                    </div>
+                    <p id="obs-progress-text" style="margin: 0; color: #9e9e9e; font-size: 14px;"></p>
+                </div>
+            </div>
+        </div>
+
         <div class="info">
             <h3>🚀 Scan Market</h3>
             <p>
@@ -2718,6 +2873,238 @@ def home():
             </p>
         </div>
     </div>
+    
+    <script>
+    // 0DTE Observation Log JavaScript
+    let currentObservationId = null;
+    
+    async function loadRegimeSummaryForCard() {
+        try {
+            const resp = await fetch('/signals/regime/analysis');
+            const data = await resp.json();
+            const badge = document.getElementById('obs-regime-badge');
+            const verdict = data.verdict || 'UNKNOWN';
+            const colors = {GREEN: '#22c55e', YELLOW: '#f59e0b', RED: '#ef4444', UNKNOWN: '#9e9e9e'};
+            badge.style.background = colors[verdict];
+            badge.style.color = verdict === 'YELLOW' ? '#000' : '#fff';
+            badge.textContent = '● ' + verdict;
+            
+            // Update regime summary
+            const summary = document.getElementById('obs-regime-summary');
+            const spx = data.spx_price || 'N/A';
+            const vix = data.vix_level || 'N/A';
+            const term = data.dimensions?.term_structure?.value || 'N/A';
+            const adx = data.dimensions?.trend_assessment?.adx || 'N/A';
+            const edge = data.dimensions?.vol_spread?.spread || 'N/A';
+            const strat = data.strategy_recommendation || 'N/A';
+            summary.innerHTML = `SPX: $${spx} | VIX: ${vix} | Term: ${term} | ADX: ${adx} | Vol Edge: ${edge}% | Strategy: ${strat}`;
+        } catch (e) {
+            document.getElementById('obs-regime-badge').textContent = '● LOADING...';
+        }
+    }
+    
+    function toggleObservationCard() {
+        const body = document.getElementById('observation-card-body');
+        const icon = document.getElementById('obs-expand-icon');
+        if (body.style.display === 'none') {
+            body.style.display = 'block';
+            icon.textContent = '▲';
+        } else {
+            body.style.display = 'none';
+            icon.textContent = '▼';
+        }
+    }
+    
+    function openObservationForm() {
+        document.getElementById('observation-card-body').style.display = 'block';
+        document.getElementById('obs-expand-icon').textContent = '▲';
+        document.getElementById('obs-spx-945').scrollIntoView({behavior: 'smooth', block: 'center'});
+    }
+    
+    async function saveObservation() {
+        const payload = {
+            spx_price_945: parseFloat(document.getElementById('obs-spx-945').value) || null,
+            vix_945: parseFloat(document.getElementById('obs-vix-945').value) || null,
+            atm_strike: parseFloat(document.getElementById('obs-atm-strike').value) || null,
+            atm_straddle_price: parseFloat(document.getElementById('obs-straddle').value) || null,
+            would_trade: document.querySelector('input[name="would-trade"]:checked')?.value || null,
+            strategy: document.getElementById('obs-strategy').value || null,
+            short_put_strike: parseFloat(document.getElementById('obs-put-strike').value) || null,
+            short_call_strike: parseFloat(document.getElementById('obs-call-strike').value) || null,
+            spread_width: parseFloat(document.getElementById('obs-width').value) || null,
+            premium_collected: parseFloat(document.getElementById('obs-premium').value) || null,
+            notes: document.getElementById('obs-notes').value || null
+        };
+        
+        try {
+            const resp = await fetch('/api/observations/spx', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+            if (data.success) {
+                alert('Observation saved ✅');
+                currentObservationId = data.id;
+                document.getElementById('obs-update-outcome-btn').style.display = 'inline-block';
+                document.getElementById('obs-log-today-btn').textContent = '✏️ Edit Today';
+                loadObservationHistory();
+                loadObservationProgress();
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+            }
+        } catch (e) {
+            alert('Error saving: ' + e.message);
+        }
+    }
+    
+    function showOutcomeFields() {
+        document.getElementById('obs-outcome-fields').style.display = 'block';
+    }
+    
+    async function saveOutcome() {
+        if (!currentObservationId) {
+            alert('No observation to update');
+            return;
+        }
+        
+        const payload = {
+            spx_close: parseFloat(document.getElementById('obs-spx-close').value) || null,
+            outcome: document.getElementById('obs-outcome').value || null,
+            outcome_pnl: parseFloat(document.getElementById('obs-pnl').value) || null,
+            max_adverse_move: parseFloat(document.getElementById('obs-max-move').value) || null
+        };
+        
+        try {
+            const resp = await fetch(`/api/observations/spx/${currentObservationId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+            if (data.success) {
+                alert('Outcome saved ✅');
+                loadObservationHistory();
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+            }
+        } catch (e) {
+            alert('Error saving outcome: ' + e.message);
+        }
+    }
+    
+    async function loadObservationHistory(limit = 10) {
+        try {
+            const resp = await fetch('/api/observations/spx');
+            const data = await resp.json();
+            const observations = data.observations || [];
+            
+            if (observations.length === 0) {
+                document.getElementById('obs-history-table').innerHTML = '<p style="color: #9e9e9e; text-align: center; padding: 20px;">No observations yet. Start logging to build your baseline.</p>';
+                return;
+            }
+            
+            let html = '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
+            html += '<thead><tr style="background: #0f0f23;"><th style="padding: 10px; text-align: left;">Date</th><th>Regime</th><th>VIX</th><th>Straddle</th><th>Strategy</th><th>Premium</th><th>Outcome</th><th>P&L</th><th>Notes</th></tr></thead><tbody>';
+            
+            observations.slice(0, limit).forEach(obs => {
+                const outcomeColors = {winner: '#22c55e', loser: '#ef4444', scratch: '#9e9e9e', not_taken: '#757575'};
+                const outcomeColor = outcomeColors[obs.outcome] || '#9e9e9e';
+                html += `<tr style="border-bottom: 1px solid #333;">
+                    <td style="padding: 10px;">${obs.date}</td>
+                    <td style="text-align: center;">${obs.regime_verdict || '-'}</td>
+                    <td style="text-align: center;">${obs.vix_945 || '-'}</td>
+                    <td style="text-align: center;">${obs.atm_straddle_price || '-'}</td>
+                    <td style="text-align: center;">${obs.strategy || '-'}</td>
+                    <td style="text-align: center;">${obs.premium_collected || '-'}</td>
+                    <td style="text-align: center; color: ${outcomeColor}; font-weight: bold;">${obs.outcome || '-'}</td>
+                    <td style="text-align: center;">${obs.outcome_pnl || '-'}</td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${obs.notes || '-'}</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            if (observations.length > limit) {
+                html += `<p style="text-align: center; margin-top: 10px;"><a href="#" onclick="loadObservationHistory(999); return false;" style="color: #4fc3f7;">Show all (${observations.length})</a></p>`;
+            }
+            
+            document.getElementById('obs-history-table').innerHTML = html;
+        } catch (e) {
+            console.error('Error loading history:', e);
+        }
+    }
+    
+    async function loadObservationProgress() {
+        try {
+            const resp = await fetch('/api/observations/spx/summary');
+            const data = await resp.json();
+            const count = data.would_trade_count || 0;
+            const target = 20;
+            const pct = Math.min(100, (count / target) * 100);
+            
+            document.getElementById('obs-progress-bar').style.width = pct + '%';
+            
+            if (count >= target) {
+                document.getElementById('obs-progress-text').innerHTML = `✅ Baseline complete — ready to build the SPX Chain Poller (${count} observations)`;
+            } else {
+                document.getElementById('obs-progress-text').innerHTML = `${count} / ${target} observations — Once you reach 20, the 0DTE SPX Chain Poller will be ready to build.`;
+            }
+        } catch (e) {
+            console.error('Error loading progress:', e);
+        }
+    }
+    
+    async function checkTodayObservation() {
+        try {
+            const resp = await fetch('/api/observations/spx/today');
+            const data = await resp.json();
+            if (data.observation) {
+                currentObservationId = data.observation.id;
+                document.getElementById('obs-log-today-btn').textContent = '✏️ Edit Today';
+                document.getElementById('obs-update-outcome-btn').style.display = 'inline-block';
+                
+                // Populate form
+                const obs = data.observation;
+                if (obs.spx_price_945) document.getElementById('obs-spx-945').value = obs.spx_price_945;
+                if (obs.vix_945) document.getElementById('obs-vix-945').value = obs.vix_945;
+                if (obs.atm_strike) document.getElementById('obs-atm-strike').value = obs.atm_strike;
+                if (obs.atm_straddle_price) document.getElementById('obs-straddle').value = obs.atm_straddle_price;
+                if (obs.would_trade) document.querySelector(`input[name="would-trade"][value="${obs.would_trade}"]`).checked = true;
+                if (obs.strategy) document.getElementById('obs-strategy').value = obs.strategy;
+                if (obs.short_put_strike) document.getElementById('obs-put-strike').value = obs.short_put_strike;
+                if (obs.short_call_strike) document.getElementById('obs-call-strike').value = obs.short_call_strike;
+                if (obs.spread_width) document.getElementById('obs-width').value = obs.spread_width;
+                if (obs.premium_collected) document.getElementById('obs-premium').value = obs.premium_collected;
+                if (obs.notes) document.getElementById('obs-notes').value = obs.notes;
+            }
+        } catch (e) {
+            console.error('Error checking today:', e);
+        }
+    }
+    
+    async function loadObservationCount() {
+        try {
+            const resp = await fetch('/api/observations/spx/summary');
+            const data = await resp.json();
+            document.getElementById('obs-count').textContent = `Observations: ${data.total_observations || 0} total`;
+        } catch (e) {
+            document.getElementById('obs-count').textContent = 'Observations: 0 total';
+        }
+    }
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        const today = new Date().toLocaleDateString('en-US', {month: 'numeric', day: 'numeric', year: 'numeric'});
+        document.getElementById('obs-today-date').textContent = `Today: ${today}`;
+        
+        loadRegimeSummaryForCard();
+        loadObservationHistory();
+        loadObservationProgress();
+        loadObservationCount();
+        checkTodayObservation();
+    });
+    </script>
+    
     </body>
     </html>
     """)
@@ -4902,6 +5289,234 @@ def api_orders():
         result = order_manager.get_orders()
         return result
     except Exception as e:
+        return {'error': str(e)}, 500
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SPX OBSERVATION LOG API
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route('/api/observations/spx', methods=['POST'])
+def save_spx_observation():
+    """Save a new SPX observation"""
+    from journal.models import SPXObservation, get_session
+    
+    data = request.get_json() or {}
+    
+    # Auto-populate regime context
+    regime_context = {}
+    try:
+        import requests as req
+        resp = req.get('http://localhost:5004/signals/regime/analysis', timeout=2)
+        if resp.ok:
+            regime = resp.json()
+            regime_context = {
+                'regime_verdict': regime.get('verdict'),
+                'regime_score': round((regime.get('composite_score', 0) + 1) / 2 * 100, 1),
+                'vix_level': regime.get('vix_level'),
+                'spx_price': regime.get('spx_price'),
+                'term_structure': regime.get('dimensions', {}).get('term_structure', {}).get('value'),
+                'adx_value': regime.get('dimensions', {}).get('trend_assessment', {}).get('adx'),
+                'vol_spread_edge': regime.get('dimensions', {}).get('vol_spread', {}).get('spread'),
+            }
+    except:
+        pass
+    
+    session = get_session()
+    try:
+        obs = SPXObservation(
+            date=datetime.now().strftime('%Y-%m-%d'),
+            logged_at=datetime.now().isoformat(),
+            regime_verdict=regime_context.get('regime_verdict') or data.get('regime_verdict'),
+            regime_score=regime_context.get('regime_score') or data.get('regime_score'),
+            vix_level=regime_context.get('vix_level') or data.get('vix_level'),
+            spx_price=regime_context.get('spx_price') or data.get('spx_price'),
+            term_structure=regime_context.get('term_structure') or data.get('term_structure'),
+            adx_value=regime_context.get('adx_value') or data.get('adx_value'),
+            vol_spread_edge=regime_context.get('vol_spread_edge') or data.get('vol_spread_edge'),
+            spx_price_945=data.get('spx_price_945'),
+            vix_945=data.get('vix_945'),
+            atm_straddle_price=data.get('atm_straddle_price'),
+            atm_strike=data.get('atm_strike'),
+            would_trade=data.get('would_trade'),
+            strategy=data.get('strategy'),
+            short_put_strike=data.get('short_put_strike'),
+            short_call_strike=data.get('short_call_strike'),
+            spread_width=data.get('spread_width'),
+            premium_collected=data.get('premium_collected'),
+            notes=data.get('notes')
+        )
+        session.add(obs)
+        session.commit()
+        obs_id = obs.id
+        session.close()
+        return {'success': True, 'id': obs_id}
+    except Exception as e:
+        session.close()
+        return {'error': str(e)}, 500
+
+@app.route('/api/observations/spx', methods=['GET'])
+def get_spx_observations():
+    """Get all SPX observations"""
+    from journal.models import SPXObservation, get_session
+    
+    session = get_session()
+    try:
+        observations = session.query(SPXObservation).order_by(SPXObservation.date.desc()).all()
+        result = []
+        for obs in observations:
+            result.append({
+                'id': obs.id,
+                'date': obs.date,
+                'logged_at': obs.logged_at,
+                'regime_verdict': obs.regime_verdict,
+                'regime_score': obs.regime_score,
+                'vix_level': obs.vix_level,
+                'spx_price': obs.spx_price,
+                'term_structure': obs.term_structure,
+                'adx_value': obs.adx_value,
+                'vol_spread_edge': obs.vol_spread_edge,
+                'spx_price_945': obs.spx_price_945,
+                'vix_945': obs.vix_945,
+                'atm_straddle_price': obs.atm_straddle_price,
+                'atm_strike': obs.atm_strike,
+                'would_trade': obs.would_trade,
+                'strategy': obs.strategy,
+                'short_put_strike': obs.short_put_strike,
+                'short_call_strike': obs.short_call_strike,
+                'spread_width': obs.spread_width,
+                'premium_collected': obs.premium_collected,
+                'spx_close': obs.spx_close,
+                'outcome': obs.outcome,
+                'outcome_pnl': obs.outcome_pnl,
+                'max_adverse_move': obs.max_adverse_move,
+                'notes': obs.notes
+            })
+        session.close()
+        return {'observations': result}
+    except Exception as e:
+        session.close()
+        return {'error': str(e)}, 500
+
+@app.route('/api/observations/spx/today', methods=['GET'])
+def get_today_spx_observation():
+    """Get today's observation if it exists"""
+    from journal.models import SPXObservation, get_session
+    
+    today = datetime.now().strftime('%Y-%m-%d')
+    session = get_session()
+    try:
+        obs = session.query(SPXObservation).filter_by(date=today).first()
+        if obs:
+            result = {
+                'id': obs.id,
+                'date': obs.date,
+                'logged_at': obs.logged_at,
+                'regime_verdict': obs.regime_verdict,
+                'regime_score': obs.regime_score,
+                'vix_level': obs.vix_level,
+                'spx_price': obs.spx_price,
+                'term_structure': obs.term_structure,
+                'adx_value': obs.adx_value,
+                'vol_spread_edge': obs.vol_spread_edge,
+                'spx_price_945': obs.spx_price_945,
+                'vix_945': obs.vix_945,
+                'atm_straddle_price': obs.atm_straddle_price,
+                'atm_strike': obs.atm_strike,
+                'would_trade': obs.would_trade,
+                'strategy': obs.strategy,
+                'short_put_strike': obs.short_put_strike,
+                'short_call_strike': obs.short_call_strike,
+                'spread_width': obs.spread_width,
+                'premium_collected': obs.premium_collected,
+                'spx_close': obs.spx_close,
+                'outcome': obs.outcome,
+                'outcome_pnl': obs.outcome_pnl,
+                'max_adverse_move': obs.max_adverse_move,
+                'notes': obs.notes
+            }
+            session.close()
+            return {'observation': result}
+        session.close()
+        return {'observation': None}
+    except Exception as e:
+        session.close()
+        return {'error': str(e)}, 500
+
+@app.route('/api/observations/spx/<int:obs_id>', methods=['PUT'])
+def update_spx_observation(obs_id):
+    """Update an existing observation"""
+    from journal.models import SPXObservation, get_session
+    
+    data = request.get_json() or {}
+    session = get_session()
+    try:
+        obs = session.query(SPXObservation).filter_by(id=obs_id).first()
+        if not obs:
+            session.close()
+            return {'error': 'Observation not found'}, 404
+        
+        # Update only provided fields
+        for key, value in data.items():
+            if hasattr(obs, key):
+                setattr(obs, key, value)
+        
+        session.commit()
+        session.close()
+        return {'success': True}
+    except Exception as e:
+        session.close()
+        return {'error': str(e)}, 500
+
+@app.route('/api/observations/spx/summary', methods=['GET'])
+def get_spx_summary():
+    """Get aggregated statistics"""
+    from journal.models import SPXObservation, get_session
+    
+    session = get_session()
+    try:
+        all_obs = session.query(SPXObservation).all()
+        
+        total = len(all_obs)
+        would_trade_count = len([o for o in all_obs if o.would_trade == 'yes'])
+        
+        # Win rate calculation
+        taken_trades = [o for o in all_obs if o.outcome in ['winner', 'loser', 'scratch']]
+        winners = [o for o in taken_trades if o.outcome == 'winner']
+        win_rate = (len(winners) / len(taken_trades) * 100) if taken_trades else 0
+        
+        # Average premium
+        premiums = [o.premium_collected for o in all_obs if o.premium_collected]
+        avg_premium = sum(premiums) / len(premiums) if premiums else 0
+        
+        # Average max adverse move
+        moves = [o.max_adverse_move for o in all_obs if o.max_adverse_move]
+        avg_move = sum(moves) / len(moves) if moves else 0
+        
+        # Regime breakdown
+        regime_breakdown = {}
+        for obs in all_obs:
+            verdict = obs.regime_verdict or 'UNKNOWN'
+            regime_breakdown[verdict] = regime_breakdown.get(verdict, 0) + 1
+        
+        # Strategy breakdown
+        strategy_breakdown = {}
+        for obs in all_obs:
+            strat = obs.strategy or 'none'
+            strategy_breakdown[strat] = strategy_breakdown.get(strat, 0) + 1
+        
+        session.close()
+        return {
+            'total_observations': total,
+            'days_observed': total,
+            'would_trade_count': would_trade_count,
+            'hypothetical_win_rate': round(win_rate, 1),
+            'avg_premium_collected': round(avg_premium, 2),
+            'avg_max_adverse_move': round(avg_move, 2),
+            'regime_breakdown': regime_breakdown,
+            'strategy_breakdown': strategy_breakdown
+        }
+    except Exception as e:
+        session.close()
         return {'error': str(e)}, 500
 
 # Register research API blueprint

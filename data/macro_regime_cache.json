@@ -3,7 +3,9 @@
   "inflation_regime": "RISING",
   "quadrant": "STAGFLATION",
   "geopolitical_risk": "HIGH",
-  "commodity_disruption": {},
+  "commodity_disruption": {
+    "oil": "HIGH"
+  },
   "favored_sectors": [
     "energy",
     "minerals_mining",
@@ -17,7 +19,7 @@
     "real_estate"
   ],
   "regime_confidence": 0.7,
-  "last_updated": "2026-03-13T11:18:47.717767",
+  "last_updated": "2026-03-13T19:14:28.928861",
   "sources": [
     "yfinance:SPY",
     "yfinance:TLT",
