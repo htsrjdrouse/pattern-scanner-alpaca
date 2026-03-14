@@ -3022,7 +3022,7 @@ def home():
         try {
             const resp = await fetch('/api/observations/spx/summary');
             const data = await resp.json();
-            const count = data.would_trade_count || 0;
+            const count = data.total_observations || 0;
             const target = 20;
             const pct = Math.min(100, (count / target) * 100);
             
@@ -3045,21 +3045,6 @@ def home():
             if (data.observation) {
                 currentObservationId = data.observation.id;
                 document.getElementById('obs-log-today-btn').textContent = '✏️ Edit Today';
-                document.getElementById('obs-update-outcome-btn').style.display = 'inline-block';
-                
-                // Populate form
-                const obs = data.observation;
-                if (obs.spx_price_945) document.getElementById('obs-spx-945').value = obs.spx_price_945;
-                if (obs.vix_945) document.getElementById('obs-vix-945').value = obs.vix_945;
-                if (obs.atm_strike) document.getElementById('obs-atm-strike').value = obs.atm_strike;
-                if (obs.atm_straddle_price) document.getElementById('obs-straddle').value = obs.atm_straddle_price;
-                if (obs.would_trade) document.querySelector(`input[name="would-trade"][value="${obs.would_trade}"]`).checked = true;
-                if (obs.strategy) document.getElementById('obs-strategy').value = obs.strategy;
-                if (obs.short_put_strike) document.getElementById('obs-put-strike').value = obs.short_put_strike;
-                if (obs.short_call_strike) document.getElementById('obs-call-strike').value = obs.short_call_strike;
-                if (obs.spread_width) document.getElementById('obs-width').value = obs.spread_width;
-                if (obs.premium_collected) document.getElementById('obs-premium').value = obs.premium_collected;
-                if (obs.notes) document.getElementById('obs-notes').value = obs.notes;
             }
         } catch (e) {
             console.error('Error checking today:', e);
