@@ -2757,7 +2757,7 @@ def home():
     </div>
     
     <script>
-    // 0DTE Observation Log JavaScript
+    // 0DTE Observation Log JavaScript v2
     let currentObservationId = null;
     
     async function loadRegimeSummaryForCard() {
@@ -2766,24 +2766,12 @@ def home():
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const data = await resp.json();
             const badge = document.getElementById('obs-regime-badge');
-            if (!badge) throw new Error('Badge element not found');
+            if (!badge) return;
             const verdict = data.verdict || 'UNKNOWN';
             const colors = {GREEN: '#22c55e', YELLOW: '#f59e0b', RED: '#ef4444', UNKNOWN: '#9e9e9e'};
             badge.style.background = colors[verdict];
             badge.style.color = verdict === 'YELLOW' ? '#000' : '#fff';
             badge.textContent = '● ' + verdict;
-            
-            // Update regime summary
-            const summary = document.getElementById('obs-regime-summary');
-            if (!summary) throw new Error('Summary element not found');
-            const spx = data.spx_price || 'N/A';
-            const vix = data.vix_level || 'N/A';
-            const term = data.dimensions?.term_structure?.value || 'N/A';
-            const adx = data.dimensions?.trend_assessment?.adx || 'N/A';
-            const edgeRaw = data.dimensions?.vol_spread?.spread;
-            const edge = edgeRaw ? (edgeRaw * 100).toFixed(1) : 'N/A';
-            const strat = data.recommended_strategy || 'N/A';
-            summary.innerHTML = `SPX: $${spx} | VIX: ${vix} | Term: ${term} | ADX: ${adx} | Vol Edge: ${edge}% | Strategy: ${strat}`;
         } catch (e) {
             console.error('loadRegimeSummaryForCard error:', e);
             const badge = document.getElementById('obs-regime-badge');
