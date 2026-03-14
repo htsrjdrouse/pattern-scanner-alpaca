@@ -41,48 +41,45 @@ def load_sectors():
         data = json.load(f)
     return data.get('sectors', {})
 
-def validate_ticker(symbol, start_date, end_date):
-    """Validate ticker has sufficient data. Returns df or None."""
+def fetch_sector_data(sector_id, tickers, start_date, end_date, min_stocks=15):
+    """Fetch and validate data for a sector using batch download."""
     try:
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(start=start_date, end=end_date)
-        if df.empty:
-            return None
-        
-        # Check for >10% missing data
-        expected_days = (end_date - start_date).days * 0.7  # ~70% for trading days
-        if len(df) < expected_days * 0.9:
-            return None
-        
-        df = df.reset_index()
-        df['symbol'] = symbol
-        df.columns = [c.lower() for c in df.columns]
-        if 'date' in df.columns and hasattr(df['date'].dtype, 'tz') and df['date'].dt.tz:
-            df['date'] = df['date'].dt.tz_localize(None)
-        return df[['symbol', 'date', 'open', 'high', 'low', 'close', 'volume']]
+        raw = yf.download(tickers, start=start_date, end=end_date, group_by='ticker', threads=True, progress=False)
     except Exception as e:
+        log(f"ERROR: {sector_id} batch download failed: {e}")
         return None
 
-def fetch_sector_data(sector_id, tickers, start_date, end_date, min_stocks=15):
-    """Fetch and validate data for a sector."""
     valid_data = []
     dropped = []
-    
+    expected_days = (end_date - start_date).days * 0.7 * 0.9
+
     for symbol in tickers:
-        df = validate_ticker(symbol, start_date, end_date)
-        if df is not None:
-            valid_data.append(df)
-        else:
+        try:
+            if len(tickers) == 1:
+                df = raw.copy()
+            else:
+                df = raw[symbol].copy()
+            df = df.dropna(subset=['Close'])
+            if df.empty or len(df) < expected_days:
+                dropped.append(symbol)
+                continue
+            df = df.reset_index()
+            df['symbol'] = symbol
+            df.columns = [c.lower() for c in df.columns]
+            if 'date' in df.columns and hasattr(df['date'].dtype, 'tz') and df['date'].dt.tz:
+                df['date'] = df['date'].dt.tz_localize(None)
+            valid_data.append(df[['symbol', 'date', 'open', 'high', 'low', 'close', 'volume']])
+        except Exception:
             dropped.append(symbol)
-    
+
     if dropped:
         with open(DROPPED_FILE, 'a') as f:
             f.write(f"{datetime.now().date()} - {sector_id}: {', '.join(dropped)}\n")
-    
+
     if len(valid_data) < min_stocks:
         log(f"WARNING: {sector_id} has only {len(valid_data)} valid tickers (min {min_stocks}), skipping")
         return None
-    
+
     return pd.concat(valid_data, ignore_index=True)
 
 def run_sector_backtest(sector_id, df_prices, signal_names, horizon_days):
