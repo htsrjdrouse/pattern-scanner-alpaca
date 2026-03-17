@@ -4783,7 +4783,7 @@ def chart(symbol):
                         {% if company.pe_ratio %}<tr><th>P/E Ratio</th><td>{{ company.pe_ratio|float|round(1) }}</td></tr>{% endif %}
                         {% if company.forward_pe %}<tr><th>Forward P/E</th><td>{{ company.forward_pe|float|round(1) }}</td></tr>{% endif %}
                         {% if company.beta %}<tr><th>Beta</th><td>{{ company.beta|float|round(2) }}</td></tr>{% endif %}
-                        <tr><th>52-Week Range</th><td>${{ company.fifty_two_week_low|float|round(2) }} - ${{ company.fifty_two_week_high|float|round(2) }}</td></tr>
+                        {% if company.fifty_two_week_low and company.fifty_two_week_high %}<tr><th>52-Week Range</th><td>${{ company.fifty_two_week_low|float|round(2) }} - ${{ company.fifty_two_week_high|float|round(2) }}</td></tr>{% endif %}
                     </table>
                 </div>
             </div>
