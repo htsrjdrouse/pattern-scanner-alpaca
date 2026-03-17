@@ -325,7 +325,7 @@ class SPXObservation(Base):
     notes = Column(Text)
 
 # Database setup
-engine = create_engine('sqlite:///trade_journal.db')
+engine = create_engine('sqlite:///data/trade_journal.db')
 SessionLocal = sessionmaker(bind=engine)
 
 def init_db():

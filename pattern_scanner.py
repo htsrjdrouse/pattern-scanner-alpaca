@@ -2724,7 +2724,10 @@ def home():
                 
                 <!-- History Table -->
                 <div style="background: #16213e; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <h3 style="margin-top: 0; color: #4fc3f7;">Observation History</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="margin-top: 0; color: #4fc3f7;">Observation History</h3>
+                        <button onclick="clearAllObservations()" style="padding: 6px 12px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">🗑️ Clear All</button>
+                    </div>
                     <div id="obs-history-table" style="overflow-x: auto;"></div>
                 </div>
                 
@@ -2997,7 +3000,7 @@ def home():
             }
             
             let html = '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
-            html += '<thead><tr style="background: #0f0f23;"><th style="padding: 10px; text-align: left;">Date</th><th>Regime</th><th>VIX</th><th>Straddle</th><th>Strategy</th><th>Premium</th><th>Traded?</th><th>Notes</th></tr></thead><tbody>';
+            html += '<thead><tr style="background: #0f0f23;"><th style="padding: 10px; text-align: left;">Date</th><th>Regime</th><th>VIX</th><th>Straddle</th><th>Strategy</th><th>Premium</th><th>Traded?</th><th>Notes</th><th></th></tr></thead><tbody>';
             
             observations.slice(0, limit).forEach((obs, idx) => {
                 const tradedColors = {yes: '#22c55e', no: '#ef4444', maybe: '#f59e0b'};
@@ -3014,6 +3017,7 @@ def home():
                     <td style="text-align: center;">${obs.premium_collected || '-'}</td>
                     <td style="text-align: center; color: ${tradedColor}; font-weight: bold;">${tradedLabel}</td>
                     <td style="max-width: 250px; cursor: pointer;" onclick="var el=document.getElementById('${notesId}'); el.style.whiteSpace = el.style.whiteSpace === 'normal' ? 'nowrap' : 'normal';"><div id="${notesId}" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${notesText}</div></td>
+                    <td style="text-align: center;"><button onclick="deleteObservation(${obs.id})" style="background: none; border: none; cursor: pointer; color: #ef4444; font-size: 16px;" title="Delete">✕</button></td>
                 </tr>`;
             });
             
@@ -3046,6 +3050,26 @@ def home():
         } catch (e) {
             console.error('Error loading progress:', e);
         }
+    }
+    
+    async function deleteObservation(id) {
+        if (!confirm('Delete this observation?')) return;
+        try {
+            const resp = await fetch(`/api/observations/spx/${id}`, {method: 'DELETE'});
+            const data = await resp.json();
+            if (data.success) { loadObservationHistory(); loadObservationProgress(); loadObservationCount(); }
+            else alert('Error: ' + (data.error || 'Unknown'));
+        } catch (e) { alert('Error: ' + e.message); }
+    }
+    
+    async function clearAllObservations() {
+        if (!confirm('Delete ALL observations? This cannot be undone.')) return;
+        try {
+            const resp = await fetch('/api/observations/spx/all', {method: 'DELETE'});
+            const data = await resp.json();
+            if (data.success) { loadObservationHistory(); loadObservationProgress(); loadObservationCount(); }
+            else alert('Error: ' + (data.error || 'Unknown'));
+        } catch (e) { alert('Error: ' + e.message); }
     }
     
     async function checkTodayObservation() {
@@ -5442,6 +5466,38 @@ def update_spx_observation(obs_id):
         session.commit()
         session.close()
         return {'success': True}
+    except Exception as e:
+        session.close()
+        return {'error': str(e)}, 500
+
+@app.route('/api/observations/spx/<int:obs_id>', methods=['DELETE'])
+def delete_spx_observation(obs_id):
+    """Delete a specific observation"""
+    from journal.models import SPXObservation, get_session
+    session = get_session()
+    try:
+        obs = session.query(SPXObservation).filter_by(id=obs_id).first()
+        if not obs:
+            session.close()
+            return {'error': 'Not found'}, 404
+        session.delete(obs)
+        session.commit()
+        session.close()
+        return {'success': True}
+    except Exception as e:
+        session.close()
+        return {'error': str(e)}, 500
+
+@app.route('/api/observations/spx/all', methods=['DELETE'])
+def delete_all_spx_observations():
+    """Delete all observations"""
+    from journal.models import SPXObservation, get_session
+    session = get_session()
+    try:
+        count = session.query(SPXObservation).delete()
+        session.commit()
+        session.close()
+        return {'success': True, 'deleted': count}
     except Exception as e:
         session.close()
         return {'error': str(e)}, 500
