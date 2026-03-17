@@ -186,7 +186,7 @@ def get_strike_by_delta(symbol: str, expiration: date, target_delta: float,
     
     Returns dict with best matching strike details, or None on failure.
     """
-    chain = get_live_option_chain(symbol, expiration, session=session)
+    chain = get_live_option_chain(symbol, expiration)
     if chain is None:
         return None
     

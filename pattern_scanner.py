@@ -2855,9 +2855,9 @@ def home():
                 <div id="strategy-section" style="display: none; margin-bottom: 15px;">
                     <label style="display: block; margin-bottom: 8px; font-weight: bold;">Strategy:</label>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button onclick="selectStrategy('iron_condor')" class="strategy-btn" style="padding: 8px 12px; background: #2e2e3e; border: 2px solid #667eea; border-radius: 6px; cursor: pointer; color: #fff;">Iron Condor</button>
-                        <button onclick="selectStrategy('put_spread')" class="strategy-btn" style="padding: 8px 12px; background: #2e2e3e; border: 2px solid #667eea; border-radius: 6px; cursor: pointer; color: #fff;">Put Spread</button>
-                        <button onclick="selectStrategy('call_spread')" class="strategy-btn" style="padding: 8px 12px; background: #2e2e3e; border: 2px solid #667eea; border-radius: 6px; cursor: pointer; color: #fff;">Call Spread</button>
+                        <button onclick="selectStrategy('iron_condor')" class="strategy-btn" data-strategy="iron_condor" style="padding: 8px 12px; background: #2e2e3e; border: 2px solid #667eea; border-radius: 6px; cursor: pointer; color: #fff;">Iron Condor</button>
+                        <button onclick="selectStrategy('put_spread')" class="strategy-btn" data-strategy="put_spread" style="padding: 8px 12px; background: #2e2e3e; border: 2px solid #667eea; border-radius: 6px; cursor: pointer; color: #fff;">Put Spread</button>
+                        <button onclick="selectStrategy('call_spread')" class="strategy-btn" data-strategy="call_spread" style="padding: 8px 12px; background: #2e2e3e; border: 2px solid #667eea; border-radius: 6px; cursor: pointer; color: #fff;">Call Spread</button>
                     </div>
                 </div>
                 
@@ -2870,6 +2870,14 @@ def home():
             </div>
         `;
         document.getElementById('obs-prefill-container').innerHTML = html;
+        
+        // Auto-select strategy from regime recommendation
+        if (data.recommended_strategy) {
+            const stratMap = {'iron condor': 'iron_condor', 'iron_condors': 'iron_condor', 'put spread': 'put_spread', 'put_spreads': 'put_spread', 'call spread': 'call_spread', 'call_spreads': 'call_spread'};
+            const key = (data.recommended_strategy || '').toLowerCase();
+            const mapped = stratMap[key] || Object.keys(stratMap).find(k => key.includes(k)) ? stratMap[Object.keys(stratMap).find(k => key.includes(k))] : null;
+            if (mapped) selectStrategy(mapped);
+        }
     }
     
     let selectedWouldTrade = null;
@@ -2888,10 +2896,10 @@ def home():
     function selectStrategy(strategy) {
         selectedStrategy = strategy;
         document.querySelectorAll('.strategy-btn').forEach(btn => {
-            btn.style.background = '#2e2e3e';
-            btn.style.color = '#fff';
+            const match = btn.dataset.strategy === strategy;
+            btn.style.background = match ? '#667eea' : '#2e2e3e';
+            btn.style.color = match ? '#fff' : '#fff';
         });
-        event.target.style.background = '#667eea';
     }
     
     async function saveObservationWithPrefill() {
@@ -2989,11 +2997,14 @@ def home():
             }
             
             let html = '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
-            html += '<thead><tr style="background: #0f0f23;"><th style="padding: 10px; text-align: left;">Date</th><th>Regime</th><th>VIX</th><th>Straddle</th><th>Strategy</th><th>Premium</th><th>Outcome</th><th>P&L</th><th>Notes</th></tr></thead><tbody>';
+            html += '<thead><tr style="background: #0f0f23;"><th style="padding: 10px; text-align: left;">Date</th><th>Regime</th><th>VIX</th><th>Straddle</th><th>Strategy</th><th>Premium</th><th>Traded?</th><th>Notes</th></tr></thead><tbody>';
             
-            observations.slice(0, limit).forEach(obs => {
-                const outcomeColors = {winner: '#22c55e', loser: '#ef4444', scratch: '#9e9e9e', not_taken: '#757575'};
-                const outcomeColor = outcomeColors[obs.outcome] || '#9e9e9e';
+            observations.slice(0, limit).forEach((obs, idx) => {
+                const tradedColors = {yes: '#22c55e', no: '#ef4444', maybe: '#f59e0b'};
+                const tradedColor = tradedColors[obs.would_trade] || '#9e9e9e';
+                const tradedLabel = {yes: '✅ Yes', no: '❌ No', maybe: '🤷 Maybe'}[obs.would_trade] || '-';
+                const notesId = `obs-notes-${idx}`;
+                const notesText = obs.notes || '-';
                 html += `<tr style="border-bottom: 1px solid #333;">
                     <td style="padding: 10px;">${obs.date}</td>
                     <td style="text-align: center;">${obs.regime_verdict || '-'}</td>
@@ -3001,9 +3012,8 @@ def home():
                     <td style="text-align: center;">${obs.atm_straddle_price || '-'}</td>
                     <td style="text-align: center;">${obs.strategy || '-'}</td>
                     <td style="text-align: center;">${obs.premium_collected || '-'}</td>
-                    <td style="text-align: center; color: ${outcomeColor}; font-weight: bold;">${obs.outcome || '-'}</td>
-                    <td style="text-align: center;">${obs.outcome_pnl || '-'}</td>
-                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${obs.notes || '-'}</td>
+                    <td style="text-align: center; color: ${tradedColor}; font-weight: bold;">${tradedLabel}</td>
+                    <td style="max-width: 250px; cursor: pointer;" onclick="var el=document.getElementById('${notesId}'); el.style.whiteSpace = el.style.whiteSpace === 'normal' ? 'nowrap' : 'normal';"><div id="${notesId}" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${notesText}</div></td>
                 </tr>`;
             });
             
@@ -3373,7 +3383,7 @@ SCAN_RESULTS_TEMPLATE = """
                 <td>{{ r.pattern_count }}</td>
                 <td>{% if r.asc_triangle %}<span class="pattern-badge badge-triangle">YES<br>R: ${{ r.asc_triangle.resistance }}</span>{% else %}-{% endif %}</td>
                 <td>{% if r.bull_flag %}<span class="pattern-badge badge-flag">FLAG<br>+{{ r.bull_flag.pole_gain|int }}%</span>{% else %}-{% endif %}</td>
-                <td>{% if r.double_bottom %}<span class="pattern-badge badge-double-bottom">W<br>${{ r.double_bottom.neckline|round(0)|int }}</span>{% else %}-{% endif %}</td>
+                <td>{% if r.double_bottom %}<span class="pattern-badge badge-double-bottom">W<br>${{ r.double_bottom.neckline|float|round(0)|int }}</span>{% else %}-{% endif %}</td>
                 <td>{% if r.golden_cross and r.golden_cross.golden_cross %}<span style="color: gold; font-weight: bold;">⭐ YES<br><span style="font-size:10px;">({{ r.golden_cross.days_since_golden }}d ago)</span></span>{% elif r.golden_cross and r.golden_cross.sma50_above_200 %}<span style="color: #8bc34a;">50>200</span>{% elif r.golden_cross and r.golden_cross.death_cross %}<span style="color: #f44336;">☠️ Death<br><span style="font-size:10px;">({{ r.golden_cross.days_since_death }}d ago)</span></span>{% else %}<span style="color: #888;">-</span>{% endif %}</td>
                 <td class="{{ r.status.lower().replace(' ', '-') }}">{{ r.status }}</td>
                 <td>{{ r.signal_score }}</td>
@@ -4263,14 +4273,14 @@ def chart(symbol):
                     <input type="hidden" name="rsi_min" value="50">
                     <input type="hidden" name="rsi_max" value="70">
                     <input type="hidden" name="volume_multiple" value="2.0">
-                    <input type="hidden" name="breakeven_move" value="{% if options.breakeven_move_pct %}{{ options.breakeven_move_pct|default(0)|round(1) }}{% elif cup_pattern %}{{ cup_pattern.cup_depth_pct|default(0)|round(1) }}{% else %}0{% endif %}">
+                    <input type="hidden" name="breakeven_move" value="{% if options.breakeven_move_pct %}{{ options.breakeven_move_pct|default(0)|float|round(1) }}{% elif cup_pattern %}{{ cup_pattern.cup_depth_pct|default(0)|float|round(1) }}{% else %}0{% endif %}">
                     <label for="email">Email (required): </label>
                     <input type="email" name="email" id="email" required placeholder="your@email.com" value="{{ analysis.email if analysis.email else '' }}">
                     <button type="submit">Start Tracking</button>
                 </form>
                 <p style="font-size: 12px; color: #888; margin-top: 10px;">
                     Will track for breakout above ${{ analysis.buy_point }}, RSI 50-70, 2x volume, and email alerts.
-                    Breakeven move: {% if options.breakeven_move_pct %}{{ options.breakeven_move_pct|default(0)|round(1) }}%{% elif cup_pattern %}{{ cup_pattern.cup_depth_pct|default(0)|round(1) }}% (cup depth){% else %}0%{% endif %}.
+                    Breakeven move: {% if options.breakeven_move_pct %}{{ options.breakeven_move_pct|default(0)|float|round(1) }}%{% elif cup_pattern %}{{ cup_pattern.cup_depth_pct|default(0)|float|round(1) }}% (cup depth){% else %}0%{% endif %}.
                 </p>
             </div>
             {% endif %}
@@ -4385,8 +4395,8 @@ def chart(symbol):
                                 <span class="detected">DETECTED</span>
                                 <span class="badge" style="background:#ec4899; color:white;">W</span><br>
                                 <span style="color:#888; font-size:12px;">
-                                    Neckline: ${{ double_bottom.neckline|round(2) }}<br>
-                                    Target: ${{ double_bottom.target|round(2) }}<br>
+                                    Neckline: ${{ double_bottom.neckline|float|round(2) }}<br>
+                                    Target: ${{ double_bottom.target|float|round(2) }}<br>
                                     Depth: {{ double_bottom.depth_pct }}%<br>
                                     {% if double_bottom.breakout_confirmed %}<span style="color:#00c853;">✅ Breakout!</span>{% else %}<span style="color:#ff9800;">⏳ Forming</span>{% endif %}
                                 </span>
@@ -4429,14 +4439,14 @@ def chart(symbol):
                     <h3>🏆 Cup & Handle Formation</h3>
                     {% if cup_pattern %}
                     <table>
-                        <tr><th>Cup Depth</th><td>{{ cup_pattern.cup_depth_pct|round(1) }}%</td></tr>
+                        <tr><th>Cup Depth</th><td>{{ cup_pattern.cup_depth_pct|float|round(1) }}%</td></tr>
                         <tr><th>Cup Duration</th><td>{{ cup_pattern.cup_length_days }} days</td></tr>
-                        <tr><th>Left Rim</th><td>${{ cup_pattern.left_rim_price|round(2) }}</td></tr>
-                        <tr><th>Right Rim</th><td>${{ cup_pattern.right_rim_price|round(2) }}</td></tr>
-                        <tr><th>Cup Bottom</th><td>${{ cup_pattern.bottom_price|round(2) }}</td></tr>
+                        <tr><th>Left Rim</th><td>${{ cup_pattern.left_rim_price|float|round(2) }}</td></tr>
+                        <tr><th>Right Rim</th><td>${{ cup_pattern.right_rim_price|float|round(2) }}</td></tr>
+                        <tr><th>Cup Bottom</th><td>${{ cup_pattern.bottom_price|float|round(2) }}</td></tr>
                         <tr><th>U-Shape Score</th><td>{{ cup_pattern.u_shape_score }} (1.0 = perfect U)</td></tr>
                         <tr><th>Symmetry</th><td>{{ cup_pattern.symmetry_pct }}%</td></tr>
-                        <tr><th>Handle Pullback</th><td>{{ cup_pattern.handle_decline_pct|round(1) }}%</td></tr>
+                        <tr><th>Handle Pullback</th><td>{{ cup_pattern.handle_decline_pct|float|round(1) }}%</td></tr>
                         <tr><th>Handle Days</th><td>{{ cup_pattern.handle_days }}</td></tr>
                     </table>
                     {% if analysis %}
@@ -4770,10 +4780,10 @@ def chart(symbol):
                         <tr><th>Market Cap</th><td>{{ company.market_cap_fmt }}</td></tr>
                         <tr><th>Employees</th><td>{{ company.employees }}</td></tr>
                         <tr><th>Country</th><td>{{ company.country }}</td></tr>
-                        {% if company.pe_ratio %}<tr><th>P/E Ratio</th><td>{{ company.pe_ratio|round(1) }}</td></tr>{% endif %}
-                        {% if company.forward_pe %}<tr><th>Forward P/E</th><td>{{ company.forward_pe|round(1) }}</td></tr>{% endif %}
-                        {% if company.beta %}<tr><th>Beta</th><td>{{ company.beta|round(2) }}</td></tr>{% endif %}
-                        <tr><th>52-Week Range</th><td>${{ company.fifty_two_week_low|round(2) }} - ${{ company.fifty_two_week_high|round(2) }}</td></tr>
+                        {% if company.pe_ratio %}<tr><th>P/E Ratio</th><td>{{ company.pe_ratio|float|round(1) }}</td></tr>{% endif %}
+                        {% if company.forward_pe %}<tr><th>Forward P/E</th><td>{{ company.forward_pe|float|round(1) }}</td></tr>{% endif %}
+                        {% if company.beta %}<tr><th>Beta</th><td>{{ company.beta|float|round(2) }}</td></tr>{% endif %}
+                        <tr><th>52-Week Range</th><td>${{ company.fifty_two_week_low|float|round(2) }} - ${{ company.fifty_two_week_high|float|round(2) }}</td></tr>
                     </table>
                 </div>
             </div>
@@ -5087,7 +5097,7 @@ def tracked():
                     <td><a href="/chart/{{ track['ticker'] }}" style="color: #00d4ff;">{{ track['ticker'] }}</a></td>
                     <td>${{ track['buy_point'] }}{% if track['current_price'] %}<br><small style="color:#888;">(Curr: ${{ track['current_price'] }})</small>{% endif %}</td>
                     <td>{{ track['rsi_min'] }}-{{ track['rsi_max'] }}{% if track['current_rsi'] %}<br><small style="color:#888;">(Curr: {{ track['current_rsi'] }})</small>{% endif %}</td>
-                    <td>{{ track['volume_multiple'] }}x{% if track['avg_volume'] %}<br><small style="color:{% if track['current_volume'] and track['current_volume'] >= (track['avg_volume'] * track['volume_multiple']) %}#4caf50{% else %}#888{% endif %};">(Avg: {{ track['avg_volume']|round(0) }} req: {{ (track['avg_volume'] * track['volume_multiple']) |round(0) }})</small>{% endif %}</td>
+                    <td>{{ track['volume_multiple'] }}x{% if track['avg_volume'] %}<br><small style="color:{% if track['current_volume'] and track['current_volume'] >= (track['avg_volume'] * track['volume_multiple']) %}#4caf50{% else %}#888{% endif %};">(Avg: {{ track['avg_volume']|float|round(0) }} req: {{ (track['avg_volume']|float * track['volume_multiple']|float) |round(0) }})</small>{% endif %}</td>
                     <td>{% if track['distance_from_52w_high'] %}{{ track['distance_from_52w_high'] }}%{% else %}-{% endif %}</td>
                     <td>{{ track['added_at'][:10] }}</td>
                     <td>
@@ -5589,20 +5599,18 @@ def get_spx_observation_prefill():
     # 4. Delta-targeted strikes from Tastytrade
     try:
         from tastytrade_data import get_strike_by_delta
-        from tastytrade_client import get_session as get_tt_session
         from datetime import datetime as dt
         
-        session = get_tt_session()
-        if session and result['target_expiry']:
+        if result['target_expiry']:
             exp_date = dt.strptime(result['target_expiry'], '%Y-%m-%d').date()
             
-            put_data = get_strike_by_delta('^SPX', exp_date, 0.12, option_type='put', session=session)
+            put_data = get_strike_by_delta('SPX', exp_date, 0.12, option_type='put')
             if put_data:
                 result['short_put_strike'] = put_data.get('strike')
                 result['short_put_delta'] = put_data.get('delta')
                 result['short_put_premium'] = put_data.get('mid')
             
-            call_data = get_strike_by_delta('^SPX', exp_date, 0.12, option_type='call', session=session)
+            call_data = get_strike_by_delta('SPX', exp_date, 0.12, option_type='call')
             if call_data:
                 result['short_call_strike'] = call_data.get('strike')
                 result['short_call_delta'] = call_data.get('delta')
