@@ -2836,12 +2836,29 @@ def home():
                     <div><strong>Straddle:</strong> $${data.atm_straddle_price || 'N/A'}</div>
                     <div><strong>Vol Edge:</strong> ${data.vol_edge ? (data.vol_edge * 100).toFixed(1) + '%' : 'N/A'}</div>
                 </div>
-                ${data.short_put_strike ? `
-                <div style="margin-top: 15px; padding: 10px; background: #1e1e2e; border-radius: 6px;">
-                    <strong>💡 Suggested Iron Condor:</strong><br>
-                    Put: ${data.short_put_strike} ($${data.short_put_premium}) | Call: ${data.short_call_strike} ($${data.short_call_premium})<br>
-                    Width: ${data.spread_width} | Total Premium: $${data.est_total_premium}
-                </div>` : '<p style="color: #f59e0b; margin-top: 10px;">⚠️ Delta strikes unavailable (Tastytrade)</p>'}
+                ${(() => {
+                    const hasPut = data.short_put_strike && data.short_put_premium;
+                    const hasCall = data.short_call_strike && data.short_call_premium;
+                    if (hasPut && hasCall) {
+                        return `<div style="margin-top: 15px; padding: 10px; background: #1e1e2e; border-radius: 6px;">
+                            <strong>💡 Suggested Iron Condor:</strong><br>
+                            Put: ${data.short_put_strike} ($${data.short_put_premium}) | Call: ${data.short_call_strike} ($${data.short_call_premium})<br>
+                            Width: ${data.spread_width} | Total Premium: $${data.est_total_premium}
+                        </div>`;
+                    } else if (hasPut) {
+                        return `<div style="margin-top: 15px; padding: 10px; background: #1e1e2e; border-radius: 6px;">
+                            <strong>💡 Single-leg only: Put spread at ${data.short_put_strike} for $${data.short_put_premium}</strong><br>
+                            <span style="color: #f59e0b;">Call leg unavailable — insufficient liquidity or strike too far OTM</span>
+                        </div>`;
+                    } else if (hasCall) {
+                        return `<div style="margin-top: 15px; padding: 10px; background: #1e1e2e; border-radius: 6px;">
+                            <strong>💡 Single-leg only: Call spread at ${data.short_call_strike} for $${data.short_call_premium}</strong><br>
+                            <span style="color: #f59e0b;">Put leg unavailable — insufficient liquidity or strike too far OTM</span>
+                        </div>`;
+                    } else {
+                        return '<p style="color: #f59e0b; margin-top: 10px;">⚠️ Insufficient liquidity for iron condor — widen strikes or check chain</p>';
+                    }
+                })()}
             </div>
             
             <div style="background: #16213e; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
@@ -5364,7 +5381,7 @@ def get_spx_observations():
     
     session = get_session()
     try:
-        observations = session.query(SPXObservation).order_by(SPXObservation.date.desc()).all()
+        observations = session.query(SPXObservation).order_by(SPXObservation.date.desc(), SPXObservation.logged_at.desc()).all()
         result = []
         for obs in observations:
             result.append({
@@ -5652,7 +5669,7 @@ def get_spx_observation_prefill():
     except Exception as e:
         result['errors'].append(f'ATM: {str(e)}')
     
-    # 4. Delta-targeted strikes from Tastytrade
+    # 4. Delta-targeted strikes — Tastytrade first, then yfinance approximation
     try:
         from tastytrade_data import get_strike_by_delta
         from datetime import datetime as dt
@@ -5671,11 +5688,73 @@ def get_spx_observation_prefill():
                 result['short_call_strike'] = call_data.get('strike')
                 result['short_call_delta'] = call_data.get('delta')
                 result['short_call_premium'] = call_data.get('mid')
-            
-            if result['short_put_premium'] and result['short_call_premium']:
-                result['est_total_premium'] = round(result['short_put_premium'] + result['short_call_premium'], 2)
     except Exception as e:
         result['errors'].append(f'Tastytrade: {str(e)}')
+    
+    # 4b. Fallback: approximate delta strikes from yfinance chain if Tastytrade missed either leg
+    try:
+        if result['target_expiry'] and result['spx_price'] and result['atm_straddle_price']:
+            need_put = result['short_put_strike'] is None or not result.get('short_put_premium')
+            need_call = result['short_call_strike'] is None or not result.get('short_call_premium')
+            
+            if need_put or need_call:
+                if 'calls' not in dir() or 'puts' not in dir():
+                    chain = spx_ticker.option_chain(result['target_expiry'])
+                    calls = chain.calls
+                    puts = chain.puts
+                current_price = result['spx_price']
+                straddle = result['atm_straddle_price']
+                
+                # ~0.10-0.12 delta proxy: mid price is 2-4% of straddle
+                target_mid_low = straddle * 0.02
+                target_mid_high = straddle * 0.04
+                target_mid = straddle * 0.03  # center of range
+                
+                if need_put:
+                    otm_puts = puts[puts['strike'] < current_price].copy()
+                    if not otm_puts.empty:
+                        otm_puts['mid'] = (otm_puts['bid'].fillna(0) + otm_puts['ask'].fillna(0)) / 2
+                        candidates = otm_puts[(otm_puts['mid'] >= target_mid_low) & (otm_puts['mid'] <= target_mid_high)]
+                        if not candidates.empty:
+                            # Pick strike closest to target mid
+                            best = candidates.iloc[(candidates['mid'] - target_mid).abs().argsort()[:1]].iloc[0]
+                        else:
+                            # Fallback: closest mid to target_mid among all OTM puts with bid > 0
+                            liquid = otm_puts[otm_puts['mid'] > 0]
+                            if not liquid.empty:
+                                best = liquid.iloc[(liquid['mid'] - target_mid).abs().argsort()[:1]].iloc[0]
+                            else:
+                                best = None
+                        if best is not None:
+                            result['short_put_strike'] = float(best['strike'])
+                            result['short_put_premium'] = round(float(best['mid']), 2)
+                            result['short_put_delta'] = '~0.10'
+                
+                if need_call:
+                    otm_calls = calls[calls['strike'] > current_price].copy()
+                    if not otm_calls.empty:
+                        otm_calls['mid'] = (otm_calls['bid'].fillna(0) + otm_calls['ask'].fillna(0)) / 2
+                        candidates = otm_calls[(otm_calls['mid'] >= target_mid_low) & (otm_calls['mid'] <= target_mid_high)]
+                        if not candidates.empty:
+                            best = candidates.iloc[(candidates['mid'] - target_mid).abs().argsort()[:1]].iloc[0]
+                        else:
+                            liquid = otm_calls[otm_calls['mid'] > 0]
+                            if not liquid.empty:
+                                best = liquid.iloc[(liquid['mid'] - target_mid).abs().argsort()[:1]].iloc[0]
+                            else:
+                                best = None
+                        if best is not None:
+                            result['short_call_strike'] = float(best['strike'])
+                            result['short_call_premium'] = round(float(best['mid']), 2)
+                            result['short_call_delta'] = '~0.10'
+    except Exception as e:
+        result['errors'].append(f'Delta fallback: {str(e)}')
+    
+    # 4c. Compute total premium only when both legs are valid
+    if result.get('short_put_premium') and result.get('short_call_premium'):
+        result['est_total_premium'] = round(result['short_put_premium'] + result['short_call_premium'], 2)
+    else:
+        result['est_total_premium'] = None
     
     result['market_open'] = result['spx_price'] is not None
     

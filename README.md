@@ -23,6 +23,18 @@ A Flask-based stock pattern scanner with **live trading capabilities** powered b
 - **DCF Valuation**: Intrinsic value with margin of safety
 - **IV Analysis**: Implied volatility rank and expected moves
 - **Trade Journal**: Track performance with detailed analytics
+  - Clickable trade rows → full detail view (entry, plan, indicators, options, exit, notes)
+  - Planned R:R auto-calculated from entry/stop/target with manual override
+  - Live P&L and days open for open positions (via yfinance)
+  - Stock and options trade support (contracts × 100 multiplier)
+
+### 0DTE Morning Observation Log
+- SPX-focused pre-market observation logging
+- Live market snapshot: SPX price, VIX, ATM straddle, vol edge
+- **Delta-based iron condor suggestions**: Strikes selected by ~0.10-0.12 delta (Tastytrade with yfinance fallback)
+- Graceful single-leg fallback when one side lacks liquidity
+- Observation history sorted by date and time (most recent first)
+- Would-trade / strategy / notes tracking for building a decision baseline
 
 ### Alpha Research Platform
 - Signal backtesting with IC/Sharpe metrics

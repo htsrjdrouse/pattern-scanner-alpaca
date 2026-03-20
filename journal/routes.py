@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Trade Journal Flask Routes
 """
@@ -15,12 +16,14 @@ init_db()
 @journal_bp.route('')
 def dashboard():
     """Main journal dashboard"""
+    import yfinance as yf
     session = get_session()
     trades = session.query(Trade).order_by(Trade.entry_date.desc()).all()
     
     # Summary stats
     total_trades = len(trades)
-    open_trades = len([t for t in trades if t.status == 'open'])
+    open_trades_list = [t for t in trades if t.status == 'open']
+    open_count = len(open_trades_list)
     closed_trades = [t for t in trades if t.status == 'closed']
     
     wins = sum(1 for t in closed_trades if t.win)
@@ -30,16 +33,55 @@ def dashboard():
     total_pnl = sum(t.pnl_dollars for t in closed_trades if t.pnl_dollars) or 0
     expectancy = analytics.calculate_expectancy(trades)
     
+    # Fetch live prices for open trades
+    live_data = {}
+    if open_trades_list:
+        symbols = list(set(t.symbol for t in open_trades_list))
+        try:
+            tickers = yf.Tickers(' '.join(symbols))
+            for sym in symbols:
+                try:
+                    price = tickers.tickers[sym].fast_info.last_price
+                    if price:
+                        live_data[sym] = price
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    
     session.close()
     
     return render_template_string(DASHBOARD_TEMPLATE,
                                   trades=trades,
                                   total_trades=total_trades,
-                                  open_trades=open_trades,
+                                  open_trades=open_count,
                                   win_rate=win_rate,
                                   avg_rr=avg_rr,
                                   total_pnl=total_pnl,
-                                  expectancy=expectancy)
+                                  expectancy=expectancy,
+                                  live_data=live_data,
+                                  today=date.today())
+
+@journal_bp.route('/<int:trade_id>')
+def trade_detail(trade_id):
+    """Trade detail view"""
+    session = get_session()
+    trade = session.query(Trade).get(trade_id)
+    if not trade:
+        session.close()
+        return redirect(url_for('journal.dashboard'))
+    
+    # Fetch live price for open trades
+    live_price = None
+    if trade.status == 'open':
+        try:
+            import yfinance as yf
+            live_price = yf.Ticker(trade.symbol).fast_info.last_price
+        except Exception:
+            pass
+    
+    session.close()
+    return render_template_string(TRADE_DETAIL_TEMPLATE, trade=trade, live_price=live_price, today=date.today())
 
 @journal_bp.route('/new', methods=['GET', 'POST'])
 def new_trade():
@@ -110,6 +152,12 @@ def new_trade():
             trade.option_delta = float(request.form.get('option_delta', 0) or 0) if request.form.get('option_delta') else None
         
         trade.compute_metrics()
+        
+        # Allow manual R:R override
+        manual_rr = request.form.get('planned_rr', '')
+        if manual_rr:
+            trade.planned_rr = float(manual_rr)
+        
         session.add(trade)
         session.commit()
         backup_to_json(session)
@@ -217,6 +265,12 @@ def edit_trade(trade_id):
         trade.notes = request.form.get('notes')
         
         trade.compute_metrics()
+        
+        # Allow manual R:R override
+        manual_rr = request.form.get('planned_rr', '')
+        if manual_rr:
+            trade.planned_rr = float(manual_rr)
+        
         session.commit()
         backup_to_json(session)
         session.close()
@@ -377,6 +431,8 @@ DASHBOARD_TEMPLATE = """
         .open { color: #ffc107; }
         .btn { padding: 8px 15px; background: #00d4ff; color: #1a1a2e; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
         .btn-danger { background: #ef5350; color: white; }
+        tr.clickable-row { cursor: pointer; }
+        tr.clickable-row:hover { background: #16213e; }
     </style>
 </head>
 <body>
@@ -428,14 +484,24 @@ DASHBOARD_TEMPLATE = """
             <th>Entry</th>
             <th>Stop</th>
             <th>Target</th>
-            <th>P&L</th>
             <th>R:R</th>
+            <th>P&L</th>
             <th>Days</th>
             <th>Status</th>
             <th>Actions</th>
         </tr>
         {% for t in trades %}
-        <tr>
+        {% set days_open = (today - t.entry_date).days if t.status == 'open' else t.days_held %}
+        {% set live_price = live_data.get(t.symbol) if t.status == 'open' else None %}
+        {% if live_price %}
+            {% if t.trade_type == 'option' %}
+                {% set live_pnl = (live_price - t.entry_price) * t.shares * 100 %}
+            {% else %}
+                {% set live_pnl = (live_price - t.entry_price) * t.shares %}
+            {% endif %}
+            {% set live_pct = ((live_price - t.entry_price) / t.entry_price * 100) if t.entry_price else 0 %}
+        {% endif %}
+        <tr class="clickable-row" onclick="window.location='/journal/{{ t.id }}'">
             <td>{{ t.entry_date }}{% if t.entry_time %}<br><small style="color:#888;">{{ t.entry_time }}</small>{% endif %}</td>
             <td><strong>{{ t.symbol }}</strong></td>
             <td>{{ t.shares or '-' }}</td>
@@ -444,13 +510,27 @@ DASHBOARD_TEMPLATE = """
             <td>${{ "%.2f"|format(t.entry_price) }}</td>
             <td>${{ "%.2f"|format(t.planned_stop) if t.planned_stop else '-' }}</td>
             <td>${{ "%.2f"|format(t.planned_target) if t.planned_target else '-' }}</td>
-            <td class="{% if t.win %}win{% elif t.win == False %}loss{% endif %}">
-                {% if t.pnl_dollars %}${{ "%.2f"|format(t.pnl_dollars) }} ({{ "%.1f"|format(t.pnl_percent) }}%){% else %}-{% endif %}
-            </td>
-            <td>{{ "%.2f"|format(t.actual_rr) if t.actual_rr else '-' }}</td>
-            <td>{{ t.days_held or '-' }}</td>
-            <td class="{% if t.status == 'open' %}open{% endif %}">{{ t.status }}</td>
             <td>
+                {% if t.status == 'closed' and t.actual_rr %}
+                    {{ "%.2f"|format(t.actual_rr) }}
+                {% elif t.planned_rr %}
+                    <span style="color:#888;">{{ "%.2f"|format(t.planned_rr) }}p</span>
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            <td class="{% if t.status == 'closed' %}{% if t.win %}win{% else %}loss{% endif %}{% elif live_price %}{% if live_pnl > 0 %}win{% else %}loss{% endif %}{% endif %}">
+                {% if t.status == 'closed' and t.pnl_dollars is not none %}
+                    ${{ "%.2f"|format(t.pnl_dollars) }} ({{ "%.1f"|format(t.pnl_percent) }}%)
+                {% elif live_price %}
+                    ${{ "%.2f"|format(live_pnl) }} ({{ "%.1f"|format(live_pct) }}%)
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            <td>{{ days_open if days_open is not none else '-' }}</td>
+            <td class="{% if t.status == 'open' %}open{% endif %}">{{ t.status }}</td>
+            <td onclick="event.stopPropagation()">
                 <a href="/journal/{{ t.id }}/edit" class="btn" style="background: #ff9800;">Edit</a>
                 {% if t.status == 'open' %}
                 <a href="/journal/{{ t.id }}/close" class="btn">Close</a>
@@ -462,6 +542,144 @@ DASHBOARD_TEMPLATE = """
         </tr>
         {% endfor %}
     </table>
+</body>
+</html>
+"""
+
+TRADE_DETAIL_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trade: {{ trade.symbol }}</title>
+    <style>
+        body { font-family: Arial; background: #1a1a2e; color: #eee; margin: 20px; }
+        .nav { background: #16213e; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+        .nav a { color: #00d4ff; text-decoration: none; margin: 0 15px; }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .card { background: #16213e; padding: 20px; border-radius: 8px; }
+        .card h3 { color: #00d4ff; margin-top: 0; }
+        .field { margin-bottom: 12px; }
+        .field-label { color: #888; font-size: 12px; }
+        .field-value { font-size: 16px; margin-top: 2px; }
+        .win { color: #4caf50; }
+        .loss { color: #ef5350; }
+        .open-tag { color: #ffc107; }
+        .btn { padding: 10px 20px; background: #00d4ff; color: #1a1a2e; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; font-weight: bold; margin-right: 8px; }
+        .btn-close { background: #4caf50; color: white; }
+        .btn-edit { background: #ff9800; }
+        .notes-box { background: #1a1a2e; padding: 15px; border-radius: 5px; white-space: pre-wrap; line-height: 1.6; }
+        .pnl-banner { padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
+        .pnl-banner.positive { background: rgba(76,175,80,0.15); border: 1px solid #4caf50; }
+        .pnl-banner.negative { background: rgba(239,83,80,0.15); border: 1px solid #ef5350; }
+        .pnl-banner.neutral { background: #16213e; }
+        .pnl-amount { font-size: 32px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/">Scanner</a>
+        <a href="/journal/">← Journal</a>
+        <a href="/journal/analytics">Analytics</a>
+    </div>
+
+    <h1>{{ trade.symbol }} — {{ trade.trade_type|capitalize }} Trade
+        {% if trade.status == 'open' %}<span class="open-tag">(OPEN)</span>{% endif %}
+    </h1>
+
+    {% set days_open = (today - trade.entry_date).days if trade.status == 'open' else trade.days_held %}
+
+    {% if trade.status == 'closed' and trade.pnl_dollars is not none %}
+    <div class="pnl-banner {% if trade.pnl_dollars > 0 %}positive{% elif trade.pnl_dollars < 0 %}negative{% else %}neutral{% endif %}">
+        <div class="pnl-amount {% if trade.pnl_dollars > 0 %}win{% else %}loss{% endif %}">
+            ${{ "%.2f"|format(trade.pnl_dollars) }} ({{ "%.1f"|format(trade.pnl_percent) }}%)
+        </div>
+        <div style="color:#999;">Closed — {{ trade.days_held or 0 }} days held</div>
+    </div>
+    {% elif trade.status == 'open' and live_price %}
+        {% if trade.trade_type == 'option' %}
+            {% set lpnl = (live_price - trade.entry_price) * trade.shares * 100 %}
+        {% else %}
+            {% set lpnl = (live_price - trade.entry_price) * trade.shares %}
+        {% endif %}
+        {% set lpct = ((live_price - trade.entry_price) / trade.entry_price * 100) if trade.entry_price else 0 %}
+    <div class="pnl-banner {% if lpnl > 0 %}positive{% elif lpnl < 0 %}negative{% else %}neutral{% endif %}">
+        <div class="pnl-amount {% if lpnl > 0 %}win{% else %}loss{% endif %}">
+            ${{ "%.2f"|format(lpnl) }} ({{ "%.1f"|format(lpct) }}%)
+        </div>
+        <div style="color:#999;">Live P&L — {{ days_open }} days open — Current: ${{ "%.2f"|format(live_price) }}</div>
+    </div>
+    {% elif trade.status == 'open' %}
+    <div class="pnl-banner neutral">
+        <div style="color:#ffc107; font-size: 20px;">Open — {{ days_open }} days</div>
+    </div>
+    {% endif %}
+
+    <div class="detail-grid">
+        <div class="card">
+            <h3>📥 Entry</h3>
+            <div class="field"><div class="field-label">Date</div><div class="field-value">{{ trade.entry_date }}{% if trade.entry_time %} {{ trade.entry_time }}{% endif %}</div></div>
+            <div class="field"><div class="field-label">Entry Price</div><div class="field-value">${{ "%.2f"|format(trade.entry_price) }}</div></div>
+            <div class="field"><div class="field-label">{{ 'Contracts' if trade.trade_type == 'option' else 'Shares' }}</div><div class="field-value">{{ trade.shares }}</div></div>
+            {% if trade.planned_entry %}<div class="field"><div class="field-label">Scanner Buy Point</div><div class="field-value">${{ "%.2f"|format(trade.planned_entry) }}</div></div>{% endif %}
+        </div>
+
+        <div class="card">
+            <h3>🎯 Plan</h3>
+            <div class="field"><div class="field-label">Stop Loss</div><div class="field-value">{{ "$%.2f"|format(trade.planned_stop) if trade.planned_stop else '-' }}</div></div>
+            <div class="field"><div class="field-label">Target</div><div class="field-value">{{ "$%.2f"|format(trade.planned_target) if trade.planned_target else '-' }}</div></div>
+            <div class="field"><div class="field-label">Planned R:R</div><div class="field-value">{{ "%.2f"|format(trade.planned_rr) if trade.planned_rr else '-' }}</div></div>
+            {% if trade.status == 'closed' %}<div class="field"><div class="field-label">Actual R:R</div><div class="field-value">{{ "%.2f"|format(trade.actual_rr) if trade.actual_rr else '-' }}</div></div>{% endif %}
+        </div>
+
+        <div class="card">
+            <h3>📊 Indicators</h3>
+            <div class="field"><div class="field-label">Pattern</div><div class="field-value">{{ trade.pattern_type or '-' }}</div></div>
+            <div class="field"><div class="field-label">Scanner Score</div><div class="field-value">{{ trade.scanner_score or '-' }}</div></div>
+            <div class="field"><div class="field-label">ADX</div><div class="field-value">{{ "%.1f"|format(trade.adx_at_entry) if trade.adx_at_entry else '-' }}</div></div>
+            <div class="field"><div class="field-label">RSI</div><div class="field-value">{{ "%.1f"|format(trade.rsi_at_entry) if trade.rsi_at_entry else '-' }}</div></div>
+            <div class="field"><div class="field-label">Volume Confirmed</div><div class="field-value">{{ '✅' if trade.volume_confirmed else '❌' }}</div></div>
+            <div class="field"><div class="field-label">Golden Cross</div><div class="field-value">{{ '✅' if trade.golden_cross else '❌' }}</div></div>
+            {% if trade.sector %}<div class="field"><div class="field-label">Sector</div><div class="field-value">{{ trade.sector }}</div></div>{% endif %}
+        </div>
+
+        {% if trade.trade_type == 'option' %}
+        <div class="card">
+            <h3>📋 Options Details</h3>
+            <div class="field"><div class="field-label">Strategy</div><div class="field-value">{{ trade.option_strategy or '-' }}</div></div>
+            <div class="field"><div class="field-label">Type</div><div class="field-value">{{ trade.option_type or '-' }}</div></div>
+            <div class="field"><div class="field-label">Strike</div><div class="field-value">{{ "$%.2f"|format(trade.option_strike) if trade.option_strike else '-' }}</div></div>
+            {% if trade.option_strike_2 %}<div class="field"><div class="field-label">Strike 2</div><div class="field-value">${{ "%.2f"|format(trade.option_strike_2) }}</div></div>{% endif %}
+            <div class="field"><div class="field-label">Expiration</div><div class="field-value">{{ trade.option_expiration or '-' }}</div></div>
+            <div class="field"><div class="field-label">DTE at Entry</div><div class="field-value">{{ trade.option_dte or '-' }}</div></div>
+            {% if trade.option_iv %}<div class="field"><div class="field-label">IV at Entry</div><div class="field-value">{{ "%.1f"|format(trade.option_iv) }}%</div></div>{% endif %}
+            {% if trade.option_delta %}<div class="field"><div class="field-label">Delta at Entry</div><div class="field-value">{{ "%.2f"|format(trade.option_delta) }}</div></div>{% endif %}
+        </div>
+        {% endif %}
+
+        {% if trade.status == 'closed' %}
+        <div class="card">
+            <h3>📤 Exit</h3>
+            <div class="field"><div class="field-label">Date</div><div class="field-value">{{ trade.exit_date }}{% if trade.exit_time %} {{ trade.exit_time }}{% endif %}</div></div>
+            <div class="field"><div class="field-label">Exit Price</div><div class="field-value">${{ "%.2f"|format(trade.exit_price) }}</div></div>
+            <div class="field"><div class="field-label">Reason</div><div class="field-value">{{ trade.exit_reason or '-' }}</div></div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if trade.notes %}
+    <div class="card" style="margin-bottom: 20px;">
+        <h3>📝 Notes</h3>
+        <div class="notes-box">{{ trade.notes }}</div>
+    </div>
+    {% endif %}
+
+    <div>
+        <a href="/journal/{{ trade.id }}/edit" class="btn btn-edit">✏️ Edit</a>
+        {% if trade.status == 'open' %}
+        <a href="/journal/{{ trade.id }}/close" class="btn btn-close">🔒 Close Trade</a>
+        {% endif %}
+        <a href="/journal/" class="btn" style="background: #555; color: #eee;">← Back</a>
+    </div>
 </body>
 </html>
 """
@@ -516,7 +734,7 @@ NEW_TRADE_TEMPLATE = """
                 </div>
                 <div class="form-group">
                     <label id="entry_price_label">Actual Entry Price *</label>
-                    <input type="number" step="0.01" name="entry_price" required>
+                    <input type="number" step="0.01" name="entry_price" required oninput="calcRR()">
                     <small style="color: #888;" id="entry_price_hint">Stock price or option premium per contract</small>
                 </div>
                 <div class="form-group">
@@ -548,11 +766,16 @@ NEW_TRADE_TEMPLATE = """
             <div>
                 <div class="form-group">
                     <label>Planned Stop Loss</label>
-                    <input type="number" step="0.01" name="planned_stop" value="{{ prepop.planned_stop }}">
+                    <input type="number" step="0.01" name="planned_stop" value="{{ prepop.planned_stop }}" oninput="calcRR()">
                 </div>
                 <div class="form-group">
                     <label>Planned Target</label>
-                    <input type="number" step="0.01" name="planned_target" value="{{ prepop.planned_target }}">
+                    <input type="number" step="0.01" name="planned_target" value="{{ prepop.planned_target }}" oninput="calcRR()">
+                </div>
+                <div class="form-group">
+                    <label>Planned R:R</label>
+                    <input type="number" step="0.01" name="planned_rr" id="planned_rr" placeholder="Auto-calculated">
+                    <small style="color: #888;">Auto-fills from entry/stop/target, or enter manually</small>
                 </div>
                 <div class="form-group">
                     <label>ADX at Entry</label>
@@ -669,6 +892,18 @@ NEW_TRADE_TEMPLATE = """
         }
     }
     
+    function calcRR() {
+        const entry = parseFloat(document.querySelector('input[name="entry_price"]').value);
+        const stop = parseFloat(document.querySelector('input[name="planned_stop"]').value);
+        const target = parseFloat(document.querySelector('input[name="planned_target"]').value);
+        const rrField = document.getElementById('planned_rr');
+        if (entry && stop && target && entry !== stop) {
+            const risk = Math.abs(entry - stop);
+            const reward = Math.abs(target - entry);
+            if (risk > 0) rrField.value = (reward / risk).toFixed(2);
+        }
+    }
+    
     function fetchIndicators() {
         const symbol = document.querySelector('input[name="symbol"]').value;
         const date = document.querySelector('input[name="entry_date"]').value;
@@ -768,7 +1003,7 @@ EDIT_TRADE_TEMPLATE = """
                 </div>
                 <div class="form-group">
                     <label>Entry Price *</label>
-                    <input type="number" step="0.01" name="entry_price" value="{{ trade.entry_price }}" required>
+                    <input type="number" step="0.01" name="entry_price" value="{{ trade.entry_price }}" required oninput="calcRR()">
                 </div>
                 <div class="form-group">
                     <label>Shares *</label>
@@ -798,11 +1033,16 @@ EDIT_TRADE_TEMPLATE = """
             <div>
                 <div class="form-group">
                     <label>Planned Stop</label>
-                    <input type="number" step="0.01" name="planned_stop" value="{{ trade.planned_stop or '' }}">
+                    <input type="number" step="0.01" name="planned_stop" value="{{ trade.planned_stop or '' }}" oninput="calcRR()">
                 </div>
                 <div class="form-group">
                     <label>Planned Target</label>
-                    <input type="number" step="0.01" name="planned_target" value="{{ trade.planned_target or '' }}">
+                    <input type="number" step="0.01" name="planned_target" value="{{ trade.planned_target or '' }}" oninput="calcRR()">
+                </div>
+                <div class="form-group">
+                    <label>Planned R:R</label>
+                    <input type="number" step="0.01" name="planned_rr" id="planned_rr" value="{{ trade.planned_rr or '' }}">
+                    <small style="color: #888;">Auto-fills from entry/stop/target, or enter manually</small>
                 </div>
                 <div class="form-group">
                     <label>ADX at Entry</label>
@@ -831,6 +1071,19 @@ EDIT_TRADE_TEMPLATE = """
         <button type="submit" class="btn">Save Changes</button>
         <a href="/journal/" style="margin-left: 10px; color: #999;">Cancel</a>
     </form>
+    <script>
+    function calcRR() {
+        const entry = parseFloat(document.querySelector('input[name="entry_price"]').value);
+        const stop = parseFloat(document.querySelector('input[name="planned_stop"]').value);
+        const target = parseFloat(document.querySelector('input[name="planned_target"]').value);
+        const rrField = document.getElementById('planned_rr');
+        if (entry && stop && target && entry !== stop) {
+            const risk = Math.abs(entry - stop);
+            const reward = Math.abs(target - entry);
+            if (risk > 0) rrField.value = (reward / risk).toFixed(2);
+        }
+    }
+    </script>
 </body>
 </html>
 """
