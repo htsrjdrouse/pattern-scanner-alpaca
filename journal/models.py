@@ -324,6 +324,63 @@ class SPXObservation(Base):
     max_adverse_move = Column(Float)
     notes = Column(Text)
 
+
+class SPXPollResult(Base):
+    __tablename__ = 'spx_poll_results'
+
+    id = Column(Integer, primary_key=True)
+    polled_at = Column(String(30), nullable=False)
+    date = Column(String(10), nullable=False)
+
+    # Market snapshot
+    spx_price = Column(Float)
+    vix = Column(Float)
+    adx = Column(Float)
+    term_structure = Column(String(20))
+    vol_edge = Column(Float)
+    regime_verdict = Column(String(10))
+    regime_score = Column(Float)
+
+    # Entry criteria
+    criteria_regime_ok = Column(Integer)
+    criteria_adx_ok = Column(Integer)
+    criteria_term_ok = Column(Integer)
+    criteria_vol_edge_ok = Column(Integer)
+    criteria_vix_ok = Column(Integer)
+    criteria_all_passed = Column(Integer)
+    skip_reason = Column(Text)
+
+    # Iron condor setup
+    atm_strike = Column(Float)
+    straddle_price = Column(Float)
+    short_put_strike = Column(Float)
+    short_put_delta = Column(Float)
+    short_put_premium = Column(Float)
+    short_call_strike = Column(Float)
+    short_call_delta = Column(Float)
+    short_call_premium = Column(Float)
+    spread_width = Column(Float)
+    total_premium = Column(Float)
+    max_loss = Column(Float)
+    stop_loss_level = Column(Float)
+    put_wing_strike = Column(Float)
+    call_wing_strike = Column(Float)
+    expiry = Column(String(10))
+    dte = Column(Integer)
+
+    # Recommendation
+    recommendation = Column(String(10))
+    recommendation_notes = Column(Text)
+
+    # Additions: expected move, min credit gate, profit target
+    expected_move_low = Column(Float)
+    expected_move_high = Column(Float)
+    criteria_min_credit_ok = Column(Integer)
+    put_spread_credit = Column(Float)
+    call_spread_credit = Column(Float)
+    profit_target_50 = Column(Float)
+
+
 # Database setup
 engine = create_engine('sqlite:///data/trade_journal.db')
 SessionLocal = sessionmaker(bind=engine)
@@ -331,6 +388,23 @@ SessionLocal = sessionmaker(bind=engine)
 def init_db():
     """Initialize database tables"""
     Base.metadata.create_all(engine)
+    # Safe migration for new columns on existing databases
+    _new_cols = [
+        ('expected_move_low', 'REAL'), ('expected_move_high', 'REAL'),
+        ('criteria_min_credit_ok', 'INTEGER'),
+        ('put_spread_credit', 'REAL'), ('call_spread_credit', 'REAL'),
+        ('profit_target_50', 'REAL'),
+    ]
+    with engine.connect() as conn:
+        existing = [r[1] for r in conn.execute(
+            __import__('sqlalchemy').text("PRAGMA table_info(spx_poll_results)")
+        ).fetchall()]
+        for col, ctype in _new_cols:
+            if col not in existing:
+                conn.execute(__import__('sqlalchemy').text(
+                    f"ALTER TABLE spx_poll_results ADD COLUMN {col} {ctype}"
+                ))
+        conn.commit()
 
 def get_session():
     """Get database session"""

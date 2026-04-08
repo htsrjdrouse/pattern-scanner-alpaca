@@ -7,6 +7,7 @@ import re
 import json
 import os
 import base64
+import threading
 from io import BytesIO
 from pathlib import Path
 import matplotlib.dates as mdates
@@ -2641,6 +2642,7 @@ def home():
             .time-note { color: #888; font-size: 12px; margin-left: 10px; }
             .new-badge { background: #00c853; color: #000; padding: 2px 8px; border-radius: 4px;
                         font-size: 10px; margin-left: 5px; }
+            @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
         </style>
     </head>
     <body>
@@ -2738,6 +2740,51 @@ def home():
                         <div id="obs-progress-bar" style="height: 100%; background: #22c55e; width: 0%; transition: width 0.3s;"></div>
                     </div>
                     <p id="obs-progress-text" style="margin: 0; color: #9e9e9e; font-size: 14px;"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SPX 0DTE CHAIN POLLER CARD -->
+        <div id="poller-card" style="margin: 30px 0; background: #1e1e2e; border-radius: 12px; overflow: hidden;">
+            <div style="padding: 15px 20px; background: #16213e; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="togglePollerCard()">
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <span style="font-size: 18px; font-weight: 600;">🎯 SPX 0DTE Chain Poller</span>
+                    <span id="poller-status-badge" style="font-size: 14px;">○ STOPPED</span>
+                    <span id="poller-last-time" style="color: #9e9e9e; font-size: 14px;"></span>
+                    <span id="poller-poll-count" style="color: #9e9e9e; font-size: 14px;"></span>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button onclick="event.stopPropagation(); startPoller()" id="poller-start-btn" style="padding: 6px 12px; background: #22c55e; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;">▶ Start</button>
+                    <button onclick="event.stopPropagation(); stopPoller()" id="poller-stop-btn" style="padding: 6px 12px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;">⏹ Stop</button>
+                    <span id="poller-expand-icon" style="font-size: 20px;">▼</span>
+                </div>
+            </div>
+            <div id="poller-card-body" style="display: none; padding: 20px;">
+                <div id="poller-econ-override" style="margin-bottom: 15px;"></div>
+                <div id="poller-recommendation" style="margin-bottom: 20px;"></div>
+                <div id="poller-criteria" style="margin-bottom: 20px;"></div>
+                <div id="poller-ic-setup" style="margin-bottom: 20px;"></div>
+                <div id="poller-history" style="background: #16213e; padding: 20px; border-radius: 8px;">
+                    <h3 style="margin-top: 0; color: #4fc3f7;">Today's Poll History</h3>
+                    <div id="poller-history-table"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KALSHI TOP 10 MARKETS CARD -->
+        <div id="kalshi-card" style="margin: 30px 0; background: #1e1e2e; border-radius: 12px; overflow: hidden;">
+            <div style="padding: 15px 20px; background: #16213e; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleKalshiCard()">
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <span style="font-size: 18px; font-weight: 600;">🎯 Kalshi Top 10 Markets</span>
+                    <span style="color: #9e9e9e; font-size: 13px;">Top open markets by volume · auto-refreshes every 5m</span>
+                </div>
+                <span id="kalshi-expand-icon" style="font-size: 20px;">▼</span>
+            </div>
+            <div id="kalshi-card-body" style="display: none; padding: 20px;">
+                <div id="kalshi-table-container"><p style="color:#9e9e9e;">Loading markets...</p></div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
+                    <span id="kalshi-updated" style="color:#666; font-size: 12px;"></span>
+                    <button onclick="fetchKalshiMarkets()" style="padding: 6px 12px; background: #4fc3f7; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;">🔄 Refresh</button>
                 </div>
             </div>
         </div>
@@ -3122,7 +3169,326 @@ def home():
         loadObservationProgress();
         loadObservationCount();
         checkTodayObservation();
+        refreshPollerStatus();
     });
+
+    // ═══════════════════════════════════════════════════════
+    // SPX Chain Poller JavaScript
+    // ═══════════════════════════════════════════════════════
+    let pollerStatusInterval = null;
+
+    function togglePollerCard() {
+        const body = document.getElementById('poller-card-body');
+        const icon = document.getElementById('poller-expand-icon');
+        if (body.style.display === 'none') {
+            body.style.display = 'block';
+            icon.textContent = '▲';
+            refreshPollerStatus();
+            loadPollerHistory();
+        } else {
+            body.style.display = 'none';
+            icon.textContent = '▼';
+        }
+    }
+
+    async function startPoller() {
+        const resp = await fetch('/api/poller/spx/start', {method: 'POST'});
+        const data = await resp.json();
+        if (data.success) {
+            showPollerToast('✅ Poller started');
+            startPollerStatusUpdates();
+            setTimeout(refreshPollerStatus, 3000);
+        } else {
+            showPollerToast(data.message || 'Already running');
+        }
+    }
+
+    async function stopPoller() {
+        await fetch('/api/poller/spx/stop', {method: 'POST'});
+        stopPollerStatusUpdates();
+        showPollerToast('⏹ Poller stopped');
+        refreshPollerStatus();
+    }
+
+    async function toggleEconOverride(active) {
+        await fetch('/api/poller/spx/econ_override', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({active})});
+        showPollerToast(active ? '🚫 Econ override ON' : '✅ Econ override OFF');
+        refreshPollerStatus();
+    }
+
+    function startPollerStatusUpdates() {
+        stopPollerStatusUpdates();
+        pollerStatusInterval = setInterval(() => {
+            refreshPollerStatus();
+            loadPollerHistory();
+        }, 30000);
+    }
+
+    function stopPollerStatusUpdates() {
+        if (pollerStatusInterval) { clearInterval(pollerStatusInterval); pollerStatusInterval = null; }
+    }
+
+    async function refreshPollerStatus() {
+        try {
+            const resp = await fetch('/api/poller/spx/status');
+            const data = await resp.json();
+            renderPollerStatus(data);
+        } catch(e) {}
+    }
+
+    function renderPollerStatus(data) {
+        const badge = document.getElementById('poller-status-badge');
+        const lastTime = document.getElementById('poller-last-time');
+        const startBtn = document.getElementById('poller-start-btn');
+        const stopBtn = document.getElementById('poller-stop-btn');
+
+        if (data.running) {
+            badge.innerHTML = '<span style="color:#22c55e; animation: pulse 1.5s infinite;">●</span> RUNNING';
+            startBtn.style.display = 'none';
+            stopBtn.style.display = 'inline-block';
+            startPollerStatusUpdates();
+        } else {
+            badge.innerHTML = '<span style="color:#666;">○</span> STOPPED';
+            startBtn.style.display = 'inline-block';
+            stopBtn.style.display = 'none';
+            stopPollerStatusUpdates();
+        }
+
+        // Econ override toggle
+        const econEl = document.getElementById('poller-econ-override');
+        const checked = data.econ_override_active ? 'checked' : '';
+        econEl.innerHTML = `
+            <div style="display:flex; align-items:center; gap:10px;">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:#f59e0b; font-size:14px;">
+                    <input type="checkbox" id="econ-override-cb" ${checked} onchange="toggleEconOverride(this.checked)" style="width:16px; height:16px; cursor:pointer;">
+                    ⚠️ Major Econ Event Today
+                </label>
+            </div>
+            ${data.econ_override_active ? '<div style="background:#3b1c1c; border:1px solid #ef4444; border-radius:6px; padding:10px; margin-top:8px; color:#ef4444; font-size:13px;">🚫 ECON OVERRIDE ACTIVE — All polls will return SKIP until unchecked</div>' : ''}`;
+
+        const poll = data.last_poll;
+        if (poll && poll.polled_at) {
+            const t = new Date(poll.polled_at);
+            lastTime.textContent = 'Last: ' + t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+            renderPollerRecommendation(poll);
+            renderPollerCriteria(poll);
+            renderPollerICSetup(poll);
+        } else {
+            lastTime.textContent = '';
+            document.getElementById('poller-recommendation').innerHTML = '<p style="color:#9e9e9e;">No polls yet. Click Start to begin polling.</p>';
+            document.getElementById('poller-criteria').innerHTML = '';
+            document.getElementById('poller-ic-setup').innerHTML = '';
+        }
+    }
+
+    function renderPollerRecommendation(poll) {
+        const el = document.getElementById('poller-recommendation');
+        const colors = {ENTER: {bg:'#1b4332', border:'#22c55e', text:'✅ ENTER IRON CONDOR'},
+                        WAIT:  {bg:'#4a3728', border:'#f59e0b', text:'⏳ WAIT — Conditions Borderline'},
+                        SKIP:  {bg:'#3b1c1c', border:'#ef4444', text:'❌ SKIP — Criteria Not Met'}};
+        const c = colors[poll.recommendation] || colors.SKIP;
+        const time = new Date(poll.polled_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+        el.innerHTML = `
+            <div style="background:${c.bg}; border:1px solid ${c.border}; border-radius:8px; padding:20px;">
+                <div style="font-size:22px; font-weight:bold; color:${c.border}; margin-bottom:10px;">${c.text}</div>
+                <div style="color:#ccc; font-size:14px; margin-bottom:8px;">${poll.recommendation_notes || ''}</div>
+                <div style="color:#888; font-size:12px;">Polled at: ${time}</div>
+            </div>`;
+    }
+
+    function renderPollerCriteria(poll) {
+        const el = document.getElementById('poller-criteria');
+        const checks = [
+            {key:'criteria_regime_ok', label:'Regime', detail: poll.regime_verdict ? `${poll.regime_verdict} (score: ${poll.regime_score || '?'})` : 'Unknown'},
+            {key:'criteria_adx_ok', label:'ADX', detail: poll.adx != null ? `${Number(poll.adx).toFixed(1)} — needs < 28` : 'Unknown'},
+            {key:'criteria_term_ok', label:'Term Structure', detail: poll.term_structure || 'Unknown'},
+            {key:'criteria_vol_edge_ok', label:'Vol Edge', detail: poll.vol_edge != null ? `${(poll.vol_edge*100).toFixed(1)}% — above 5% minimum` : 'Unknown'},
+            {key:'criteria_vix_ok', label:'VIX', detail: poll.vix != null ? `${Number(poll.vix).toFixed(2)} — below 30` : 'Unknown'},
+        ];
+        let html = '<div style="background:#16213e; padding:15px; border-radius:8px;"><h4 style="margin-top:0; color:#4fc3f7;">Entry Criteria Checklist</h4>';
+        checks.forEach(c => {
+            const ok = poll[c.key];
+            const icon = ok ? '✅' : '❌';
+            const color = ok ? '#22c55e' : '#ef4444';
+            html += `<div style="padding:6px 0; border-bottom:1px solid #2a2a3e; color:${color};">${icon} <strong>${c.label}:</strong> ${c.detail}</div>`;
+        });
+        // Min credit row — special handling for unknown state
+        const mc = poll.criteria_min_credit_ok;
+        const pc = poll.put_spread_credit, cc = poll.call_spread_credit;
+        if (mc === null || mc === undefined) {
+            html += `<div style="padding:6px 0; border-bottom:1px solid #2a2a3e; color:#f59e0b;">⚠️ <strong>Min Credit:</strong> Premium data unavailable</div>`;
+        } else {
+            const ok = mc === 1;
+            const icon = ok ? '✅' : '❌';
+            const color = ok ? '#22c55e' : '#ef4444';
+            const pf = pc != null ? '$' + Number(pc).toFixed(2) : '?';
+            const cf = cc != null ? '$' + Number(cc).toFixed(2) : '?';
+            html += `<div style="padding:6px 0; border-bottom:1px solid #2a2a3e; color:${color};">${icon} <strong>Min Credit:</strong> Put ${pf} / Call ${cf} — needs ≥ $0.50 each</div>`;
+        }
+        html += '</div>';
+        el.innerHTML = html;
+    }
+
+    function renderPollerICSetup(poll) {
+        const el = document.getElementById('poller-ic-setup');
+        // Show expected move for ENTER and WAIT, full setup only for ENTER
+        if (poll.recommendation === 'SKIP' || !poll.atm_strike) {
+            el.innerHTML = '';
+            return;
+        }
+        const fmt = v => v != null ? Number(v).toFixed(2) : '—';
+        const fmtD = v => v != null ? Number(v).toFixed(3) : '—';
+
+        // Expected move range (shown for ENTER and WAIT)
+        let emHtml = '';
+        if (poll.expected_move_low && poll.expected_move_high) {
+            emHtml = `<div style="background:#16213e; padding:15px; border-radius:8px; margin-bottom:15px;">
+                <div style="color:#4fc3f7; font-weight:bold; margin-bottom:6px;">Expected Move Range</div>
+                <div style="color:#ccc; font-family:monospace; font-size:15px;">$${fmt(poll.expected_move_low)} – $${fmt(poll.expected_move_high)}</div>
+                <div style="color:#888; font-size:12px; margin-top:4px;">SPX must stay in this range to expire worthless</div>
+            </div>`;
+        }
+
+        if (poll.recommendation !== 'ENTER' || !poll.short_put_strike) {
+            el.innerHTML = emHtml;
+            return;
+        }
+
+        el.innerHTML = emHtml + `
+            <div style="background:#16213e; padding:20px; border-radius:8px; font-family:monospace; font-size:14px;">
+                <h4 style="margin-top:0; color:#22c55e;">SPX 0DTE Iron Condor — ${poll.expiry || 'today'}</h4>
+                <div style="border-top:2px solid #4fc3f7; border-bottom:2px solid #4fc3f7; padding:12px 0; margin:10px 0;">
+                    <div style="color:#ef4444; padding:3px 0;">BUY  Put  ${fmt(poll.put_wing_strike)}</div>
+                    <div style="color:#22c55e; padding:3px 0;">SELL Put  ${fmt(poll.short_put_strike)}  Δ${fmtD(poll.short_put_delta)}  @ $${fmt(poll.short_put_premium)}</div>
+                    <div style="color:#22c55e; padding:3px 0;">SELL Call ${fmt(poll.short_call_strike)} Δ${fmtD(poll.short_call_delta)}  @ $${fmt(poll.short_call_premium)}</div>
+                    <div style="color:#ef4444; padding:3px 0;">BUY  Call ${fmt(poll.call_wing_strike)}</div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; color:#ccc;">
+                    <div>Total Premium: <strong style="color:#22c55e;">$${fmt(poll.total_premium)}</strong></div>
+                    <div>Max Loss: <strong style="color:#ef4444;">$${fmt(poll.max_loss)}</strong> per contract</div>
+                    <div>Stop Loss: Exit if loses $${fmt(poll.stop_loss_level)} (2x premium)</div>
+                    <div>50% Profit Target: Exit at $${fmt(poll.profit_target_50)} gain</div>
+                    <div>ATM Strike: ${fmt(poll.atm_strike)}</div>
+                    <div>Straddle: $${fmt(poll.straddle_price)}</div>
+                    <div>Spread Width: ${poll.spread_width || 5} pts</div>
+                </div>
+            </div>`;
+    }
+
+    async function loadPollerHistory() {
+        try {
+            const resp = await fetch('/api/poller/spx/history');
+            const data = await resp.json();
+            const countEl = document.getElementById('poller-poll-count');
+            countEl.textContent = data.count ? `Today: ${data.count} poll${data.count > 1 ? 's' : ''}` : '';
+
+            const el = document.getElementById('poller-history-table');
+            if (!data.polls || data.polls.length === 0) {
+                el.innerHTML = '<p style="color:#9e9e9e;">No polls recorded today.</p>';
+                return;
+            }
+            const rows = data.polls;
+            let html = '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
+            html += '<tr style="color:#9e9e9e; border-bottom:1px solid #2a2a3e;"><th style="text-align:left; padding:8px;">Time</th><th style="text-align:left; padding:8px;">Rec</th><th style="text-align:right; padding:8px;">ADX</th><th style="text-align:right; padding:8px;">Vol Edge</th><th style="text-align:left; padding:8px;">Notes</th></tr>';
+            const badgeColors = {ENTER:'#22c55e', WAIT:'#f59e0b', SKIP:'#ef4444'};
+            rows.forEach(r => {
+                const t = new Date(r.polled_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                const bc = badgeColors[r.recommendation] || '#888';
+                const adx = r.adx != null ? Number(r.adx).toFixed(1) : '—';
+                const ve = r.vol_edge != null ? (r.vol_edge * 100).toFixed(1) + '%' : '—';
+                const notes = (r.recommendation_notes || '').substring(0, 80);
+                html += `<tr style="border-bottom:1px solid #1a1a2e;">
+                    <td style="padding:6px 8px; color:#ccc;">${t}</td>
+                    <td style="padding:6px 8px;"><span style="background:${bc}; color:#000; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;">${r.recommendation}</span></td>
+                    <td style="padding:6px 8px; text-align:right; color:#ccc;">${adx}</td>
+                    <td style="padding:6px 8px; text-align:right; color:#ccc;">${ve}</td>
+                    <td style="padding:6px 8px; color:#999; font-size:12px;">${notes}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            el.innerHTML = html;
+        } catch(e) {}
+    }
+
+    function showPollerToast(msg) {
+        const toast = document.createElement('div');
+        toast.textContent = msg;
+        toast.style.cssText = 'position:fixed; top:20px; right:20px; background:#16213e; color:#fff; padding:12px 20px; border-radius:8px; z-index:9999; border:1px solid #4fc3f7; font-size:14px;';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Kalshi Top 10 Markets JavaScript
+    // ═══════════════════════════════════════════════════════
+    function toggleKalshiCard() {
+        const body = document.getElementById('kalshi-card-body');
+        const icon = document.getElementById('kalshi-expand-icon');
+        if (body.style.display === 'none') {
+            body.style.display = 'block';
+            icon.textContent = '▲';
+            fetchKalshiMarkets();
+        } else {
+            body.style.display = 'none';
+            icon.textContent = '▼';
+        }
+    }
+
+    function fmtVol(v) {
+        if (v >= 1000000) return '$' + (v / 1000000).toFixed(1) + 'M';
+        if (v >= 1000) return '$' + (v / 1000).toFixed(0) + 'k';
+        return '$' + v;
+    }
+
+    function fmtDate(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        const now = new Date();
+        const opts = d.getFullYear() === now.getFullYear()
+            ? {month: 'short', day: 'numeric'}
+            : {month: 'short', day: 'numeric', year: 'numeric'};
+        return d.toLocaleDateString('en-US', opts);
+    }
+
+    async function fetchKalshiMarkets() {
+        const container = document.getElementById('kalshi-table-container');
+        try {
+            const resp = await fetch('/api/kalshi/top-markets');
+            const data = await resp.json();
+            if (data.error || !data.markets || data.markets.length === 0) {
+                container.innerHTML = '<p style="color:#f59e0b;">⚠️ Kalshi data unavailable</p>';
+                return;
+            }
+            const catColors = {Economics:'#4fc3f7', Politics:'#f59e0b', Sports:'#22c55e', Crypto:'#a78bfa', Tech:'#f472b6', Weather:'#38bdf8', Culture:'#fb923c'};
+            let html = '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
+            html += '<tr style="color:#9e9e9e; border-bottom:1px solid #2a2a3e;"><th style="text-align:left;padding:8px;">#</th><th style="text-align:left;padding:8px;">Market</th><th style="text-align:left;padding:8px;">Category</th><th style="text-align:right;padding:8px;">Yes %</th><th style="text-align:right;padding:8px;">No %</th><th style="text-align:right;padding:8px;">Volume</th><th style="text-align:left;padding:8px;">Ends</th><th style="text-align:center;padding:8px;">Link</th></tr>';
+            data.markets.forEach((m, i) => {
+                const title = m.title.length > 55 ? m.title.substring(0, 55) + '…' : m.title;
+                const cc = catColors[m.category] || '#9e9e9e';
+                html += `<tr style="border-bottom:1px solid #1a1a2e;">
+                    <td style="padding:6px 8px; color:#666;">${i+1}</td>
+                    <td style="padding:6px 8px; color:#ccc;" title="${m.title}">${title}</td>
+                    <td style="padding:6px 8px;"><span style="background:${cc}22; color:${cc}; padding:2px 8px; border-radius:4px; font-size:11px;">${m.category}</span></td>
+                    <td style="padding:6px 8px; text-align:right; color:#22c55e;">${Math.round(m.yes_ask*100)}%</td>
+                    <td style="padding:6px 8px; text-align:right; color:#ef4444;">${Math.round(m.no_ask*100)}%</td>
+                    <td style="padding:6px 8px; text-align:right; color:#ccc;">${fmtVol(m.volume)}</td>
+                    <td style="padding:6px 8px; color:#999;">${fmtDate(m.close_time)}</td>
+                    <td style="padding:6px 8px; text-align:center;"><a href="${m.url}" target="_blank" rel="noopener" style="color:#4fc3f7; text-decoration:none; font-size:12px;">View</a></td>
+                </tr>`;
+            });
+            html += '</table>';
+            container.innerHTML = html;
+            if (data.fetched_at) {
+                const t = new Date(data.fetched_at);
+                document.getElementById('kalshi-updated').textContent = 'Last updated: ' + t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+            }
+        } catch(e) {
+            container.innerHTML = '<p style="color:#f59e0b;">⚠️ Kalshi data unavailable</p>';
+        }
+    }
+
+    fetchKalshiMarkets();
+    setInterval(fetchKalshiMarkets, 300000);
     </script>
     
     </body>
@@ -5310,6 +5676,413 @@ def api_orders():
         return result
     except Exception as e:
         return {'error': str(e)}, 500
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SPX 0DTE CHAIN POLLER
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Refinable parameters — adjust as observation data accumulates
+POLLER_ADX_THRESHOLD = 28
+POLLER_VOL_EDGE_MIN = 0.05
+POLLER_VIX_MAX = 30
+POLLER_TARGET_DELTA = 0.12
+POLLER_SPREAD_WIDTH = 5
+POLLER_STOP_MULTIPLIER = 2.0
+POLLER_MIN_CREDIT = 0.50
+POLLER_ENTRY_WINDOW_START = (9, 45)
+POLLER_ENTRY_WINDOW_END = (10, 30)
+POLLER_INTERVAL_SECONDS = 600
+
+# Poller state
+_poller_running = False
+_poller_thread = None
+_poller_last_result = None
+_poller_session_start = None
+_econ_override_active = False
+
+
+def _evaluate_spx_entry_criteria(regime, spx_price):
+    if _econ_override_active:
+        return {
+            'criteria': {'regime_ok': False, 'adx_ok': False, 'term_ok': False, 'vol_edge_ok': False, 'vix_ok': False},
+            'all_passed': False, 'recommendation': 'SKIP',
+            'notes': 'Manual econ event override active — major scheduled event today',
+            'skip_reason': 'Manual econ event override active — major scheduled event today',
+            'adx': None, 'vix': None, 'term': None, 'vol_edge': None,
+        }
+
+    dims = regime.get('dimensions', {})
+    verdict = regime.get('verdict', 'RED')
+    adx = dims.get('trend_assessment', {}).get('adx', 99)
+    term = dims.get('term_structure', {}).get('value', 'UNKNOWN')
+    vol_edge = dims.get('vol_spread', {}).get('spread', 0)
+    vix = regime.get('vix_level', 99)
+
+    criteria = {
+        'regime_ok': verdict in ('GREEN', 'YELLOW'),
+        'adx_ok': adx < POLLER_ADX_THRESHOLD,
+        'term_ok': term != 'BACKWARDATION',
+        'vol_edge_ok': vol_edge > POLLER_VOL_EDGE_MIN,
+        'vix_ok': vix < POLLER_VIX_MAX,
+    }
+    all_passed = all(criteria.values())
+
+    skip_reasons = []
+    if not criteria['regime_ok']:
+        skip_reasons.append('Regime RED — sit in cash')
+    if not criteria['adx_ok']:
+        skip_reasons.append(f'ADX {adx:.1f} too high (need < {POLLER_ADX_THRESHOLD})')
+    if not criteria['term_ok']:
+        skip_reasons.append(f'Term structure {term} — danger zone')
+    if not criteria['vol_edge_ok']:
+        skip_reasons.append(f'Vol edge {vol_edge*100:.1f}% too thin (need > {POLLER_VOL_EDGE_MIN*100:.0f}%)')
+    if not criteria['vix_ok']:
+        skip_reasons.append(f'VIX {vix:.1f} in crisis zone')
+
+    if all_passed:
+        if verdict == 'GREEN' and adx < 25:
+            recommendation, notes = 'ENTER', f'All criteria met. GREEN regime, ADX {adx:.1f} range-bound. Iron condor conditions optimal.'
+        elif verdict == 'GREEN':
+            recommendation, notes = 'ENTER', f'Criteria met but ADX {adx:.1f} elevated — use wider strikes. Monitor closely.'
+        else:
+            recommendation, notes = 'WAIT', f'YELLOW regime — single side spread only if direction confirms by 10:30 AM. Avoid iron condor.'
+    else:
+        recommendation, notes = 'SKIP', ' | '.join(skip_reasons)
+
+    return {
+        'criteria': criteria, 'all_passed': all_passed,
+        'recommendation': recommendation, 'notes': notes,
+        'skip_reason': ' | '.join(skip_reasons) if skip_reasons else None,
+        'adx': adx, 'vix': vix, 'term': term, 'vol_edge': vol_edge,
+    }
+
+
+def _save_poll_result(result):
+    global _poller_last_result
+    _poller_last_result = result
+    try:
+        from journal.models import SPXPollResult, get_session
+        session = get_session()
+        row = SPXPollResult(**{k: v for k, v in result.items() if k != 'id'})
+        session.add(row)
+        session.commit()
+        result['id'] = row.id
+        session.close()
+    except Exception as e:
+        app.logger.error(f'Failed to save poll result: {e}')
+
+
+def _execute_single_poll():
+    from regime_classifier import run_regime_analysis
+    from datetime import date
+    import yfinance as yf
+
+    polled_at = datetime.now().isoformat()
+    today = date.today().strftime('%Y-%m-%d')
+
+    result = {
+        'polled_at': polled_at, 'date': today,
+        'spx_price': None, 'vix': None, 'adx': None,
+        'term_structure': None, 'vol_edge': None,
+        'regime_verdict': None, 'regime_score': None,
+        'criteria_regime_ok': 0, 'criteria_adx_ok': 0,
+        'criteria_term_ok': 0, 'criteria_vol_edge_ok': 0,
+        'criteria_vix_ok': 0, 'criteria_all_passed': 0,
+        'skip_reason': None,
+        'atm_strike': None, 'straddle_price': None,
+        'short_put_strike': None, 'short_put_delta': None, 'short_put_premium': None,
+        'short_call_strike': None, 'short_call_delta': None, 'short_call_premium': None,
+        'spread_width': POLLER_SPREAD_WIDTH,
+        'total_premium': None, 'max_loss': None, 'stop_loss_level': None,
+        'put_wing_strike': None, 'call_wing_strike': None,
+        'expiry': None, 'dte': 0,
+        'recommendation': 'SKIP', 'recommendation_notes': None,
+        'expected_move_low': None, 'expected_move_high': None,
+        'criteria_min_credit_ok': None, 'put_spread_credit': None,
+        'call_spread_credit': None, 'profit_target_50': None,
+    }
+
+    # 1. Get regime from cache
+    try:
+        regime = run_regime_analysis()
+        dims = regime.get('dimensions', {})
+        result['spx_price'] = regime.get('spx_price')
+        result['vix'] = regime.get('vix_level')
+        result['adx'] = dims.get('trend_assessment', {}).get('adx')
+        result['term_structure'] = dims.get('term_structure', {}).get('value')
+        result['vol_edge'] = dims.get('vol_spread', {}).get('spread')
+        result['regime_verdict'] = regime.get('verdict')
+        result['regime_score'] = round((regime.get('composite_score', 0) + 1) / 2 * 100, 1)
+    except Exception as e:
+        result['skip_reason'] = f'Regime fetch failed: {str(e)}'
+        result['recommendation_notes'] = 'Cannot evaluate — regime data unavailable'
+        _save_poll_result(result)
+        return result
+
+    # 2. Evaluate entry criteria
+    evaluation = _evaluate_spx_entry_criteria(regime, result['spx_price'] or 0)
+    for k in ('regime_ok', 'adx_ok', 'term_ok', 'vol_edge_ok', 'vix_ok'):
+        result[f'criteria_{k}'] = int(evaluation['criteria'][k])
+    result['criteria_all_passed'] = int(evaluation['all_passed'])
+    result['skip_reason'] = evaluation['skip_reason']
+    result['recommendation'] = evaluation['recommendation']
+    result['recommendation_notes'] = evaluation['notes']
+
+    if not evaluation['all_passed']:
+        _save_poll_result(result)
+        return result
+
+    # 3. Fetch SPX chain for strikes and premium
+    try:
+        spx = yf.Ticker('^SPX')
+        expirations = spx.options
+        if not expirations:
+            raise ValueError('No SPX expirations available')
+
+        from datetime import date as date_cls
+        today_str = date_cls.today().strftime('%Y-%m-%d')
+        expiry = today_str if today_str in expirations else expirations[0]
+        result['expiry'] = expiry
+
+        from datetime import datetime as dt
+        exp_date = dt.strptime(expiry, '%Y-%m-%d').date()
+        result['dte'] = (exp_date - date_cls.today()).days
+
+        chain = spx.option_chain(expiry)
+        calls, puts = chain.calls, chain.puts
+        current_price = result['spx_price']
+
+        atm_idx = (calls['strike'] - current_price).abs().idxmin()
+        atm_strike = float(calls.loc[atm_idx, 'strike'])
+        result['atm_strike'] = atm_strike
+
+        atm_call = calls[calls['strike'] == atm_strike].iloc[0]
+        atm_put = puts[puts['strike'] == atm_strike].iloc[0]
+        call_mid = (float(atm_call.get('bid', 0) or 0) + float(atm_call.get('ask', 0) or 0)) / 2
+        put_mid = (float(atm_put.get('bid', 0) or 0) + float(atm_put.get('ask', 0) or 0)) / 2
+        result['straddle_price'] = round(call_mid + put_mid, 2)
+        result['expected_move_low'] = round(atm_strike - result['straddle_price'], 2)
+        result['expected_move_high'] = round(atm_strike + result['straddle_price'], 2)
+    except Exception as e:
+        result['recommendation_notes'] += f' | Chain fetch failed: {str(e)}'
+        _save_poll_result(result)
+        return result
+
+    # 4. Delta-targeted strikes from Tastytrade
+    try:
+        from tastytrade_data import get_strike_by_delta
+        put_data = get_strike_by_delta('SPX', exp_date, POLLER_TARGET_DELTA, option_type='put')
+        call_data = get_strike_by_delta('SPX', exp_date, POLLER_TARGET_DELTA, option_type='call')
+
+        if put_data:
+            result['short_put_strike'] = put_data.get('strike')
+            result['short_put_delta'] = put_data.get('delta')
+            result['short_put_premium'] = put_data.get('mid')
+            result['put_wing_strike'] = (put_data.get('strike') or 0) - POLLER_SPREAD_WIDTH
+
+        if call_data:
+            result['short_call_strike'] = call_data.get('strike')
+            result['short_call_delta'] = call_data.get('delta')
+            result['short_call_premium'] = call_data.get('mid')
+            result['call_wing_strike'] = (call_data.get('strike') or 0) + POLLER_SPREAD_WIDTH
+
+        if result['short_put_premium'] and result['short_call_premium']:
+            total = round(result['short_put_premium'] + result['short_call_premium'], 2)
+            result['total_premium'] = total
+            result['max_loss'] = round(POLLER_SPREAD_WIDTH - total, 2)
+            result['stop_loss_level'] = round(total * POLLER_STOP_MULTIPLIER, 2)
+            result['profit_target_50'] = round(total * 0.50, 2)
+    except Exception as e:
+        result['recommendation_notes'] += f' | Delta strikes unavailable: {str(e)}'
+
+    # 5. Min credit gate check
+    pc = result.get('short_put_premium')
+    cc = result.get('short_call_premium')
+    result['put_spread_credit'] = pc
+    result['call_spread_credit'] = cc
+    if pc is not None and cc is not None:
+        ok = pc >= POLLER_MIN_CREDIT and cc >= POLLER_MIN_CREDIT
+        result['criteria_min_credit_ok'] = int(ok)
+        if not ok:
+            result['recommendation'] = 'SKIP'
+            reason = f'Put credit ${pc:.2f} and/or call credit ${cc:.2f} below ${POLLER_MIN_CREDIT:.2f} minimum'
+            result['skip_reason'] = (result['skip_reason'] + ' | ' + reason) if result['skip_reason'] else reason
+            result['recommendation_notes'] = (result['recommendation_notes'] or '') + ' | ' + reason
+
+    _save_poll_result(result)
+    return result
+
+
+def _polling_loop():
+    import time
+    global _poller_running
+
+    app.logger.info('SPX chain poller started')
+
+    # Immediate poll on start
+    try:
+        result = _execute_single_poll()
+        app.logger.info(f'Initial poll: {result["recommendation"]} — {result["recommendation_notes"]}')
+    except Exception as e:
+        app.logger.error(f'Initial poll failed: {e}')
+
+    while _poller_running:
+        for _ in range(POLLER_INTERVAL_SECONDS):
+            if not _poller_running:
+                break
+            time.sleep(1)
+
+        if not _poller_running:
+            break
+
+        # Time gate (commented out for testing — uncomment for production)
+        # now = datetime.now()
+        # mins = now.hour * 60 + now.minute
+        # start = POLLER_ENTRY_WINDOW_START[0] * 60 + POLLER_ENTRY_WINDOW_START[1]
+        # end = POLLER_ENTRY_WINDOW_END[0] * 60 + POLLER_ENTRY_WINDOW_END[1]
+        # if not (start <= mins <= end):
+        #     app.logger.debug(f'Outside entry window ({now.strftime("%H:%M")}), skipping')
+        #     continue
+
+        try:
+            result = _execute_single_poll()
+            app.logger.info(f'Poll: {result["recommendation"]} — {result["recommendation_notes"]}')
+        except Exception as e:
+            app.logger.error(f'Poll cycle failed: {e}')
+
+    app.logger.info('SPX chain poller stopped')
+
+
+@app.route('/api/poller/spx/start', methods=['POST'])
+def start_spx_poller():
+    global _poller_running, _poller_thread, _poller_session_start
+    if _poller_running:
+        return {'success': False, 'message': 'Poller already running'}
+    _poller_running = True
+    _poller_session_start = datetime.now().isoformat()
+    _poller_thread = threading.Thread(target=_polling_loop, daemon=True)
+    _poller_thread.start()
+    return {'success': True, 'message': 'Poller started', 'started_at': _poller_session_start}
+
+
+@app.route('/api/poller/spx/stop', methods=['POST'])
+def stop_spx_poller():
+    global _poller_running, _poller_session_start
+    _poller_running = False
+    _poller_session_start = None
+    return {'success': True, 'message': 'Poller stopped'}
+
+
+@app.route('/api/poller/spx/status', methods=['GET'])
+def get_spx_poller_status():
+    return {'running': _poller_running, 'started_at': _poller_session_start,
+            'last_poll': _poller_last_result, 'econ_override_active': _econ_override_active}
+
+
+@app.route('/api/poller/spx/latest', methods=['GET'])
+def get_spx_poller_latest():
+    return _poller_last_result or {'message': 'No polls yet today'}
+
+
+@app.route('/api/poller/spx/econ_override', methods=['POST'])
+def set_econ_override():
+    global _econ_override_active
+    data = request.get_json() or {}
+    _econ_override_active = bool(data.get('active', False))
+    return {'econ_override_active': _econ_override_active}
+
+
+@app.route('/api/poller/spx/history', methods=['GET'])
+def get_spx_poller_history():
+    from journal.models import SPXPollResult, get_session
+    session = get_session()
+    try:
+        rows = session.query(SPXPollResult).order_by(
+            SPXPollResult.polled_at.desc()
+        ).limit(20).all()
+        results = [{c.name: getattr(r, c.name) for c in SPXPollResult.__table__.columns} for r in rows]
+        session.close()
+        return {'polls': results, 'count': len(results)}
+    except Exception as e:
+        session.close()
+        return {'error': str(e)}, 500
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# KALSHI TOP MARKETS API
+# ═══════════════════════════════════════════════════════════════════════════
+
+_kalshi_cache = {'data': None, 'expires': 0}
+
+@app.route('/api/kalshi/top-markets', methods=['GET'])
+def kalshi_top_markets():
+    import time, requests as req
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    now = time.time()
+    if _kalshi_cache['data'] and now < _kalshi_cache['expires']:
+        return _kalshi_cache['data']
+
+    KALSHI_BASE = 'https://api.elections.kalshi.com/trade-api/v2'
+
+    try:
+        # Fetch events (up to 200)
+        all_events = []
+        cursor = None
+        for _ in range(2):
+            params = {'limit': 100, 'status': 'open'}
+            if cursor:
+                params['cursor'] = cursor
+            r = req.get(f'{KALSHI_BASE}/events', params=params, timeout=15)
+            r.raise_for_status()
+            data = r.json()
+            all_events.extend(data.get('events', []))
+            cursor = data.get('cursor')
+            if not cursor:
+                break
+
+        # Parallel-fetch top market per event
+        def fetch_market(event):
+            try:
+                r = req.get(f'{KALSHI_BASE}/markets',
+                    params={'limit': 1, 'event_ticker': event.get('event_ticker', ''), 'status': 'open'}, timeout=5)
+                ms = r.json().get('markets', [])
+                for m in ms:
+                    m['_category'] = event.get('category', '')
+                return ms
+            except Exception:
+                return []
+
+        all_markets = []
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            for result in as_completed([executor.submit(fetch_market, e) for e in all_events]):
+                all_markets.extend(result.result())
+
+        all_markets.sort(key=lambda m: float(m.get('volume_fp') or 0), reverse=True)
+
+        markets = []
+        for m in all_markets[:10]:
+            ya = float(m.get('yes_ask_dollars') or 0)
+            na = float(m.get('no_ask_dollars') or 0)
+            ticker = m.get('ticker', '')
+            markets.append({
+                'ticker': ticker,
+                'title': m.get('title', ''),
+                'category': m.get('_category', ''),
+                'yes_ask': ya,
+                'no_ask': na,
+                'volume': int(float(m.get('volume_fp') or 0)),
+                'close_time': m.get('close_time'),
+                'url': f"https://kalshi.com/events/{m.get('event_ticker', ticker)}",
+            })
+
+        result = {'markets': markets, 'fetched_at': datetime.now().isoformat()}
+        _kalshi_cache['data'] = result
+        _kalshi_cache['expires'] = now + 300  # 5 min cache
+        return result
+    except Exception:
+        return {'error': 'Kalshi API unavailable', 'markets': []}
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # SPX OBSERVATION LOG API
