@@ -173,6 +173,7 @@ RESEARCH_DASHBOARD_HTML = """
         
         <div class="nav">
             <a href="/">Pattern Scanner</a>
+            <button onclick="showTab('morning-brief')" id="tab-morning-brief">🌅 Morning Brief</button>
             <button onclick="showTab('signals')" id="tab-signals" class="active">Signal Analysis</button>
             <button onclick="showTab('sector-scan')" id="tab-sector-scan">Sector Scan</button>
             <button onclick="showTab('regime')" id="tab-regime">Regime Classifier</button>
@@ -2203,6 +2204,288 @@ RESEARCH_DASHBOARD_HTML = """
         }
         
         startRiskAutoRefresh();
+    </script>
+
+    <!-- MORNING BRIEF TAB -->
+    <div id="morning-brief-tab" class="tab-content">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2 style="color:#4fc3f7; margin:0;">🌅 Morning Brief</h2>
+            <div>
+                <span id="mb-updated" style="color:#666; font-size:12px;"></span>
+                <button onclick="loadMorningBrief()" style="padding:6px 14px; background:#4fc3f7; color:#1e1e2e; border:none; border-radius:4px; cursor:pointer; font-weight:bold; margin-left:10px;">🔄 Refresh</button>
+            </div>
+        </div>
+        <div id="mb-content">
+            <p style="color:#9e9e9e;">Click the tab to load the morning brief.</p>
+        </div>
+    </div>
+
+    <script>
+    // Morning Brief
+    let mbLoaded = false;
+    const origShowTab = showTab;
+    showTab = function(name) {
+        origShowTab(name);
+        if (name === 'morning-brief' && !mbLoaded) {
+            mbLoaded = true;
+            loadMorningBrief();
+        }
+    };
+
+    function mbScoreBar(score, min, max) {
+        const pct = Math.max(0, Math.min(100, ((score - min) / (max - min)) * 100));
+        const color = score > 0.3 ? '#22c55e' : (score > -0.2 ? '#f59e0b' : '#ef4444');
+        return `<div style="background:#1a1a2e; border-radius:4px; height:8px; margin:8px 0; overflow:hidden;">
+            <div style="width:${pct}%; height:100%; background:${color}; border-radius:4px;"></div>
+        </div>`;
+    }
+
+    function mbColor(val, map) { return map[val] || '#9e9e9e'; }
+
+    async function loadMorningBrief() {
+        const el = document.getElementById('mb-content');
+        el.innerHTML = `<div style="color:#666;">Loading morning brief...</div>`;
+        try {
+            const resp = await fetch('/signals/morning/brief');
+            if (!resp.ok) throw new Error('Failed');
+            const data = await resp.json();
+            if (data.error) throw new Error(data.error);
+            renderMorningBrief(data);
+            const t = new Date(data.generated_at);
+            document.getElementById('mb-updated').textContent = 'Last updated: ' + t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+        } catch(e) {
+            el.innerHTML = `<div style="background:#3b1c1c; border:1px solid #ef4444; border-radius:8px; padding:20px; text-align:center;">
+                <div style="font-size:18px; margin-bottom:10px;">⚠️ Morning Brief unavailable</div>
+                <div style="color:#999; margin-bottom:15px;">${e.message || 'Regime data could not be loaded.'}</div>
+                <button onclick="loadMorningBrief()" style="padding:8px 20px; background:#4fc3f7; color:#1e1e2e; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Retry</button>
+            </div>`;
+        }
+    }
+
+    function renderMorningBrief(data) {
+        const s = data.sections;
+        const el = document.getElementById('mb-content');
+        const tsColors = {CONTANGO:'#22c55e', FLAT:'#9e9e9e', BACKWARDATION:'#ef4444'};
+        const tsIcon = s.vix_regime.term_structure === 'BACKWARDATION' ? '⚠️ ' : '';
+
+        // Section 1 — VIX
+        let html = `<div class="section">
+            <h2>① VIX Regime</h2>
+            <div style="display:flex; gap:40px; flex-wrap:wrap; font-size:16px; margin-bottom:10px;">
+                <div>VIX: <strong>${s.vix_regime.vix ?? '—'}</strong></div>
+                <div>VIX3M: <strong>${s.vix_regime.vix_3m ?? '—'}</strong></div>
+                <div>Term Structure: <strong style="color:${tsColors[s.vix_regime.term_structure] || '#9e9e9e'};">${tsIcon}${s.vix_regime.term_structure}</strong></div>
+            </div>
+            ${mbScoreBar(s.vix_regime.score, -1, 1)}
+            <div style="color:#bbb;">${s.vix_regime.summary}</div>
+        </div>`;
+
+        // Section 2 — Trend
+        const adxOk = s.trend_assessment.adx < s.trend_assessment.adx_threshold;
+        const adxColor = adxOk ? '#22c55e' : '#ef4444';
+        const trendLabel = adxOk ? 'RANGE-BOUND' : 'TRENDING';
+        html += `<div class="section">
+            <h2>② Trend Assessment</h2>
+            <div style="font-size:16px; margin-bottom:10px;">
+                ADX: <strong>${s.trend_assessment.adx}</strong> (threshold: &lt; ${s.trend_assessment.adx_threshold})
+                &nbsp;&nbsp; Assessment: <strong style="color:${adxColor};">${trendLabel}</strong>
+            </div>
+            ${mbScoreBar(s.trend_assessment.score, -1, 1)}
+            <div style="color:#bbb;">${s.trend_assessment.summary}</div>
+            ${!adxOk ? '<div style="background:#3b1c1c; border:1px solid #ef4444; border-radius:6px; padding:10px; margin-top:10px; color:#ef4444;">⛔ Iron condor suspended. Single-side credit spread only (half size).</div>' : ''}
+        </div>`;
+
+        // Section 3 — Vol Edge
+        const veColors = {STRONG:'#22c55e', PRESENT:'#22c55e', THIN:'#f59e0b', ABSENT:'#ef4444'};
+        html += `<div class="section">
+            <h2>③ Volatility Edge</h2>
+            <div style="font-size:16px; margin-bottom:10px;">
+                IV vs RV Spread: <strong>${s.volatility_edge.vol_edge_pct}%</strong>
+                &nbsp;&nbsp; Assessment: <strong style="color:${veColors[s.volatility_edge.value] || '#9e9e9e'};">${s.volatility_edge.value}</strong>
+            </div>
+            ${mbScoreBar(s.volatility_edge.score, -1, 1)}
+            <div style="color:#bbb;">${s.volatility_edge.summary}</div>
+        </div>`;
+
+        // Section 4 — Gap Risk
+        const grColors = {LOW:'#22c55e', ELEVATED:'#f59e0b', HIGH:'#ef4444', UNKNOWN:'#9e9e9e'};
+        const grVal = s.gap_risk.value;
+        const esPct = s.gap_risk.es_change_pct != null ? `${s.gap_risk.es_direction} ${Math.abs(s.gap_risk.es_change_pct).toFixed(2)}%` : '—';
+        html += `<div class="section">
+            <h2>④ Gap Risk</h2>
+            <div style="font-size:16px; margin-bottom:10px;">
+                ES Futures: <strong>${s.gap_risk.es_price ?? '—'}</strong> (${esPct} pre-market)
+                &nbsp;&nbsp; Gap Risk: <strong style="color:${grColors[grVal]};">${grVal}</strong>
+            </div>
+            <div style="color:#bbb;">${s.gap_risk.summary}</div>
+            ${s.gap_risk.gap_risk_override ? '<div style="background:#3b1c1c; border:1px solid #ef4444; border-radius:6px; padding:10px; margin-top:10px; color:#ef4444;">⚠️ Gap Risk Override — Overnight move > 1%. Verdict downgraded from GREEN → YELLOW. Widen strike distances. Trade half size.</div>' : ''}
+        </div>`;
+
+        // Section 5 — Verdict
+        const v = s.verdict;
+        const vColors = {GREEN:{bg:'#1b4332',border:'#22c55e',text:'#22c55e',icon:'✅'},
+                         YELLOW:{bg:'#4a3728',border:'#f59e0b',text:'#f59e0b',icon:'⚠️'},
+                         RED:{bg:'#3b1c1c',border:'#ef4444',text:'#ef4444',icon:'🛑'}};
+        const vc = vColors[v.value] || vColors.RED;
+        const nextLink = v.value === 'RED'
+            ? `<a href="#" onclick="showTab('risk'); return false;" style="color:${vc.text}; font-size:15px;">→ Review open positions</a>`
+            : `<a href="/" style="color:${vc.text}; font-size:15px;">→ Go to Scanner — start the chain poller</a>`;
+        html += `<div style="background:${vc.bg}; border:2px solid ${vc.border}; border-radius:12px; padding:30px; margin-top:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+                <div style="font-size:26px; font-weight:bold; color:${vc.text};">${vc.icon} ${v.value} — ${v.value === 'GREEN' ? 'TRADE AGGRESSIVELY' : (v.value === 'YELLOW' ? 'TRADE CAUTIOUSLY' : 'DO NOT TRADE')}</div>
+                <div style="font-size:18px; color:${vc.text};">Score: ${v.composite_score}/100</div>
+            </div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:6px 20px; margin-top:20px; font-size:15px; color:#ccc;">
+                <div style="color:#999;">Strategy:</div><div>${v.strategy}</div>
+                <div style="color:#999;">Sizing:</div><div>${v.sizing}</div>
+                <div style="color:#999;">Entry:</div><div>${v.entry_window}</div>
+            </div>
+            <div style="color:#bbb; margin-top:15px; font-size:14px;">${v.notes}</div>
+            <div style="margin-top:15px;">${nextLink}</div>
+            <div id="mb-position-status" style="margin-top:10px; color:#888; font-size:13px;">○ No active 0DTE position today</div>
+        </div>`;
+
+        // Fetch position status
+        fetch('/api/poller/spx/proximity').then(r=>r.json()).then(p => {
+            const el = document.getElementById('mb-position-status');
+            if (p.status === 'NO_ACTIVE_POSITION' || p.status === 'ERROR' || p.status === 'NO_DATA') {
+                el.innerHTML = '○ No active 0DTE position today';
+                el.style.color = '#888';
+            } else {
+                const sc = {SAFE:'#22c55e', WARNING:'#f59e0b', CRITICAL:'#ef4444'};
+                el.innerHTML = `● Active position — $${p.short_put_strike} / $${p.short_call_strike} — <span style="color:${sc[p.status] || '#888'};">${p.status}</span> (Put: ${p.put_buffer}pts | Call: ${p.call_buffer}pts)`;
+                el.style.color = '#ccc';
+            }
+        }).catch(()=>{});
+
+        // Section 6 — Strike Probability Panel
+        const sp = data.strike_probability;
+        if (sp) {
+            html += `<div class="section" style="margin-top:20px;">
+                <h2>⑥ Strike Probability Panel</h2>
+                <div style="color:#999; margin-bottom:10px;">SPX: ${sp.spx_price} | VIX: ${sp.vix} | Daily IV: ${sp.daily_iv_pct}%</div>
+                <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:20px;">
+                    <tr style="color:#9e9e9e; border-bottom:1px solid #3a3a52;"><th style="text-align:left;padding:8px;">Delta</th><th style="text-align:right;padding:8px;">Put Strike</th><th style="text-align:right;padding:8px;">Call Strike</th><th style="text-align:right;padding:8px;">Prob OTM</th><th style="text-align:left;padding:8px;">Status</th></tr>`;
+            sp.delta_map.forEach(r => {
+                const bg = r.is_current_target ? 'background:#4a3728;' : '';
+                const grey = r.pop < 80 ? 'opacity:0.4;' : '';
+                const status = r.is_current_target ? '<strong style="color:#f59e0b;">← Current target</strong>'
+                    : (r.pop >= 85 ? '✅' : (r.pop >= 80 ? '⚠️ minimum' : '❌ below 80%'));
+                html += `<tr style="${bg}${grey} border-bottom:1px solid #2a2a3e;">
+                    <td style="padding:6px 8px; color:#ccc;${r.is_current_target ? 'font-weight:bold;' : ''}">${r.delta.toFixed(2)}</td>
+                    <td style="padding:6px 8px; text-align:right; color:#ef4444;">$${Number(r.put_strike).toLocaleString()}</td>
+                    <td style="padding:6px 8px; text-align:right; color:#22c55e;">$${Number(r.call_strike).toLocaleString()}</td>
+                    <td style="padding:6px 8px; text-align:right; color:#ccc; font-weight:bold;">${r.pop}%</td>
+                    <td style="padding:6px 8px;">${status}</td>
+                </tr>`;
+            });
+            html += `</table><div style="color:#666; font-size:12px; margin-bottom:20px;">Platform minimum: 80% PoP (delta ≤ 0.20)</div>`;
+
+            // SD Bands
+            html += `<h3 style="color:#4fc3f7; margin-bottom:10px;">Standard Deviation Bands</h3>`;
+            const bands = sp.sd_bands;
+            // Visual bar
+            const b2 = bands['2_sigma'], b15 = bands['1_5_sigma'], b1 = bands['1_sigma'];
+            html += `<div style="position:relative; height:50px; background:#1a1a2e; border-radius:6px; margin-bottom:15px; overflow:hidden;">
+                <div style="position:absolute; left:5%; right:5%; top:5px; bottom:5px; background:#3b1c1c33; border:1px solid #ef444444; border-radius:4px;"></div>
+                <div style="position:absolute; left:15%; right:15%; top:8px; bottom:8px; background:#4a372844; border:1px solid #f59e0b44; border-radius:4px;"></div>
+                <div style="position:absolute; left:25%; right:25%; top:11px; bottom:11px; background:#1b433244; border:1px solid #22c55e44; border-radius:4px;"></div>
+                <div style="position:absolute; left:50%; top:0; bottom:0; width:2px; background:#4fc3f7; transform:translateX(-1px);"></div>
+                <div style="position:absolute; left:50%; bottom:2px; transform:translateX(-50%); color:#4fc3f7; font-size:10px;">ATM</div>
+            </div>`;
+            [{k:'1_sigma',c:'#22c55e',l:'1σ'},{k:'1_5_sigma',c:'#f59e0b',l:'1.5σ'},{k:'2_sigma',c:'#ef4444',l:'2σ'}].forEach(b => {
+                const d = bands[b.k];
+                html += `<div style="padding:4px 0; color:#ccc; font-size:13px;"><span style="color:${b.c}; font-weight:bold; display:inline-block; width:40px;">${b.l}</span> ±$${d.move.toFixed(2)} → $${d.lower.toFixed(2)} – $${d.upper.toFixed(2)} <span style="color:#888;">${d.pct} of sessions</span></div>`;
+            });
+            if (sp.straddle_range) {
+                const sr = sp.straddle_range;
+                html += `<div style="padding:4px 0; color:#4fc3f7; font-size:13px; font-weight:bold;">Straddle ±$${sr.move.toFixed(2)} → $${sr.lower.toFixed(2)} – $${sr.upper.toFixed(2)} <span style="color:#888; font-weight:normal;">Most accurate 0DTE range</span></div>`;
+            }
+
+            // Historical win rates
+            const hw = sp.historical_win_rates;
+            if (hw) {
+                html += `<div style="margin-top:20px; background:#1a1a2e; padding:15px; border-radius:8px;">`;
+                if (hw.status === 'ready') {
+                    const wrColor = hw.win_rate_pct >= 80 ? '#22c55e' : '#f59e0b';
+                    const wrIcon = hw.win_rate_pct >= 80 ? '✅ Above 80% threshold' : '⚠️ Below 80% threshold — review strike selection';
+                    const winPct = hw.total_traded > 0 ? Math.round(hw.wins / hw.total_traded * 100) : 0;
+                    const lossPct = 100 - winPct;
+                    html += `<div style="color:${wrColor}; font-weight:bold; margin-bottom:8px;">📊 Historical Win Rate: ${hw.win_rate_pct}% (${hw.total_traded} trades) — ${wrIcon}</div>
+                        <div style="margin-bottom:6px;"><span style="color:#22c55e;">Wins</span> <div style="display:inline-block; width:200px; height:10px; background:#2a2a3e; border-radius:5px; vertical-align:middle;"><div style="width:${winPct}%; height:100%; background:#22c55e; border-radius:5px;"></div></div> ${winPct}%</div>
+                        <div style="margin-bottom:10px;"><span style="color:#ef4444;">Loss</span> <div style="display:inline-block; width:200px; height:10px; background:#2a2a3e; border-radius:5px; vertical-align:middle;"><div style="width:${lossPct}%; height:100%; background:#ef4444; border-radius:5px;"></div></div> ${lossPct}%</div>`;
+                } else {
+                    const pct = Math.min(100, ((hw.total_traded || 0) / hw.required) * 100);
+                    html += `<div style="color:#4fc3f7; font-weight:bold; margin-bottom:8px;">📊 Historical Win Rates — Accumulating baseline</div>
+                        <div style="background:#2a2a3e; height:12px; border-radius:6px; overflow:hidden; margin-bottom:8px;">
+                            <div style="width:${pct}%; height:100%; background:#4fc3f7; border-radius:6px;"></div>
+                        </div>
+                        <div style="color:#888; font-size:13px; margin-bottom:8px;">${hw.message}</div>`;
+                }
+                if (hw.breakdown) {
+                    const bd = hw.breakdown;
+                    html += `<div style="color:#888; font-size:12px;">✅ Expired worthless: ${bd.expired_worthless} · ✅ Closed 50%: ${bd.closed_50pct} · ❌ Stopped out: ${bd.stopped_out} · ⬜ Closed manually: ${bd.closed_manually}</div>`;
+                }
+                html += `</div>`;
+            }
+            html += `</div>`;
+        }
+
+        // Section 7 — Trade Plan
+        html += `<div class="section" style="margin-top:20px;"><h2>📋 Trade Plan</h2>`;
+
+        // Sub-section A: Key Levels
+        const kl = data.key_levels;
+        if (kl && kl.status === 'ok' && kl.levels && kl.levels.length > 0) {
+            html += `<h3 style="color:#4fc3f7; margin-bottom:10px;">Key SPX Levels</h3>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:20px;">`;
+            const borderColors = {resistance:'#ef4444', support:'#22c55e', pivot:'#4fc3f7', psychological:'#a78bfa'};
+            kl.levels.forEach(lv => {
+                const bc = borderColors[lv.type] || '#666';
+                const arrow = lv.position === 'above' ? '↑' : '↓';
+                html += `<div style="background:#1a1a2e; padding:15px; border-radius:8px; border-left:4px solid ${bc};">
+                    <div style="color:#999; font-size:12px; margin-bottom:4px;">${lv.label}</div>
+                    <div style="font-size:20px; font-weight:bold; color:#fff;">$${Number(lv.price).toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                    <div style="color:${bc}; font-size:13px; margin-top:4px;">${arrow} ${lv.distance_pts}pts ${lv.position} (${lv.distance_pct}%)</div>
+                    <div style="color:#888; font-size:12px; margin-top:6px;">${lv.context}</div>
+                </div>`;
+            });
+            html += `</div>`;
+        } else {
+            html += `<div style="background:#1a1a2e; padding:15px; border-radius:8px; color:#999; margin-bottom:20px;">⚠️ Key levels unavailable — market data could not be loaded</div>`;
+        }
+
+        // Sub-section B: Scenario Playbook
+        const pb = data.playbook;
+        if (pb) {
+            html += `<h3 style="color:#4fc3f7; margin-bottom:10px;">Scenario Playbook</h3>`;
+            if (pb.adx_note) {
+                html += `<div style="background:#4a3728; border:1px solid #f59e0b; border-radius:6px; padding:10px; margin-bottom:12px; color:#f59e0b; font-size:13px;">${pb.adx_note}</div>`;
+            }
+            const scenColors = {bull:'#22c55e', bear:'#ef4444', neutral:'#666'};
+            html += `<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; margin-bottom:15px;">`;
+            ['bull','bear','neutral'].forEach(key => {
+                const sc = pb.scenarios[key];
+                const bc = scenColors[key];
+                html += `<div style="background:#1a1a2e; padding:15px; border-radius:8px; border-left:4px solid ${bc};">
+                    <div style="font-size:16px; font-weight:bold; color:${bc}; margin-bottom:8px;">${sc.label}</div>
+                    <div style="color:#999; font-size:12px; margin-bottom:4px;">Trigger: ${sc.trigger}</div>
+                    <div style="color:#ccc; font-size:12px; margin-bottom:8px;">Risk: ${sc.spread_risk}</div>
+                    <div style="color:#bbb; font-size:13px;">${sc.action}</div>
+                </div>`;
+            });
+            html += `</div>`;
+            const emStr = pb.expected_move ? `±$${Number(pb.expected_move).toFixed(0)}pts` : '—';
+            let strikeLine = 'Strikes will appear here after first ENTER recommendation';
+            if (pb.put_strike_ref && pb.call_strike_ref) {
+                strikeLine = `Short put $${Number(pb.put_strike_ref).toLocaleString()} / Short call $${Number(pb.call_strike_ref).toLocaleString()}`;
+            }
+            html += `<div style="color:#999; font-size:13px;">Expected move today: ${emStr} · ${strikeLine}</div>`;
+        }
+        html += `</div>`;
+
+        el.innerHTML = html;
+    }
     </script>
 </body>
 </html>

@@ -2704,46 +2704,6 @@ def home():
             </form>
         </div>
 
-        <!-- 0DTE OBSERVATION LOG CARD -->
-        <div id="observation-card" style="margin: 30px 0; background: #1e1e2e; border-radius: 12px; overflow: hidden;">
-            <!-- Card Header (always visible) -->
-            <div style="padding: 15px 20px; background: #16213e; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleObservationCard()">
-                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                    <span style="font-size: 18px; font-weight: 600;">📅 0DTE Morning Observation Log</span>
-                    <span id="obs-today-date" style="color: #9e9e9e; font-size: 14px;"></span>
-                    <span id="obs-regime-badge" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold;"></span>
-                    <span id="obs-count" style="color: #9e9e9e; font-size: 14px;"></span>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <button id="obs-log-today-btn" onclick="event.stopPropagation(); openObservationForm()" style="padding: 6px 12px; background: #4fc3f7; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;">+ Log Today</button>
-                    <span id="obs-expand-icon" style="font-size: 20px;">▼</span>
-                </div>
-            </div>
-            
-            <!-- Card Body (collapsible) -->
-            <div id="observation-card-body" style="display: none; padding: 20px;">
-                <div id="obs-prefill-container"></div>
-                
-                <!-- History Table -->
-                <div style="background: #16213e; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3 style="margin-top: 0; color: #4fc3f7;">Observation History</h3>
-                        <button onclick="clearAllObservations()" style="padding: 6px 12px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">🗑️ Clear All</button>
-                    </div>
-                    <div id="obs-history-table" style="overflow-x: auto;"></div>
-                </div>
-                
-                <!-- Progress Bar -->
-                <div style="background: #16213e; padding: 20px; border-radius: 8px;">
-                    <h4 style="margin-top: 0; color: #9e9e9e;">Observation Baseline Progress</h4>
-                    <div style="background: #0f0f23; height: 30px; border-radius: 15px; overflow: hidden; margin-bottom: 10px;">
-                        <div id="obs-progress-bar" style="height: 100%; background: #22c55e; width: 0%; transition: width 0.3s;"></div>
-                    </div>
-                    <p id="obs-progress-text" style="margin: 0; color: #9e9e9e; font-size: 14px;"></p>
-                </div>
-            </div>
-        </div>
-
         <!-- SPX 0DTE CHAIN POLLER CARD -->
         <div id="poller-card" style="margin: 30px 0; background: #1e1e2e; border-radius: 12px; overflow: hidden;">
             <div style="padding: 15px 20px; background: #16213e; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="togglePollerCard()">
@@ -2752,6 +2712,7 @@ def home():
                     <span id="poller-status-badge" style="font-size: 14px;">○ STOPPED</span>
                     <span id="poller-last-time" style="color: #9e9e9e; font-size: 14px;"></span>
                     <span id="poller-poll-count" style="color: #9e9e9e; font-size: 14px;"></span>
+                    <span id="poller-proximity-badge" style="font-size: 14px;"></span>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <button onclick="event.stopPropagation(); startPoller()" id="poller-start-btn" style="padding: 6px 12px; background: #22c55e; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;">▶ Start</button>
@@ -2760,6 +2721,22 @@ def home():
                 </div>
             </div>
             <div id="poller-card-body" style="display: none; padding: 20px;">
+                <div id="poller-settings" style="margin-bottom: 15px;">
+                    <div style="cursor:pointer; color:#9e9e9e; font-size:14px;" onclick="document.getElementById('poller-settings-body').style.display = document.getElementById('poller-settings-body').style.display === 'none' ? 'block' : 'none';">⚙️ Poller Settings ▾</div>
+                    <div id="poller-settings-body" style="display:none; background:#16213e; padding:15px; border-radius:8px; margin-top:8px;">
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+                            <label style="color:#ccc; font-size:13px;">Account Size (0DTE allocation): $</label>
+                            <input type="number" id="poller-account-size" placeholder="10000" style="width:120px; padding:6px; background:#1a1a2e; color:#fff; border:1px solid #4fc3f7; border-radius:4px;">
+                            <label style="color:#ccc; font-size:13px; margin-left:15px;">Risk:</label>
+                            <label style="color:#ccc; font-size:13px;"><input type="radio" name="poller-risk" value="2" style="margin-right:3px;">2%</label>
+                            <label style="color:#ccc; font-size:13px;"><input type="radio" name="poller-risk" value="3" style="margin-right:3px;">3%</label>
+                            <label style="color:#ccc; font-size:13px;"><input type="radio" name="poller-risk" value="5" checked style="margin-right:3px;">5%</label>
+                            <button onclick="savePollerSettings()" style="padding:4px 12px; background:#4fc3f7; color:#000; border:none; border-radius:4px; cursor:pointer; font-size:12px;">Save</button>
+                        </div>
+                        <div id="poller-sizing-preview" style="color:#999; font-size:13px;"></div>
+                    </div>
+                </div>
+                <div id="poller-proximity-alert" style="margin-bottom: 15px;"></div>
                 <div id="poller-econ-override" style="margin-bottom: 15px;"></div>
                 <div id="poller-recommendation" style="margin-bottom: 20px;"></div>
                 <div id="poller-criteria" style="margin-bottom: 20px;"></div>
@@ -2807,368 +2784,7 @@ def home():
     </div>
     
     <script>
-    // 0DTE Observation Log JavaScript v2
-    let currentObservationId = null;
-    
-    async function loadRegimeSummaryForCard() {
-        try {
-            const resp = await fetch('/signals/regime/analysis');
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            const data = await resp.json();
-            const badge = document.getElementById('obs-regime-badge');
-            if (!badge) return;
-            const verdict = data.verdict || 'UNKNOWN';
-            const colors = {GREEN: '#22c55e', YELLOW: '#f59e0b', RED: '#ef4444', UNKNOWN: '#9e9e9e'};
-            badge.style.background = colors[verdict];
-            badge.style.color = verdict === 'YELLOW' ? '#000' : '#fff';
-            badge.textContent = '● ' + verdict;
-        } catch (e) {
-            console.error('loadRegimeSummaryForCard error:', e);
-            const badge = document.getElementById('obs-regime-badge');
-            if (badge) badge.textContent = '● ERROR';
-        }
-    }
-    
-    function toggleObservationCard() {
-        const body = document.getElementById('observation-card-body');
-        const icon = document.getElementById('obs-expand-icon');
-        if (body.style.display === 'none') {
-            body.style.display = 'block';
-            icon.textContent = '▲';
-            loadPrefillData();
-        } else {
-            body.style.display = 'none';
-            icon.textContent = '▼';
-        }
-    }
-    
-    function openObservationForm() {
-        const body = document.getElementById('observation-card-body');
-        if (body) {
-            body.style.display = 'block';
-            document.getElementById('obs-expand-icon').textContent = '▲';
-            body.scrollIntoView({behavior: 'smooth', block: 'center'});
-            loadPrefillData();
-        }
-    }
-    
-    let currentPrefillData = null;
-    
-    async function loadPrefillData() {
-        const container = document.getElementById('obs-prefill-container');
-        container.innerHTML = '<p style="text-align: center; color: #9e9e9e;">⏳ Fetching live market data...</p>';
-        
-        try {
-            const resp = await fetch('/api/observations/spx/prefill');
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            currentPrefillData = await resp.json();
-            renderPrefillData(currentPrefillData);
-        } catch (e) {
-            container.innerHTML = `<p style="color: #ef4444;">❌ Error loading data: ${e.message}</p>`;
-        }
-    }
-    
-    function renderPrefillData(data) {
-        const html = `
-            <div style="background: #16213e; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h4 style="margin: 0;">📊 Live Market Snapshot</h4>
-                    <button onclick="loadPrefillData()" style="padding: 4px 8px; background: #667eea; border: none; border-radius: 4px; cursor: pointer; color: #fff; font-size: 12px;">🔄 Refresh</button>
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; font-size: 14px;">
-                    <div><strong>SPX:</strong> $${data.spx_price || 'N/A'}</div>
-                    <div><strong>VIX:</strong> ${data.vix || 'N/A'}</div>
-                    <div><strong>Expiry:</strong> ${data.target_expiry || 'N/A'} (${data.dte}DTE)</div>
-                    <div><strong>ATM Strike:</strong> ${data.atm_strike || 'N/A'}</div>
-                    <div><strong>Straddle:</strong> $${data.atm_straddle_price || 'N/A'}</div>
-                    <div><strong>Vol Edge:</strong> ${data.vol_edge ? (data.vol_edge * 100).toFixed(1) + '%' : 'N/A'}</div>
-                </div>
-                ${(() => {
-                    const hasPut = data.short_put_strike && data.short_put_premium;
-                    const hasCall = data.short_call_strike && data.short_call_premium;
-                    if (hasPut && hasCall) {
-                        return `<div style="margin-top: 15px; padding: 10px; background: #1e1e2e; border-radius: 6px;">
-                            <strong>💡 Suggested Iron Condor:</strong><br>
-                            Put: ${data.short_put_strike} ($${data.short_put_premium}) | Call: ${data.short_call_strike} ($${data.short_call_premium})<br>
-                            Width: ${data.spread_width} | Total Premium: $${data.est_total_premium}
-                        </div>`;
-                    } else if (hasPut) {
-                        return `<div style="margin-top: 15px; padding: 10px; background: #1e1e2e; border-radius: 6px;">
-                            <strong>💡 Single-leg only: Put spread at ${data.short_put_strike} for $${data.short_put_premium}</strong><br>
-                            <span style="color: #f59e0b;">Call leg unavailable — insufficient liquidity or strike too far OTM</span>
-                        </div>`;
-                    } else if (hasCall) {
-                        return `<div style="margin-top: 15px; padding: 10px; background: #1e1e2e; border-radius: 6px;">
-                            <strong>💡 Single-leg only: Call spread at ${data.short_call_strike} for $${data.short_call_premium}</strong><br>
-                            <span style="color: #f59e0b;">Put leg unavailable — insufficient liquidity or strike too far OTM</span>
-                        </div>`;
-                    } else {
-                        return '<p style="color: #f59e0b; margin-top: 10px;">⚠️ Insufficient liquidity for iron condor — widen strikes or check chain</p>';
-                    }
-                })()}
-            </div>
-            
-            <div style="background: #16213e; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                <h4 style="margin: 0 0 10px 0;">🤔 Your Judgment</h4>
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">Would you trade this setup?</label>
-                    <div style="display: flex; gap: 10px;">
-                        <button onclick="selectWouldTrade('yes')" id="btn-yes" style="flex: 1; padding: 10px; background: #2e2e3e; border: 2px solid #4fc3f7; border-radius: 6px; cursor: pointer; color: #fff; font-weight: bold;">✅ Yes</button>
-                        <button onclick="selectWouldTrade('no')" id="btn-no" style="flex: 1; padding: 10px; background: #2e2e3e; border: 2px solid #4fc3f7; border-radius: 6px; cursor: pointer; color: #fff; font-weight: bold;">❌ No</button>
-                        <button onclick="selectWouldTrade('maybe')" id="btn-maybe" style="flex: 1; padding: 10px; background: #2e2e3e; border: 2px solid #4fc3f7; border-radius: 6px; cursor: pointer; color: #fff; font-weight: bold;">🤷 Maybe</button>
-                    </div>
-                </div>
-                
-                <div id="strategy-section" style="display: none; margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">Strategy:</label>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button onclick="selectStrategy('iron_condor')" class="strategy-btn" data-strategy="iron_condor" style="padding: 8px 12px; background: #2e2e3e; border: 2px solid #667eea; border-radius: 6px; cursor: pointer; color: #fff;">Iron Condor</button>
-                        <button onclick="selectStrategy('put_spread')" class="strategy-btn" data-strategy="put_spread" style="padding: 8px 12px; background: #2e2e3e; border: 2px solid #667eea; border-radius: 6px; cursor: pointer; color: #fff;">Put Spread</button>
-                        <button onclick="selectStrategy('call_spread')" class="strategy-btn" data-strategy="call_spread" style="padding: 8px 12px; background: #2e2e3e; border: 2px solid #667eea; border-radius: 6px; cursor: pointer; color: #fff;">Call Spread</button>
-                    </div>
-                </div>
-                
-                <div>
-                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">Notes:</label>
-                    <textarea id="obs-notes" rows="3" style="width: 100%; background: #2e2e3e; border: 1px solid #667eea; border-radius: 6px; padding: 8px; color: #fff; font-family: inherit;"></textarea>
-                </div>
-                
-                <button onclick="saveObservationWithPrefill()" style="margin-top: 15px; padding: 10px 20px; background: #4fc3f7; color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%;">💾 Save Observation</button>
-            </div>
-        `;
-        document.getElementById('obs-prefill-container').innerHTML = html;
-        
-        // Auto-select strategy from regime recommendation
-        if (data.recommended_strategy) {
-            const stratMap = {'iron condor': 'iron_condor', 'iron_condors': 'iron_condor', 'put spread': 'put_spread', 'put_spreads': 'put_spread', 'call spread': 'call_spread', 'call_spreads': 'call_spread'};
-            const key = (data.recommended_strategy || '').toLowerCase();
-            const mapped = stratMap[key] || Object.keys(stratMap).find(k => key.includes(k)) ? stratMap[Object.keys(stratMap).find(k => key.includes(k))] : null;
-            if (mapped) selectStrategy(mapped);
-        }
-    }
-    
-    let selectedWouldTrade = null;
-    let selectedStrategy = null;
-    
-    function selectWouldTrade(choice) {
-        selectedWouldTrade = choice;
-        ['btn-yes', 'btn-no', 'btn-maybe'].forEach(id => {
-            const btn = document.getElementById(id);
-            btn.style.background = id === `btn-${choice}` ? '#4fc3f7' : '#2e2e3e';
-            btn.style.color = id === `btn-${choice}` ? '#000' : '#fff';
-        });
-        document.getElementById('strategy-section').style.display = (choice === 'yes' || choice === 'maybe') ? 'block' : 'none';
-    }
-    
-    function selectStrategy(strategy) {
-        selectedStrategy = strategy;
-        document.querySelectorAll('.strategy-btn').forEach(btn => {
-            const match = btn.dataset.strategy === strategy;
-            btn.style.background = match ? '#667eea' : '#2e2e3e';
-            btn.style.color = match ? '#fff' : '#fff';
-        });
-    }
-    
-    async function saveObservationWithPrefill() {
-        if (!currentPrefillData) {
-            alert('No market data loaded');
-            return;
-        }
-        if (!selectedWouldTrade) {
-            alert('Please select: Would you trade?');
-            return;
-        }
-        
-        const payload = {
-            spx_price_945: currentPrefillData.spx_price,
-            vix_945: currentPrefillData.vix,
-            atm_strike: currentPrefillData.atm_strike,
-            atm_straddle_price: currentPrefillData.atm_straddle_price,
-            would_trade: selectedWouldTrade,
-            strategy: selectedStrategy,
-            short_put_strike: currentPrefillData.short_put_strike,
-            short_call_strike: currentPrefillData.short_call_strike,
-            spread_width: currentPrefillData.spread_width,
-            premium_collected: currentPrefillData.est_total_premium,
-            notes: document.getElementById('obs-notes').value || null
-        };
-        
-        try {
-            const resp = await fetch('/api/observations/spx', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            });
-            const data = await resp.json();
-            if (data.success) {
-                alert('✅ Observation saved!');
-                currentObservationId = data.id;
-                loadObservationHistory();
-                loadObservationProgress();
-                loadObservationCount();
-                document.getElementById('observation-card-body').style.display = 'none';
-                document.getElementById('obs-expand-icon').textContent = '▼';
-            } else {
-                alert('Error: ' + (data.error || 'Unknown error'));
-            }
-        } catch (e) {
-            alert('Error saving: ' + e.message);
-        }
-    }
-    
-    
-    function showOutcomeFields() {
-        document.getElementById('obs-outcome-fields').style.display = 'block';
-    }
-    
-    async function saveOutcome() {
-        if (!currentObservationId) {
-            alert('No observation to update');
-            return;
-        }
-        
-        const payload = {
-            spx_close: parseFloat(document.getElementById('obs-spx-close').value) || null,
-            outcome: document.getElementById('obs-outcome').value || null,
-            outcome_pnl: parseFloat(document.getElementById('obs-pnl').value) || null,
-            max_adverse_move: parseFloat(document.getElementById('obs-max-move').value) || null
-        };
-        
-        try {
-            const resp = await fetch(`/api/observations/spx/${currentObservationId}`, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            });
-            const data = await resp.json();
-            if (data.success) {
-                alert('Outcome saved ✅');
-                loadObservationHistory();
-            } else {
-                alert('Error: ' + (data.error || 'Unknown error'));
-            }
-        } catch (e) {
-            alert('Error saving outcome: ' + e.message);
-        }
-    }
-    
-    async function loadObservationHistory(limit = 10) {
-        try {
-            const resp = await fetch('/api/observations/spx');
-            const data = await resp.json();
-            const observations = data.observations || [];
-            
-            if (observations.length === 0) {
-                document.getElementById('obs-history-table').innerHTML = '<p style="color: #9e9e9e; text-align: center; padding: 20px;">No observations yet. Start logging to build your baseline.</p>';
-                return;
-            }
-            
-            let html = '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
-            html += '<thead><tr style="background: #0f0f23;"><th style="padding: 10px; text-align: left;">Date</th><th>Regime</th><th>VIX</th><th>Straddle</th><th>Strategy</th><th>Premium</th><th>Traded?</th><th>Notes</th><th></th></tr></thead><tbody>';
-            
-            observations.slice(0, limit).forEach((obs, idx) => {
-                const tradedColors = {yes: '#22c55e', no: '#ef4444', maybe: '#f59e0b'};
-                const tradedColor = tradedColors[obs.would_trade] || '#9e9e9e';
-                const tradedLabel = {yes: '✅ Yes', no: '❌ No', maybe: '🤷 Maybe'}[obs.would_trade] || '-';
-                const notesId = `obs-notes-${idx}`;
-                const notesText = obs.notes || '-';
-                html += `<tr style="border-bottom: 1px solid #333;">
-                    <td style="padding: 10px;">${obs.date}</td>
-                    <td style="text-align: center;">${obs.regime_verdict || '-'}</td>
-                    <td style="text-align: center;">${obs.vix_945 || '-'}</td>
-                    <td style="text-align: center;">${obs.atm_straddle_price || '-'}</td>
-                    <td style="text-align: center;">${obs.strategy || '-'}</td>
-                    <td style="text-align: center;">${obs.premium_collected || '-'}</td>
-                    <td style="text-align: center; color: ${tradedColor}; font-weight: bold;">${tradedLabel}</td>
-                    <td style="max-width: 250px; cursor: pointer;" onclick="var el=document.getElementById('${notesId}'); el.style.whiteSpace = el.style.whiteSpace === 'normal' ? 'nowrap' : 'normal';"><div id="${notesId}" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${notesText}</div></td>
-                    <td style="text-align: center;"><button onclick="deleteObservation(${obs.id})" style="background: none; border: none; cursor: pointer; color: #ef4444; font-size: 16px;" title="Delete">✕</button></td>
-                </tr>`;
-            });
-            
-            html += '</tbody></table>';
-            if (observations.length > limit) {
-                html += `<p style="text-align: center; margin-top: 10px;"><a href="#" onclick="loadObservationHistory(999); return false;" style="color: #4fc3f7;">Show all (${observations.length})</a></p>`;
-            }
-            
-            document.getElementById('obs-history-table').innerHTML = html;
-        } catch (e) {
-            console.error('Error loading history:', e);
-        }
-    }
-    
-    async function loadObservationProgress() {
-        try {
-            const resp = await fetch('/api/observations/spx/summary');
-            const data = await resp.json();
-            const count = data.total_observations || 0;
-            const target = 20;
-            const pct = Math.min(100, (count / target) * 100);
-            
-            document.getElementById('obs-progress-bar').style.width = pct + '%';
-            
-            if (count >= target) {
-                document.getElementById('obs-progress-text').innerHTML = `✅ Baseline complete — ready to build the SPX Chain Poller (${count} observations)`;
-            } else {
-                document.getElementById('obs-progress-text').innerHTML = `${count} / ${target} observations — Once you reach 20, the 0DTE SPX Chain Poller will be ready to build.`;
-            }
-        } catch (e) {
-            console.error('Error loading progress:', e);
-        }
-    }
-    
-    async function deleteObservation(id) {
-        if (!confirm('Delete this observation?')) return;
-        try {
-            const resp = await fetch(`/api/observations/spx/${id}`, {method: 'DELETE'});
-            const data = await resp.json();
-            if (data.success) { loadObservationHistory(); loadObservationProgress(); loadObservationCount(); }
-            else alert('Error: ' + (data.error || 'Unknown'));
-        } catch (e) { alert('Error: ' + e.message); }
-    }
-    
-    async function clearAllObservations() {
-        if (!confirm('Delete ALL observations? This cannot be undone.')) return;
-        try {
-            const resp = await fetch('/api/observations/spx/all', {method: 'DELETE'});
-            const data = await resp.json();
-            if (data.success) { loadObservationHistory(); loadObservationProgress(); loadObservationCount(); }
-            else alert('Error: ' + (data.error || 'Unknown'));
-        } catch (e) { alert('Error: ' + e.message); }
-    }
-    
-    async function checkTodayObservation() {
-        try {
-            const resp = await fetch('/api/observations/spx/today');
-            const data = await resp.json();
-            if (data.observation) {
-                currentObservationId = data.observation.id;
-                document.getElementById('obs-log-today-btn').textContent = '✏️ Edit Today';
-            }
-        } catch (e) {
-            console.error('Error checking today:', e);
-        }
-    }
-    
-    async function loadObservationCount() {
-        try {
-            const resp = await fetch('/api/observations/spx/summary');
-            const data = await resp.json();
-            document.getElementById('obs-count').textContent = `Observations: ${data.total_observations || 0} total`;
-        } catch (e) {
-            document.getElementById('obs-count').textContent = 'Observations: 0 total';
-        }
-    }
-    
-    // Initialize on page load
     document.addEventListener('DOMContentLoaded', () => {
-        const today = new Date().toLocaleDateString('en-US', {month: 'numeric', day: 'numeric', year: 'numeric'});
-        document.getElementById('obs-today-date').textContent = `Today: ${today}`;
-        
-        loadRegimeSummaryForCard();
-        loadObservationHistory();
-        loadObservationProgress();
-        loadObservationCount();
-        checkTodayObservation();
         refreshPollerStatus();
     });
 
@@ -3247,11 +2863,14 @@ def home():
             startBtn.style.display = 'none';
             stopBtn.style.display = 'inline-block';
             startPollerStatusUpdates();
+            if (data.last_poll && data.last_poll.recommendation === 'ENTER') startProximityPolling();
+            else stopProximityPolling();
         } else {
             badge.innerHTML = '<span style="color:#666;">○</span> STOPPED';
             startBtn.style.display = 'inline-block';
             stopBtn.style.display = 'none';
             stopPollerStatusUpdates();
+            stopProximityPolling();
         }
 
         // Econ override toggle
@@ -3325,6 +2944,19 @@ def home():
             const cf = cc != null ? '$' + Number(cc).toFixed(2) : '?';
             html += `<div style="padding:6px 0; border-bottom:1px solid #2a2a3e; color:${color};">${icon} <strong>Min Credit:</strong> Put ${pf} / Call ${cf} — needs ≥ $0.50 each</div>`;
         }
+        // Put skew row
+        const sk = poll.skew_status;
+        const skOk = poll.criteria_skew_ok;
+        if (sk === null || sk === undefined || sk === 'UNKNOWN') {
+            html += `<div style="padding:6px 0; border-bottom:1px solid #2a2a3e; color:#9e9e9e;">⚠️ <strong>Put Skew:</strong> ${poll.skew_status === 'UNKNOWN' ? 'VVIX unavailable — no adjustment' : 'Data unavailable'}</div>`;
+        } else {
+            const skColors = {NORMAL:'#22c55e', ELEVATED:'#f59e0b', STEEP:'#ef4444'};
+            const skIcons = {NORMAL:'✅', ELEVATED:'⚠️', STEEP:'❌'};
+            const skC = skColors[sk] || '#9e9e9e';
+            const ratio = poll.vix_vvix_ratio != null ? ` (VIX/VVIX=${Number(poll.vix_vvix_ratio).toFixed(3)})` : '';
+            const adj = poll.put_width_adjustment > 0 ? ` — put wing widened +${poll.put_width_adjustment}pts` : '';
+            html += `<div style="padding:6px 0; border-bottom:1px solid #2a2a3e; color:${skC};">${skIcons[sk]||'⚠️'} <strong>Put Skew:</strong> ${sk}${ratio}${adj}</div>`;
+        }
         html += '</div>';
         el.innerHTML = html;
     }
@@ -3372,6 +3004,8 @@ def home():
                     <div>Straddle: $${fmt(poll.straddle_price)}</div>
                     <div>Spread Width: ${poll.spread_width || 5} pts</div>
                 </div>
+                ${poll.skew_status === 'ELEVATED' && poll.put_width_adjustment > 0 ? `<div style="background:#4a3728; border:1px solid #f59e0b; border-radius:6px; padding:10px; margin-top:12px; color:#f59e0b; font-size:13px;">⚠️ Put skew elevated — put wing widened by ${poll.put_width_adjustment} points. Long put: $${fmt(poll.put_wing_strike)}</div>` : ''}
+                ${renderPositionSizing(poll)}
             </div>`;
     }
 
@@ -3389,19 +3023,40 @@ def home():
             }
             const rows = data.polls;
             let html = '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
-            html += '<tr style="color:#9e9e9e; border-bottom:1px solid #2a2a3e;"><th style="text-align:left; padding:8px;">Time</th><th style="text-align:left; padding:8px;">Rec</th><th style="text-align:right; padding:8px;">ADX</th><th style="text-align:right; padding:8px;">Vol Edge</th><th style="text-align:left; padding:8px;">Notes</th></tr>';
+            html += '<tr style="color:#9e9e9e; border-bottom:1px solid #2a2a3e;"><th style="text-align:left; padding:8px;">Time</th><th style="text-align:left; padding:8px;">Rec</th><th style="text-align:right; padding:8px;">ADX</th><th style="text-align:right; padding:8px;">Vol Edge</th><th style="text-align:center; padding:8px;">Prox</th><th style="text-align:left; padding:8px;">Outcome</th><th style="text-align:left; padding:8px;">Notes</th></tr>';
             const badgeColors = {ENTER:'#22c55e', WAIT:'#f59e0b', SKIP:'#ef4444'};
+            const proxIcons = {SAFE:'<span style="color:#22c55e;">●</span>', WARNING:'<span style="color:#f59e0b;">⚠️</span>', CRITICAL:'<span style="color:#ef4444;">⛔</span>'};
+            const outcomeBadges = {expired_worthless:'<span style="background:#22c55e; color:#000; padding:1px 6px; border-radius:3px; font-size:11px;">Expired ✓</span>',
+                closed_50pct:'<span style="background:#22c55e; color:#000; padding:1px 6px; border-radius:3px; font-size:11px;">50% ✓</span>',
+                stopped_out:'<span style="background:#ef4444; color:#fff; padding:1px 6px; border-radius:3px; font-size:11px;">Stopped ✗</span>',
+                closed_manually:'<span style="background:#666; color:#fff; padding:1px 6px; border-radius:3px; font-size:11px;">Closed</span>'};
             rows.forEach(r => {
                 const t = new Date(r.polled_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
                 const bc = badgeColors[r.recommendation] || '#888';
                 const adx = r.adx != null ? Number(r.adx).toFixed(1) : '—';
                 const ve = r.vol_edge != null ? (r.vol_edge * 100).toFixed(1) + '%' : '—';
-                const notes = (r.recommendation_notes || '').substring(0, 80);
+                const prox = proxIcons[r.proximity_status] || '<span style="color:#666;">—</span>';
+                const notes = (r.recommendation_notes || '').substring(0, 60);
+                let outcomeCell = '—';
+                if (r.recommendation === 'ENTER') {
+                    if (r.outcome) {
+                        outcomeCell = `${outcomeBadges[r.outcome] || r.outcome} <span onclick="editOutcome(${r.id})" style="cursor:pointer;" title="Edit">✏️</span>`;
+                    } else if (r.traded === 0 && r.outcome_recorded_at) {
+                        outcomeCell = '<span style="color:#666;">Not traded</span>';
+                    } else {
+                        outcomeCell = `<span id="oc-${r.id}">` +
+                            `<button onclick="markNotTraded(${r.id})" style="padding:1px 6px; background:#2a2a3e; color:#999; border:1px solid #444; border-radius:3px; cursor:pointer; font-size:11px; margin-right:4px;">Skip</button>` +
+                            `<button onclick="showOutcomeForm(${r.id})" style="padding:1px 6px; background:#1b4332; color:#22c55e; border:1px solid #22c55e; border-radius:3px; cursor:pointer; font-size:11px;">Traded</button>` +
+                            `</span>`;
+                    }
+                }
                 html += `<tr style="border-bottom:1px solid #1a1a2e;">
                     <td style="padding:6px 8px; color:#ccc;">${t}</td>
                     <td style="padding:6px 8px;"><span style="background:${bc}; color:#000; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;">${r.recommendation}</span></td>
                     <td style="padding:6px 8px; text-align:right; color:#ccc;">${adx}</td>
                     <td style="padding:6px 8px; text-align:right; color:#ccc;">${ve}</td>
+                    <td style="padding:6px 8px; text-align:center;">${prox}</td>
+                    <td style="padding:6px 8px;">${outcomeCell}</td>
                     <td style="padding:6px 8px; color:#999; font-size:12px;">${notes}</td>
                 </tr>`;
             });
@@ -3417,6 +3072,165 @@ def home():
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
     }
+
+    // ═══════════════════════════════════════════════════════
+    // Position Sizing + Proximity
+    // ═══════════════════════════════════════════════════════
+    function getPollerSettings() {
+        return {
+            accountSize: parseFloat(localStorage.getItem('poller_account_size')) || 0,
+            riskPct: parseFloat(localStorage.getItem('poller_risk_pct')) || 5
+        };
+    }
+
+    function savePollerSettings() {
+        const sz = parseFloat(document.getElementById('poller-account-size').value) || 0;
+        const riskEl = document.querySelector('input[name="poller-risk"]:checked');
+        const risk = riskEl ? parseFloat(riskEl.value) : 5;
+        localStorage.setItem('poller_account_size', sz);
+        localStorage.setItem('poller_risk_pct', risk);
+        updateSizingPreview();
+        showPollerToast('✅ Settings saved');
+    }
+
+    function computePositionSize(accountSize, riskPct, spreadWidth) {
+        const mlpc = (spreadWidth || 5) * 100;
+        const maxRisk = accountSize * (riskPct / 100);
+        const contracts = Math.max(1, Math.floor(maxRisk / mlpc));
+        return { contracts, maxLossPerContract: mlpc, maxTotalRisk: Math.round(maxRisk), actualMaxLoss: contracts * mlpc, actualRiskPct: ((contracts * mlpc) / accountSize * 100).toFixed(1) };
+    }
+
+    function updateSizingPreview() {
+        const el = document.getElementById('poller-sizing-preview');
+        const sz = parseFloat(document.getElementById('poller-account-size').value) || parseFloat(localStorage.getItem('poller_account_size')) || 0;
+        if (!sz) { el.innerHTML = '<span style="color:#666;">Enter account size to see preview.</span>'; return; }
+        let html = '';
+        [2,3,5].forEach(r => {
+            const p = computePositionSize(sz, r, 5);
+            html += `<div>At ${r}%: Max loss $${p.maxTotalRisk.toLocaleString()} → <strong>${p.contracts}</strong> contract${p.contracts>1?'s':''} ($${p.actualMaxLoss.toLocaleString()} actual)</div>`;
+        });
+        el.innerHTML = html;
+    }
+
+    function loadPollerSettings() {
+        const s = getPollerSettings();
+        if (s.accountSize) document.getElementById('poller-account-size').value = s.accountSize;
+        const radios = document.querySelectorAll('input[name="poller-risk"]');
+        radios.forEach(r => { r.checked = parseFloat(r.value) === s.riskPct; });
+        updateSizingPreview();
+    }
+
+    function renderPositionSizing(poll) {
+        const s = getPollerSettings();
+        if (!s.accountSize) return '<div style="color:#888; font-size:13px; margin-top:12px;">⚙️ Set account size in Settings above to enable position sizing</div>';
+        const p = computePositionSize(s.accountSize, s.riskPct, poll.spread_width || 5);
+        const totalPrem = poll.total_premium ? (poll.total_premium * p.contracts * 100).toFixed(0) : '—';
+        return `<div style="border-top:2px solid #4fc3f7; margin-top:15px; padding-top:12px;">
+            <div style="color:#4fc3f7; font-weight:bold; margin-bottom:8px;">Position Sizing (${s.riskPct}% risk rule)</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; color:#ccc;">
+                <div>Account allocation: $${s.accountSize.toLocaleString()}</div>
+                <div>Max risk (${s.riskPct}%): $${p.maxTotalRisk.toLocaleString()}</div>
+                <div>Spread max loss: $${p.maxLossPerContract} per contract</div>
+                <div style="color:#4fc3f7; font-weight:bold; font-size:16px;">TRADE SIZE: ${p.contracts} contract${p.contracts>1?'s':''}</div>
+                <div>Max loss if stopped: $${p.actualMaxLoss.toLocaleString()}</div>
+                <div>Premium collected: $${totalPrem} (${p.contracts} contracts)</div>
+            </div>
+        </div>`;
+    }
+
+    // Proximity polling
+    let proximityInterval = null;
+
+    function startProximityPolling() {
+        stopProximityPolling();
+        proximityInterval = setInterval(checkProximity, 60000);
+        checkProximity();
+    }
+
+    function stopProximityPolling() {
+        if (proximityInterval) { clearInterval(proximityInterval); proximityInterval = null; }
+    }
+
+    async function checkProximity() {
+        try {
+            const resp = await fetch('/api/poller/spx/proximity');
+            const data = await resp.json();
+            renderProximityBadge(data);
+            renderProximityAlert(data);
+            if (data.status === 'CRITICAL' && Notification.permission === 'granted') {
+                new Notification('⛔ SPX Strike Breach', {body: data.alert_message || 'Short strike breached — consider closing.'});
+            }
+        } catch(e) {}
+    }
+
+    function renderProximityBadge(data) {
+        const el = document.getElementById('poller-proximity-badge');
+        if (!data || data.status === 'NO_ACTIVE_POSITION' || data.status === 'ERROR' || data.status === 'NO_DATA') {
+            el.innerHTML = '';
+            return;
+        }
+        const styles = {
+            SAFE: 'color:#22c55e;', WARNING: 'color:#f59e0b; animation:pulse 1.5s infinite;', CRITICAL: 'color:#ef4444; animation:pulse 1s infinite;'
+        };
+        const icons = {SAFE: '✅ Safe', WARNING: '⚠️ Warning', CRITICAL: '⛔ Critical'};
+        el.innerHTML = `<span style="${styles[data.status] || ''} font-size:13px;" title="Put: ${data.put_buffer}pts | Call: ${data.call_buffer}pts">${icons[data.status] || ''}</span>`;
+    }
+
+    function renderProximityAlert(data) {
+        const el = document.getElementById('poller-proximity-alert');
+        if (!data || data.status === 'SAFE' || data.status === 'NO_ACTIVE_POSITION' || data.status === 'ERROR' || data.status === 'NO_DATA') {
+            el.innerHTML = '';
+            return;
+        }
+        const bg = data.status === 'CRITICAL' ? '#3b1c1c' : '#4a3728';
+        const border = data.status === 'CRITICAL' ? '#ef4444' : '#f59e0b';
+        el.innerHTML = `<div style="background:${bg}; border:1px solid ${border}; border-radius:8px; padding:15px;">
+            <div style="font-size:16px; font-weight:bold; color:${border}; margin-bottom:8px;">${data.status === 'CRITICAL' ? '⛔ SPX HAS BREACHED SHORT STRIKE' : '⚠️ SPX APPROACHING SHORT STRIKE'}</div>
+            <div style="color:#ccc; font-size:13px;">Put buffer: ${data.put_buffer}pts | Call buffer: ${data.call_buffer}pts</div>
+            <div style="color:#ccc; font-size:13px;">SPX: $${data.spx_price} | Short put: $${data.short_put_strike} | Short call: $${data.short_call_strike}</div>
+            ${data.status === 'CRITICAL' ? '<div style="color:#ef4444; font-weight:bold; margin-top:8px;">Rule: Close the position now.</div>' : '<div style="color:#f59e0b; margin-top:8px;">Consider closing if movement continues.</div>'}
+        </div>`;
+    }
+
+    // Override startPoller to request notification permission
+    const _origStartPoller = startPoller;
+    startPoller = async function() {
+        if (Notification.permission === 'default') Notification.requestPermission();
+        await _origStartPoller();
+    };
+
+    async function markNotTraded(pollId) {
+        const resp = await fetch('/api/poller/spx/outcome', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({poll_id:pollId, traded:false})});
+        const d = await resp.json();
+        if (d.success) { showPollerToast('Saved ✓'); loadPollerHistory(); }
+    }
+
+    function showOutcomeForm(pollId) {
+        const el = document.getElementById('oc-' + pollId);
+        if (!el) return;
+        el.innerHTML = `<select id="oc-sel-${pollId}" style="padding:2px; background:#1a1a2e; color:#ccc; border:1px solid #444; border-radius:3px; font-size:11px;">
+            <option value="">Select…</option><option value="expired_worthless">Expired worthless</option><option value="closed_50pct">Closed at 50%</option>
+            <option value="stopped_out">Stopped out</option><option value="closed_manually">Closed manually</option></select>
+            <input id="oc-note-${pollId}" placeholder="Notes" style="width:60px; padding:2px; background:#1a1a2e; color:#ccc; border:1px solid #444; border-radius:3px; font-size:11px; margin-left:3px;">
+            <button onclick="saveOutcome(${pollId})" style="padding:1px 6px; background:#4fc3f7; color:#000; border:none; border-radius:3px; cursor:pointer; font-size:11px; margin-left:3px;">Save</button>`;
+    }
+
+    function editOutcome(pollId) { showOutcomeForm(pollId); }
+
+    async function saveOutcome(pollId) {
+        const outcome = document.getElementById('oc-sel-' + pollId)?.value;
+        const notes = document.getElementById('oc-note-' + pollId)?.value || '';
+        if (!outcome) { showPollerToast('Select an outcome'); return; }
+        const resp = await fetch('/api/poller/spx/outcome', {method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({poll_id:pollId, traded:true, outcome, outcome_notes:notes})});
+        const d = await resp.json();
+        if (d.success) {
+            showPollerToast(`Saved ✓ Win rate: ${d.win_rate_update.win_rate_pct}%`);
+            loadPollerHistory();
+        } else { showPollerToast(d.error || 'Error saving'); }
+    }
+
+    loadPollerSettings();
 
     // ═══════════════════════════════════════════════════════
     // Kalshi Top 10 Markets JavaScript
@@ -4529,6 +4343,7 @@ def chart(symbol):
         <html>
         <head>
             <title>{{ symbol }} - {{ company.name }} | Pattern Analysis</title>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
             <style>
                 body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; background: #1a1a2e; color: #eee; }
                 h1, h2, h3 { color: #00d4ff; }
@@ -4645,7 +4460,13 @@ def chart(symbol):
             </div>
             
             <!-- Chart -->
-            <img src="data:image/png;base64,{{ chart }}" alt="{{ symbol }} Chart">
+            {% if chart %}
+            <img src="data:image/png;base64,{{ chart }}" alt="{{ symbol }} Chart" onerror="this.style.display='none'">
+            {% else %}
+            <div style="background:#16213e; padding:20px; border-radius:10px; text-align:center; color:#888; margin:20px 0;">
+                ⚠️ Static chart unavailable — use the ATR Model chart below
+            </div>
+            {% endif %}
             
             <div class="chart-legend">
                 <div class="legend-item"><div class="legend-color" style="background: cyan;"></div> Price</div>
@@ -4668,6 +4489,39 @@ def chart(symbol):
                 <div class="legend-item"><div class="legend-color" style="background: magenta;"></div> Ascending Triangle</div>
                 <div class="legend-item"><div class="legend-color" style="background: #ff9800;"></div> Bull Flag</div>
                 <div class="legend-item"><div class="legend-color" style="background: #00ff00; height: 3px;"></div> Buy Point</div>
+            </div>
+
+            <!-- ATR Model Chart -->
+            <div style="margin: 25px 0;">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
+                    <h3 style="margin: 0;">📊 ATR Model</h3>
+                    <div style="display: flex; gap: 4px;">
+                        <button onclick="loadATRChart('day')" id="atr-btn-day" style="padding: 5px 14px; border-radius: 20px; border: none; cursor: pointer; font-size: 12px; font-weight: bold; background: #6366f1; color: #fff;">1D</button>
+                        <button onclick="loadATRChart('week')" id="atr-btn-week" style="padding: 5px 14px; border-radius: 20px; border: none; cursor: pointer; font-size: 12px; font-weight: bold; background: #2a2a3e; color: #9e9e9e;">1W</button>
+                        <button onclick="loadATRChart('month')" id="atr-btn-month" style="padding: 5px 14px; border-radius: 20px; border: none; cursor: pointer; font-size: 12px; font-weight: bold; background: #2a2a3e; color: #9e9e9e;">1M</button>
+                    </div>
+                    <div style="display: flex; gap: 4px;">
+                        <button onclick="setChartType('candle')" id="atr-btn-candle" style="padding: 5px 14px; border-radius: 20px; border: none; cursor: pointer; font-size: 12px; font-weight: bold; background: #2a2a3e; color: #9e9e9e;">Candle</button>
+                        <button onclick="setChartType('line')" id="atr-btn-line" style="padding: 5px 14px; border-radius: 20px; border: none; cursor: pointer; font-size: 12px; font-weight: bold; background: #6366f1; color: #fff;">Line</button>
+                    </div>
+                    <label style="display:flex; align-items:center; gap:5px; cursor:pointer; font-size:12px; color:#9e9e9e;">
+                        <input type="checkbox" id="atr-show-signals" checked onchange="toggleSignals(this.checked)" style="cursor:pointer;"> Show Signals
+                    </label>
+                    <div style="display: flex; gap: 15px; font-size: 11px; color: #888;">
+                        <span><span style="color:rgba(239,68,68,0.8);">──</span> ATR Upper</span>
+                        <span><span style="color:rgba(34,197,94,0.8);">──</span> ATR Lower</span>
+                        <span><span style="color:rgba(251,191,36,0.8);">──</span> EMA 20</span>
+                        <span><span style="color:rgba(147,51,234,0.8);">──</span> EMA 50</span>
+                        <span><span style="color:rgba(34,197,94,0.3);">▓</span> Trend Cloud</span>
+                        <span><span style="color:#22c55e;">▲</span> Buy</span>
+                        <span><span style="color:#ef4444;">▼</span> Sell</span>
+                    </div>
+                </div>
+                <div id="atr-loading" style="display:none; text-align:center; padding:40px; color:#666;">Loading...</div>
+                <div style="background: #0f0f23; border-radius: 10px; padding: 15px;">
+                    <div style="position:relative; height:280px;"><canvas id="atr-price-chart"></canvas></div>
+                    <div style="position:relative; height:120px; margin-top:5px;"><canvas id="atr-atr-chart"></canvas></div>
+                </div>
             </div>
 
             <!-- Track Stock Form -->
@@ -5320,6 +5174,161 @@ def chart(symbol):
                     showStatus('Error: ' + e.message, true);
                 }
             }
+
+        // ATR Model Chart
+        const atrSymbol = '{{ symbol }}';
+        let atrPriceChart = null, atrATRChart = null;
+        let chartData = null, currentChartType = 'line', currentTF = 'day';
+        let showSignals = true;
+
+        async function loadATRChart(tf) {
+            currentTF = tf;
+            ['day','week','month'].forEach(t => {
+                const btn = document.getElementById('atr-btn-' + t);
+                btn.style.background = t === tf ? '#6366f1' : '#2a2a3e';
+                btn.style.color = t === tf ? '#fff' : '#9e9e9e';
+            });
+            document.getElementById('atr-loading').style.display = 'block';
+            try {
+                const resp = await fetch(`/api/chart_data/${atrSymbol}?timeframe=${tf}`);
+                chartData = await resp.json();
+                if (chartData.error) throw new Error(chartData.error);
+                renderCharts(chartData, currentChartType);
+            } catch(e) {
+                document.getElementById('atr-loading').textContent = 'Error: ' + e.message;
+            }
+        }
+
+        function setChartType(type) {
+            currentChartType = type;
+            ['candle','line'].forEach(t => {
+                const btn = document.getElementById('atr-btn-' + t);
+                btn.style.background = t === type ? '#6366f1' : '#2a2a3e';
+                btn.style.color = t === type ? '#fff' : '#9e9e9e';
+            });
+            if (chartData) renderCharts(chartData, type);
+        }
+
+        function toggleSignals(on) {
+            showSignals = on;
+            if (chartData) renderCharts(chartData, currentChartType);
+        }
+
+        function renderCharts(d, chartType) {
+            document.getElementById('atr-loading').style.display = 'none';
+            if (atrPriceChart) atrPriceChart.destroy();
+            if (atrATRChart) atrATRChart.destroy();
+
+            const labels = d.dates;
+            const ind = d.indicators;
+            const close = d.ohlcv.close;
+            const catX = { type: 'category', ticks: { color: '#666', maxTicksLimit: 12, font: {size: 10} }, grid: { color: '#1a1a2e' } };
+
+            const datasets = [];
+
+            // Custom candlestick plugin — draws OHLC candles directly on canvas
+            const candlePlugin = {
+                id: 'candlestick',
+                afterDatasetsDraw(chart) {
+                    if (chartType !== 'candle') return;
+                    const ctx = chart.ctx;
+                    const xAxis = chart.scales.x;
+                    const yAxis = chart.scales.y;
+                    const ohlcv = d.ohlcv;
+                    const barCount = labels.length;
+                    const barWidth = Math.max(1, Math.min(8, (xAxis.width / barCount) * 0.6));
+
+                    for (let i = 0; i < barCount; i++) {
+                        const o = ohlcv.open[i], h = ohlcv.high[i], l = ohlcv.low[i], c = ohlcv.close[i];
+                        if (o == null || h == null || l == null || c == null) continue;
+
+                        const x = xAxis.getPixelForValue(i);
+                        const yO = yAxis.getPixelForValue(o);
+                        const yH = yAxis.getPixelForValue(h);
+                        const yL = yAxis.getPixelForValue(l);
+                        const yC = yAxis.getPixelForValue(c);
+                        const bull = c >= o;
+                        const color = bull ? '#22c55e' : '#ef4444';
+
+                        // Wick (thin line from high to low)
+                        ctx.beginPath();
+                        ctx.strokeStyle = color;
+                        ctx.lineWidth = 1;
+                        ctx.moveTo(x, yH);
+                        ctx.lineTo(x, yL);
+                        ctx.stroke();
+
+                        // Body (filled rect from open to close)
+                        const bodyTop = Math.min(yO, yC);
+                        const bodyHeight = Math.max(1, Math.abs(yO - yC));
+                        ctx.fillStyle = color;
+                        ctx.fillRect(x - barWidth / 2, bodyTop, barWidth, bodyHeight);
+                    }
+                }
+            };
+
+            if (chartType === 'candle') {
+                // Hidden close line just to set y-axis scale correctly
+                datasets.push({ label: 'Close', data: close, borderColor: 'transparent', borderWidth: 0, pointRadius: 0 });
+                // Also need high/low for y-axis range
+                datasets.push({ label: '_high', data: d.ohlcv.high, borderColor: 'transparent', borderWidth: 0, pointRadius: 0 });
+                datasets.push({ label: '_low', data: d.ohlcv.low, borderColor: 'transparent', borderWidth: 0, pointRadius: 0 });
+            } else {
+                datasets.push({ label: 'Close', data: close, borderColor: 'rgba(0,212,255,0.9)', borderWidth: 1.5, pointRadius: 0, tension: 0 });
+            }
+
+            // Overlays
+            datasets.push({ label: 'ATR Upper', data: ind.atr_upper, borderColor: 'rgba(239,68,68,0.6)', borderWidth: 1, borderDash: [4,3], pointRadius: 0 });
+            datasets.push({ label: 'ATR Lower', data: ind.atr_lower, borderColor: 'rgba(34,197,94,0.6)', borderWidth: 1, borderDash: [4,3], pointRadius: 0 });
+            datasets.push({ label: 'EMA 20', data: ind.ema20, borderColor: 'rgba(251,191,36,0.8)', borderWidth: 1, pointRadius: 0 });
+            datasets.push({ label: 'EMA 50', data: ind.ema50, borderColor: 'rgba(147,51,234,0.8)', borderWidth: 1, pointRadius: 0, fill: '-1',
+                backgroundColor: labels.map((_, i) => ind.trend_state[i] === 'bull' ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)') });
+
+            // Buy/sell signals
+            if (showSignals && ind.buy_signals) {
+                datasets.push({
+                    label: 'Buy', data: ind.buy_signals, borderColor: '#22c55e', backgroundColor: '#22c55e',
+                    pointRadius: ind.buy_signals.map(v => v != null ? 6 : 0), pointStyle: 'triangle', showLine: false, borderWidth: 0
+                });
+                datasets.push({
+                    label: 'Sell', data: ind.sell_signals, borderColor: '#ef4444', backgroundColor: '#ef4444',
+                    pointRadius: ind.sell_signals.map(v => v != null ? 6 : 0), pointStyle: 'triangle', pointRotation: 180, showLine: false, borderWidth: 0
+                });
+            }
+
+            atrPriceChart = new Chart(document.getElementById('atr-price-chart'), {
+                type: 'line',
+                data: { labels: labels, datasets: datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: catX,
+                        y: { position: 'right', ticks: { color: '#888', font: {size: 10} }, grid: { color: '#1a1a2e33' },
+                             title: { display: true, text: 'Price ($)', color: '#666', font: {size: 10} } }
+                    }
+                },
+                plugins: [candlePlugin]
+            });
+
+            atrATRChart = new Chart(document.getElementById('atr-atr-chart'), {
+                type: 'line',
+                data: { labels: labels, datasets: [{ label: 'ATR', data: ind.atr, borderColor: 'rgba(99,102,241,0.8)', backgroundColor: 'rgba(99,102,241,0.15)', borderWidth: 1.5, pointRadius: 0, fill: true }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: catX,
+                        y: { position: 'right', ticks: { color: '#888', font: {size: 10} }, grid: { color: '#1a1a2e33' },
+                             title: { display: true, text: 'ATR', color: '#666', font: {size: 10} } }
+                    }
+                }
+            });
+        }
+
+        loadATRChart('day');
         </script>
         </body>
         </html>
@@ -5677,6 +5686,86 @@ def api_orders():
     except Exception as e:
         return {'error': str(e)}, 500
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ATR CHART DATA API
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route('/api/chart_data/<symbol>')
+def api_chart_data(symbol):
+    import yfinance as yf
+    import math
+
+    tf = request.args.get('timeframe', 'day')
+    params = {'day': ('6mo', '1d'), 'week': ('2y', '1wk'), 'month': ('5y', '1mo')}.get(tf, ('6mo', '1d'))
+    df = yf.Ticker(symbol).history(period=params[0], interval=params[1])
+    if df.empty:
+        return {'error': 'symbol not found'}, 400
+
+    close = df['Close']
+    high, low = df['High'], df['Low']
+    prev_close = close.shift(1)
+    tr = pd.concat([high - low, (high - prev_close).abs(), (low - prev_close).abs()], axis=1).max(axis=1)
+    atr = tr.ewm(alpha=1/14, adjust=False).mean()
+
+    # Supertrend with proper band tracking
+    hl2 = (high + low) / 2
+    basic_upper = hl2 + 3.0 * atr
+    basic_lower = hl2 - 3.0 * atr
+    final_upper = basic_upper.copy()
+    final_lower = basic_lower.copy()
+    trend = ['bull'] * len(df)
+    for i in range(1, len(df)):
+        # Tighten bands
+        if basic_lower.iloc[i] > final_lower.iloc[i-1] or close.iloc[i-1] < final_lower.iloc[i-1]:
+            final_lower.iloc[i] = basic_lower.iloc[i]
+        else:
+            final_lower.iloc[i] = final_lower.iloc[i-1]
+        if basic_upper.iloc[i] < final_upper.iloc[i-1] or close.iloc[i-1] > final_upper.iloc[i-1]:
+            final_upper.iloc[i] = basic_upper.iloc[i]
+        else:
+            final_upper.iloc[i] = final_upper.iloc[i-1]
+        # Determine trend
+        prev = trend[i-1]
+        if prev == 'bull':
+            trend[i] = 'bear' if close.iloc[i] < final_lower.iloc[i] else 'bull'
+        else:
+            trend[i] = 'bull' if close.iloc[i] > final_upper.iloc[i] else 'bear'
+
+    ema20 = close.ewm(span=20).mean()
+    ema50 = close.ewm(span=50).mean()
+
+    # Buy/sell signals: trend state changes
+    buy_signals = [None] * len(df)
+    sell_signals = [None] * len(df)
+    for i in range(1, len(df)):
+        if trend[i] == 'bull' and trend[i-1] == 'bear':
+            buy_signals[i] = float(low.iloc[i])
+        elif trend[i] == 'bear' and trend[i-1] == 'bull':
+            sell_signals[i] = float(high.iloc[i])
+
+    def to_list(s):
+        return [None if (v is None or (isinstance(v, float) and (np.isnan(v) or np.isinf(v)))) else round(v, 4) for v in s]
+
+    return {
+        'symbol': symbol.upper(), 'timeframe': tf,
+        'dates': [d.strftime('%Y-%m-%d') for d in df.index],
+        'ohlcv': {
+            'open': to_list(df['Open']), 'high': to_list(high),
+            'low': to_list(low), 'close': to_list(close), 'volume': to_list(df['Volume'])
+        },
+        'indicators': {
+            'atr': to_list(atr),
+            'atr_upper': to_list(close + 2.0 * atr),
+            'atr_lower': to_list(close - 2.0 * atr),
+            'ema20': to_list(ema20), 'ema50': to_list(ema50),
+            'trend_state': trend,
+            'buy_signals': to_list(buy_signals),
+            'sell_signals': to_list(sell_signals)
+        }
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # SPX 0DTE CHAIN POLLER
 # ═══════════════════════════════════════════════════════════════════════════
@@ -5757,6 +5846,52 @@ def _evaluate_spx_entry_criteria(regime, spx_price):
     }
 
 
+POLLER_ALERT_POINTS = 15  # alert within 15pts of short strike
+
+
+def _check_strike_proximity(spx_price, short_put_strike, short_call_strike):
+    put_buf = round(spx_price - short_put_strike, 2)
+    call_buf = round(short_call_strike - spx_price, 2)
+    p_alert = put_buf <= POLLER_ALERT_POINTS
+    c_alert = call_buf <= POLLER_ALERT_POINTS
+    p_breach = put_buf <= 0
+    c_breach = call_buf <= 0
+    if p_breach or c_breach:
+        side = 'PUT' if p_breach else 'CALL'
+        return {'put_buffer': put_buf, 'call_buffer': call_buf, 'put_alert': p_alert, 'call_alert': c_alert,
+                'status': 'CRITICAL', 'alert_message': f'⛔ CRITICAL: SPX breached short {side}. Put buf: {put_buf:.1f}pts | Call buf: {call_buf:.1f}pts'}
+    if p_alert or c_alert:
+        sides = []
+        if p_alert: sides.append(f'put ({put_buf:.1f}pts)')
+        if c_alert: sides.append(f'call ({call_buf:.1f}pts)')
+        return {'put_buffer': put_buf, 'call_buffer': call_buf, 'put_alert': p_alert, 'call_alert': c_alert,
+                'status': 'WARNING', 'alert_message': f'⚠️ WARNING: SPX approaching {" and ".join(sides)}. Monitor closely.'}
+    return {'put_buffer': put_buf, 'call_buffer': call_buf, 'put_alert': False, 'call_alert': False,
+            'status': 'SAFE', 'alert_message': f'✅ SAFE: Put buf {put_buf:.1f}pts | Call buf {call_buf:.1f}pts'}
+
+
+def _get_put_skew_assessment(vix):
+    try:
+        import yfinance as yf
+        vvix_hist = yf.Ticker('^VVIX').history(period='2d')
+        if vvix_hist.empty:
+            raise ValueError("VVIX unavailable")
+        vvix = round(float(vvix_hist['Close'].iloc[-1]), 2)
+        ratio = round(vix / vvix, 4)
+        if ratio > 0.35:
+            return {'skew_status': 'NORMAL', 'vvix': vvix, 'ratio': ratio, 'put_width_adjustment': 0,
+                    'criteria_skew_ok': True, 'note': f'Put skew normal (VIX/VVIX={ratio:.3f}). No strike adjustment needed.'}
+        elif ratio >= 0.28:
+            return {'skew_status': 'ELEVATED', 'vvix': vvix, 'ratio': ratio, 'put_width_adjustment': 5,
+                    'criteria_skew_ok': True, 'note': f'Put skew elevated (VIX/VVIX={ratio:.3f}). Widen put wing by 5 points.'}
+        else:
+            return {'skew_status': 'STEEP', 'vvix': vvix, 'ratio': ratio, 'put_width_adjustment': 10,
+                    'criteria_skew_ok': False, 'note': f'Put skew steep (VIX/VVIX={ratio:.3f}). Widen put wing by 10pts or skip put side.'}
+    except Exception as e:
+        return {'skew_status': 'UNKNOWN', 'vvix': None, 'ratio': None, 'put_width_adjustment': 0,
+                'criteria_skew_ok': True, 'note': f'VVIX unavailable — skew assessment skipped ({str(e)})'}
+
+
 def _save_poll_result(result):
     global _poller_last_result
     _poller_last_result = result
@@ -5800,6 +5935,10 @@ def _execute_single_poll():
         'expected_move_low': None, 'expected_move_high': None,
         'criteria_min_credit_ok': None, 'put_spread_credit': None,
         'call_spread_credit': None, 'profit_target_50': None,
+        'skew_status': None, 'vvix': None, 'vix_vvix_ratio': None,
+        'put_width_adjustment': 0, 'criteria_skew_ok': None,
+        'proximity_status': None, 'put_buffer': None, 'call_buffer': None,
+        'put_alert': None, 'call_alert': None, 'proximity_message': None,
     }
 
     # 1. Get regime from cache
@@ -5909,6 +6048,34 @@ def _execute_single_poll():
             result['skip_reason'] = (result['skip_reason'] + ' | ' + reason) if result['skip_reason'] else reason
             result['recommendation_notes'] = (result['recommendation_notes'] or '') + ' | ' + reason
 
+    # 6. Put skew assessment
+    skew = _get_put_skew_assessment(result.get('vix') or 20)
+    result['skew_status'] = skew['skew_status']
+    result['vvix'] = skew['vvix']
+    result['vix_vvix_ratio'] = skew['ratio']
+    result['put_width_adjustment'] = skew['put_width_adjustment']
+    result['criteria_skew_ok'] = int(skew['criteria_skew_ok'])
+    if not skew['criteria_skew_ok']:
+        result['recommendation'] = 'SKIP'
+        reason = skew['note']
+        result['skip_reason'] = (result['skip_reason'] + ' | ' + reason) if result['skip_reason'] else reason
+        result['recommendation_notes'] = (result['recommendation_notes'] or '') + ' | ' + reason
+    elif skew['put_width_adjustment'] > 0 and result.get('put_wing_strike'):
+        result['put_wing_strike'] = result['put_wing_strike'] - skew['put_width_adjustment']
+
+    # 7. Strike proximity check
+    sp = result.get('short_put_strike')
+    sc = result.get('short_call_strike')
+    spx = result.get('spx_price')
+    if sp and sc and spx:
+        prox = _check_strike_proximity(spx, sp, sc)
+        result['proximity_status'] = prox['status']
+        result['put_buffer'] = prox['put_buffer']
+        result['call_buffer'] = prox['call_buffer']
+        result['put_alert'] = int(prox['put_alert'])
+        result['call_alert'] = int(prox['call_alert'])
+        result['proximity_message'] = prox['alert_message']
+
     _save_poll_result(result)
     return result
 
@@ -5992,6 +6159,37 @@ def set_econ_override():
     return {'econ_override_active': _econ_override_active}
 
 
+@app.route('/api/poller/spx/proximity', methods=['GET'])
+def get_spx_proximity():
+    from journal.models import SPXPollResult, get_session
+    from datetime import date
+    import yfinance as yf
+    today = date.today().strftime('%Y-%m-%d')
+    session = get_session()
+    try:
+        row = session.query(SPXPollResult).filter(
+            SPXPollResult.date == today, SPXPollResult.recommendation == 'ENTER',
+            SPXPollResult.short_put_strike.isnot(None)
+        ).order_by(SPXPollResult.polled_at.desc()).first()
+        session.close()
+        if not row:
+            return {'status': 'NO_ACTIVE_POSITION', 'message': 'No ENTER recommendation today — proximity inactive'}
+        spx = yf.Ticker('^GSPC')
+        hist = spx.history(period='1d', interval='1m')
+        spx_price = float(hist['Close'].iloc[-1]) if not hist.empty else None
+        if not spx_price:
+            return {'status': 'NO_DATA', 'message': 'SPX price unavailable'}
+        prox = _check_strike_proximity(spx_price, row.short_put_strike, row.short_call_strike)
+        prox['spx_price'] = round(spx_price, 2)
+        prox['short_put_strike'] = row.short_put_strike
+        prox['short_call_strike'] = row.short_call_strike
+        prox['timestamp'] = datetime.now().isoformat()
+        return prox
+    except Exception as e:
+        session.close()
+        return {'status': 'ERROR', 'message': str(e)}
+
+
 @app.route('/api/poller/spx/history', methods=['GET'])
 def get_spx_poller_history():
     from journal.models import SPXPollResult, get_session
@@ -6006,6 +6204,41 @@ def get_spx_poller_history():
     except Exception as e:
         session.close()
         return {'error': str(e)}, 500
+
+
+@app.route('/api/poller/spx/outcome', methods=['POST'])
+def save_poll_outcome():
+    data = request.get_json() or {}
+    poll_id = data.get('poll_id')
+    traded = data.get('traded', False)
+    outcome = data.get('outcome')
+    notes = data.get('outcome_notes', '')
+    if not poll_id:
+        return {'success': False, 'error': 'poll_id required'}, 400
+    valid = ('expired_worthless', 'closed_50pct', 'stopped_out', 'closed_manually')
+    if traded and outcome not in valid:
+        return {'success': False, 'error': f'Invalid outcome. Must be one of: {", ".join(valid)}'}, 400
+    try:
+        from journal.models import SPXPollResult, get_session
+        session = get_session()
+        row = session.query(SPXPollResult).filter(SPXPollResult.id == poll_id).first()
+        if not row:
+            session.close()
+            return {'success': False, 'error': 'Poll not found'}, 404
+        row.traded = 1 if traded else 0
+        row.outcome = outcome if traded else None
+        row.outcome_notes = notes
+        row.outcome_recorded_at = datetime.now().isoformat()
+        session.commit()
+        # Win rate
+        from sqlalchemy import func, case
+        total = session.query(func.count()).filter(SPXPollResult.traded == 1, SPXPollResult.outcome.isnot(None)).scalar() or 0
+        wins = session.query(func.count()).filter(SPXPollResult.traded == 1, SPXPollResult.outcome.in_(['expired_worthless', 'closed_50pct'])).scalar() or 0
+        session.close()
+        return {'success': True, 'poll_id': poll_id, 'traded': traded, 'outcome': outcome,
+                'win_rate_update': {'total_traded': total, 'wins': wins, 'win_rate_pct': round(wins / total * 100, 1) if total > 0 else 0}}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}, 500
 
 
 # ═══════════════════════════════════════════════════════════════════════════

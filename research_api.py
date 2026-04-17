@@ -1122,3 +1122,289 @@ def get_stock_detail(symbol):
         }
 
     return jsonify(result)
+
+
+# ============================================================================
+# MORNING BRIEF
+# ============================================================================
+
+def _get_es_premarket():
+    import yfinance as yf
+    try:
+        es = yf.Ticker('ES=F')
+        hist = es.history(period='2d', interval='1m')
+        if hist.empty:
+            return None
+        current_price = float(hist['Close'].iloc[-1])
+        prior_close = float(hist['Close'].iloc[0])
+        change_pct = ((current_price - prior_close) / prior_close) * 100
+        abs_pct = abs(change_pct)
+        direction = 'FLAT' if abs_pct < 0.25 else ('UP' if change_pct > 0 else 'DOWN')
+        gap_risk = 'LOW' if abs_pct < 0.5 else ('ELEVATED' if abs_pct < 1.0 else 'HIGH')
+        return {
+            'es_price': round(current_price, 2), 'es_prior_close': round(prior_close, 2),
+            'es_change_pct': round(change_pct, 3), 'es_direction': direction,
+            'gap_risk': gap_risk, 'source_time': hist.index[-1].isoformat()
+        }
+    except Exception as e:
+        return {'error': str(e), 'gap_risk': 'UNKNOWN'}
+
+
+def _get_latest_straddle_price():
+    try:
+        import sqlite3
+        from datetime import date
+        conn = sqlite3.connect('data/trade_journal.db')
+        row = conn.execute(
+            "SELECT straddle_price FROM spx_poll_results WHERE date=? AND straddle_price IS NOT NULL ORDER BY polled_at DESC LIMIT 1",
+            (date.today().isoformat(),)
+        ).fetchone()
+        conn.close()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+
+def _get_todays_active_strikes():
+    try:
+        import sqlite3
+        from datetime import date
+        conn = sqlite3.connect('data/trade_journal.db')
+        row = conn.execute(
+            "SELECT short_put_strike, short_call_strike FROM spx_poll_results WHERE date=? AND recommendation='ENTER' AND short_put_strike IS NOT NULL ORDER BY polled_at DESC LIMIT 1",
+            (date.today().isoformat(),)
+        ).fetchone()
+        conn.close()
+        return (row[0], row[1]) if row else (None, None)
+    except Exception:
+        return (None, None)
+
+
+def _compute_spx_key_levels():
+    try:
+        import yfinance as yf
+        import math
+        hist = yf.Ticker('^SPX').history(period='10d')
+        if hist.empty or len(hist) < 2:
+            return {'status': 'unavailable', 'levels': []}
+        prior = hist.iloc[-2]
+        pc = round(float(prior['Close']), 2)
+        ph = round(float(prior['High']), 2)
+        pl = round(float(prior['Low']), 2)
+        cp = round(float(hist.iloc[-1]['Close']), 2)
+        fh = round(float(hist['High'].tail(5).max()), 2)
+        fl = round(float(hist['Low'].tail(5).min()), 2)
+        ra = math.ceil(cp / 25) * 25
+        rb = math.floor(cp / 25) * 25
+        candidates = [
+            {'price': pc, 'label': 'Prior Day Close', 'type': 'pivot', 'context': f'Key pivot. Above {pc} = bulls. Below = bears.'},
+            {'price': ph, 'label': 'Prior Day High', 'type': 'resistance', 'context': f'First resistance. Break above {ph} signals momentum.'},
+            {'price': pl, 'label': 'Prior Day Low', 'type': 'support', 'context': f'First support. Break below {pl} signals sellers in control.'},
+            {'price': fh, 'label': '5-Day High', 'type': 'resistance', 'context': f'Short-term resistance at {fh}.'},
+            {'price': fl, 'label': '5-Day Low', 'type': 'support', 'context': f'Short-term support at {fl}.'},
+            {'price': ra, 'label': f'Round Number ({ra})', 'type': 'psychological', 'context': f'Psychological resistance. Options strikes cluster at {ra}.'},
+            {'price': rb, 'label': f'Round Number ({rb})', 'type': 'psychological', 'context': f'Psychological support. Options strikes cluster at {rb}.'},
+        ]
+        seen, unique = set(), []
+        for c in candidates:
+            if c['price'] not in seen:
+                seen.add(c['price']); unique.append(c)
+        unique.sort(key=lambda x: abs(x['price'] - cp))
+        top3 = unique[:3]
+        top3.sort(key=lambda x: x['price'], reverse=True)
+        for lv in top3:
+            lv['position'] = 'above' if lv['price'] > cp else 'below'
+            lv['distance_pts'] = round(abs(lv['price'] - cp), 2)
+            lv['distance_pct'] = round(abs(lv['price'] - cp) / cp * 100, 2)
+        return {'status': 'ok', 'current_price': cp, 'prior_close': pc, 'levels': top3}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e), 'levels': []}
+
+
+def _compute_scenario_playbook(regime, key_levels, gap_risk_data, short_put=None, short_call=None):
+    import math
+    vix = regime.get('vix_level', 20) or 20
+    adx = regime.get('dimensions', {}).get('trend_assessment', {}).get('adx', 0)
+    cp = key_levels.get('current_price', 0) or 0
+    es_pct = gap_risk_data.get('es_change_pct', 0) or 0
+    em = round(cp * (vix / 100) / math.sqrt(252), 0) if cp else 0
+    pr = short_put or (round(cp - em * 1.45, 0) if cp else None)
+    cr = short_call or (round(cp + em * 1.45, 0) if cp else None)
+    ps = f'${pr:,.0f}' if pr else 'short put'
+    cs = f'${cr:,.0f}' if cr else 'short call'
+    levels = key_levels.get('levels', [])
+    low_ref = levels[-1]['price'] if levels else 'key support'
+
+    bull = {'label': '🟢 Bull', 'trigger': 'SPX rallies above prior day high, ES gap holds', 'spread_risk': f'Call side ({cs})',
+            'action': f'Call side comes under pressure. If SPX within 15pts of {cs}, close the full IC. Strong gap-up that holds is highest risk for call side.'}
+    bear = {'label': '🔴 Bear', 'trigger': 'SPX sells off, ES gap fades, prior day low tested', 'spread_risk': f'Put side ({ps})',
+            'action': f'Put side comes under pressure. If SPX within 15pts of {ps}, close the full IC immediately. Watch {low_ref} as early warning.'}
+    neutral = {'label': '⚪ Neutral', 'trigger': f'SPX stays within ±{em:.0f}pts of open', 'spread_risk': 'Neither — ideal outcome',
+               'action': f'Target scenario. SPX oscillates within ±${em:.0f}, both strikes untested. Close at 50% profit if reached before 2 PM, else hold to expiry.'}
+
+    if gap_risk_data.get('value') == 'HIGH' or gap_risk_data.get('gap_risk') == 'HIGH':
+        if es_pct > 0: bull['action'] = f'⚠️ ES already up {es_pct:.1f}% pre-market. ' + bull['action']
+        else: bear['action'] = f'⚠️ ES already down {abs(es_pct):.1f}% pre-market. ' + bear['action']
+
+    adx_note = None
+    if adx > 28:
+        adx_note = f'⚠️ ADX {adx:.1f} — Trending market. Iron condor suspended. Single-side credit spread only at half size.'
+
+    return {'expected_move': em, 'put_strike_ref': pr, 'call_strike_ref': cr, 'adx_note': adx_note,
+            'scenarios': {'bull': bull, 'bear': bear, 'neutral': neutral}}
+
+
+def _compute_strike_probability(spx_price, vix, straddle_price=None):
+    import math
+    if not spx_price or spx_price <= 0 or not vix or vix <= 0:
+        return None
+    daily_iv = (vix / 100) / math.sqrt(252)
+    s1 = spx_price * daily_iv
+
+    delta_map = []
+    for delta, pop, mult in [(0.05,95,2.0),(0.10,90,1.6),(0.12,88,1.45),(0.15,85,1.3),(0.20,80,1.0),(0.25,75,0.75),(0.30,70,0.55)]:
+        delta_map.append({
+            'delta': delta, 'pop': pop,
+            'put_strike': round(spx_price - mult * s1, 0),
+            'call_strike': round(spx_price + mult * s1, 0),
+            'is_current_target': delta == 0.12
+        })
+
+    sd_bands = {}
+    for label, mult, pct in [('1_sigma',1.0,'68%'),('1_5_sigma',1.5,'87%'),('2_sigma',2.0,'95%')]:
+        m = round(s1 * mult, 2)
+        sd_bands[label] = {'move': m, 'lower': round(spx_price - m, 2), 'upper': round(spx_price + m, 2), 'pct': pct}
+
+    straddle_range = None
+    if straddle_price:
+        straddle_range = {'lower': round(spx_price - straddle_price, 2), 'upper': round(spx_price + straddle_price, 2), 'move': round(straddle_price, 2)}
+
+    hist = _compute_historical_win_rates()
+
+    return {
+        'spx_price': spx_price, 'vix': vix, 'daily_iv_pct': round(daily_iv * 100, 3),
+        'delta_map': delta_map, 'sd_bands': sd_bands, 'straddle_range': straddle_range,
+        'historical_win_rates': hist, 'current_target_delta': 0.12, 'current_target_pop': 88
+    }
+
+
+def _compute_historical_win_rates():
+    try:
+        import sqlite3
+        conn = sqlite3.connect('data/trade_journal.db')
+        row = conn.execute("""
+            SELECT COUNT(*) as total,
+                   SUM(CASE WHEN outcome IN ('expired_worthless','closed_50pct') THEN 1 ELSE 0 END) as wins,
+                   SUM(CASE WHEN outcome='expired_worthless' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN outcome='closed_50pct' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN outcome='stopped_out' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN outcome='closed_manually' THEN 1 ELSE 0 END)
+            FROM spx_poll_results WHERE traded=1 AND outcome IS NOT NULL
+        """).fetchone()
+        conn.close()
+        total = row[0] or 0
+        wins = row[1] or 0
+        bd = {'expired_worthless': row[2] or 0, 'closed_50pct': row[3] or 0, 'stopped_out': row[4] or 0, 'closed_manually': row[5] or 0}
+        wr = round(wins / total * 100, 1) if total > 0 else None
+        REQ = 20
+        if total < REQ:
+            msg = f'{total}/{REQ} trades recorded. ' + (f'Preliminary win rate: {wr}%' if total > 0 else 'No trades recorded yet.')
+            return {'status': 'accumulating', 'total_traded': total, 'wins': wins, 'required': REQ, 'win_rate_pct': wr, 'breakdown': bd, 'message': msg}
+        return {'status': 'ready', 'total_traded': total, 'wins': wins, 'required': REQ, 'win_rate_pct': wr, 'breakdown': bd, 'message': f'Win rate {wr}% over {total} trades'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e), 'total_traded': 0, 'wins': 0}
+
+
+@research_bp.route('/morning/brief', methods=['GET'])
+def morning_brief():
+    try:
+        regime = regime_classifier.run_regime_analysis(force_refresh=False)
+    except Exception as e:
+        return jsonify({'error': f'Regime unavailable: {str(e)}'}), 500
+
+    dims = regime.get('dimensions', {})
+    vix = regime.get('vix_level')
+    vix_3m = regime.get('vix_3m')
+    ts = dims.get('term_structure', {})
+    ta_dim = dims.get('trend_assessment', {})
+    vs = dims.get('vol_spread', {})
+    adx = ta_dim.get('adx', 0)
+    vol_edge = vs.get('spread', 0)
+    vol_edge_pct = round(vol_edge * 100, 1) if vol_edge else 0
+    composite = round((regime.get('composite_score', 0) + 1) / 2 * 100, 1)
+    verdict = regime.get('verdict', 'RED')
+
+    if vol_edge_pct >= 15:
+        ve_val, ve_sum = 'STRONG', f'IV running {vol_edge_pct}% above realized vol. Strong edge for premium sellers.'
+    elif vol_edge_pct >= 5:
+        ve_val, ve_sum = 'PRESENT', f'IV running {vol_edge_pct}% above realized vol. Edge present for premium sellers.'
+    elif vol_edge_pct >= 1:
+        ve_val, ve_sum = 'THIN', f'IV only {vol_edge_pct}% above realized vol. Thin edge — minimum $0.50 credit gate may fail.'
+    else:
+        ve_val, ve_sum = 'ABSENT', f'IV spread {vol_edge_pct}%. No edge for premium sellers — skip today.'
+
+    es = _get_es_premarket() or {'gap_risk': 'UNKNOWN', 'es_price': None, 'es_change_pct': None, 'es_direction': 'UNKNOWN'}
+    gap_risk = es.get('gap_risk', 'UNKNOWN')
+    gap_override = False
+    if gap_risk == 'HIGH' and verdict == 'GREEN':
+        verdict = 'YELLOW'
+        gap_override = True
+
+    if verdict == 'GREEN':
+        strat, sizing, notes = 'Iron Condor — full size', '$250–$375 per spread', 'All conditions favorable. Run the chain poller during the entry window.'
+    elif verdict == 'YELLOW':
+        strat, sizing, notes = 'Single-side credit spread — half size', '$125–$187 per spread', 'Conditions mixed. Single-side spread only at half size. Widen strikes.'
+    else:
+        strat, sizing, notes = 'No premium selling', '$0', 'Conditions unfavorable. No new trades today. Manage existing positions only.'
+
+    es_dir = es.get('es_direction', '')
+    es_pct = abs(es.get('es_change_pct', 0) or 0)
+    gap_sum = {
+        'UNKNOWN': 'ES futures data unavailable. No gap risk adjustment applied.',
+        'HIGH': f'ES futures {es_dir} {es_pct:.2f}% pre-market. Significant overnight gap risk.',
+        'ELEVATED': f'ES futures {es_dir} {es_pct:.2f}% pre-market. Moderate gap — widen strikes.',
+    }.get(gap_risk, f'ES futures {es_dir} {es_pct:.2f}% pre-market. No meaningful overnight gap risk.')
+
+    # Strike probability panel
+    spx_p = regime.get('spx_price') or 0
+    vix_val = vix or 20
+    straddle = _get_latest_straddle_price()
+    strike_prob = _compute_strike_probability(spx_p, vix_val, straddle)
+    key_levels = _compute_spx_key_levels()
+    sp_strikes = _get_todays_active_strikes()
+    playbook = _compute_scenario_playbook(regime, key_levels, es, sp_strikes[0], sp_strikes[1])
+
+    return jsonify({
+        'generated_at': datetime.now().isoformat(),
+        'strike_probability': strike_prob,
+        'key_levels': key_levels,
+        'playbook': playbook,
+        'sections': {
+            'vix_regime': {
+                'label': 'VIX Regime', 'value': dims.get('vix_regime', {}).get('value', 'UNKNOWN'),
+                'vix': vix, 'vix_3m': vix_3m,
+                'term_structure': ts.get('value', 'UNKNOWN'), 'term_spread': ts.get('spread', 0),
+                'score': dims.get('vix_regime', {}).get('score', 0),
+                'summary': dims.get('vix_regime', {}).get('description', '') + f' Term structure: {ts.get("value","UNKNOWN")}.'
+            },
+            'trend_assessment': {
+                'label': 'Trend Assessment', 'value': ta_dim.get('value', 'UNKNOWN'),
+                'adx': round(adx, 1) if adx else 0, 'adx_threshold': 28,
+                'score': ta_dim.get('score', 0), 'summary': ta_dim.get('description', '')
+            },
+            'volatility_edge': {
+                'label': 'Volatility Edge', 'value': ve_val,
+                'vol_edge_pct': vol_edge_pct, 'score': vs.get('score', 0), 'summary': ve_sum
+            },
+            'gap_risk': {
+                'label': 'Gap Risk', 'value': gap_risk,
+                'es_price': es.get('es_price'), 'es_change_pct': es.get('es_change_pct'),
+                'es_direction': es.get('es_direction', 'UNKNOWN'),
+                'gap_risk_override': gap_override, 'summary': gap_sum
+            },
+            'verdict': {
+                'label': 'Verdict', 'value': verdict, 'composite_score': composite,
+                'strategy': strat, 'sizing': sizing, 'entry_window': '9:45–10:30 AM', 'notes': notes
+            }
+        }
+    })

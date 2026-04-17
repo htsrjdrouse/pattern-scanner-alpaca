@@ -379,6 +379,21 @@ class SPXPollResult(Base):
     put_spread_credit = Column(Float)
     call_spread_credit = Column(Float)
     profit_target_50 = Column(Float)
+    skew_status = Column(String(10))
+    vvix = Column(Float)
+    vix_vvix_ratio = Column(Float)
+    put_width_adjustment = Column(Integer)
+    criteria_skew_ok = Column(Integer)
+    proximity_status = Column(String(10))
+    put_buffer = Column(Float)
+    call_buffer = Column(Float)
+    put_alert = Column(Integer)
+    call_alert = Column(Integer)
+    proximity_message = Column(Text)
+    traded = Column(Integer, default=0)
+    outcome = Column(String(20))
+    outcome_notes = Column(Text)
+    outcome_recorded_at = Column(String(30))
 
 
 # Database setup
@@ -394,6 +409,11 @@ def init_db():
         ('criteria_min_credit_ok', 'INTEGER'),
         ('put_spread_credit', 'REAL'), ('call_spread_credit', 'REAL'),
         ('profit_target_50', 'REAL'),
+        ('skew_status', 'TEXT'), ('vvix', 'REAL'), ('vix_vvix_ratio', 'REAL'),
+        ('put_width_adjustment', 'INTEGER'), ('criteria_skew_ok', 'INTEGER'),
+        ('proximity_status', 'TEXT'), ('put_buffer', 'REAL'), ('call_buffer', 'REAL'),
+        ('put_alert', 'INTEGER'), ('call_alert', 'INTEGER'), ('proximity_message', 'TEXT'),
+        ('traded', 'INTEGER'), ('outcome', 'TEXT'), ('outcome_notes', 'TEXT'), ('outcome_recorded_at', 'TEXT'),
     ]
     with engine.connect() as conn:
         existing = [r[1] for r in conn.execute(
