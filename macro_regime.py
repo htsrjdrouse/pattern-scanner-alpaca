@@ -15,15 +15,93 @@ import pandas as pd
 import yfinance as yf
 import feedparser
 
+def _fetch_fred_series(series_id: str, limit: int = 12) -> list[float] | None:
+    """
+    Fetch a FRED economic data series using the public API.
+    No API key required for basic access.
+
+    Args:
+        series_id: FRED series identifier (e.g. 'CPIAUCSL', 'UNRATE')
+        limit: number of most recent observations to return
+
+    Returns:
+        List of float values (most recent last), or None on failure.
+
+    FRED series used in this module:
+        CPIAUCSL — Consumer Price Index, All Urban Consumers (monthly)
+        UNRATE   — Unemployment Rate (monthly)
+        T10YIE   — 10-Year Breakeven Inflation Rate (daily, market-implied)
+        ICSA     — Initial Jobless Claims (weekly, leading indicator)
+    """
+    import requests
+
+    try:
+        url = (
+            f'https://api.stlouisfed.org/fred/series/observations'
+            f'?series_id={series_id}'
+            f'&sort_order=desc'
+            f'&limit={limit}'
+            f'&file_type=json'
+            f'&api_key=NONE'  # Public read access for common series
+        )
+
+        # FRED public endpoint — no API key needed for standard series
+        # Falls back gracefully if rate limited
+        resp = requests.get(url, timeout=10, headers={
+            'User-Agent': 'Mozilla/5.0 (compatible; macro-regime/1.0)'
+        })
+
+        if resp.status_code != 200:
+            # Try alternative public endpoint
+            url_alt = (
+                f'https://fred.stlouisfed.org/graph/fredgraph.csv'
+                f'?id={series_id}'
+            )
+            resp = requests.get(url_alt, timeout=10)
+            if resp.status_code != 200:
+                return None
+
+            # Parse CSV format
+            import io
+            import csv
+            reader = csv.reader(io.StringIO(resp.text))
+            next(reader)  # skip header
+            values = []
+            for row in reader:
+                try:
+                    if row[1] != '.' and row[1] != '':
+                        values.append(float(row[1]))
+                except (IndexError, ValueError):
+                    continue
+            return values[-limit:] if values else None
+
+        data = resp.json()
+        observations = data.get('observations', [])
+
+        values = []
+        for obs in reversed(observations):  # newest first from API, reverse to oldest-first
+            try:
+                if obs['value'] != '.':
+                    values.append(float(obs['value']))
+            except (KeyError, ValueError):
+                continue
+
+        return values if values else None
+
+    except Exception as e:
+        print(f'FRED fetch failed for {series_id}: {e}')
+        return None
+
+
 # Regime->Sector Mapping Table
 REGIME_SECTOR_MAP = {
     "STAGFLATION": {  # high inflation, slowing growth
         "favored": ["energy", "minerals_mining", "agriculture", "gold_miners"],
         "suppressed": ["semiconductors", "saas", "consumer_discretionary", "real_estate"]
     },
-    "REFLATION": {  # rising inflation, expanding growth
-        "favored": ["energy", "minerals_mining", "industrials", "financials", "agriculture"],
-        "suppressed": ["utilities", "bonds_proxy"]
+    "REFLATION": {  # rising inflation, expanding growth (current likely regime)
+        "favored": ["energy", "minerals_mining", "industrials", "financials", "agriculture", "defense"],
+        "suppressed": ["utilities", "bonds_proxy", "saas", "consumer_discretionary"]
     },
     "GOLDILOCKS": {  # low inflation, expanding growth
         "favored": ["semiconductors", "saas", "consumer_discretionary", "industrials", "financials"],
@@ -108,7 +186,10 @@ def build_macro_context() -> MacroRegime:
             )
         
         regime_confidence = min(growth_conf, inflation_conf)
-        sources.extend(['yfinance:SPY', 'yfinance:TLT', 'yfinance:DBC'])
+        sources.extend([
+            'fred:CPIAUCSL', 'fred:UNRATE', 'fred:T10YIE', 'fred:ICSA',
+            'yfinance:SPY', 'yfinance:CL=F', 'yfinance:GLD'
+        ])
         
         # Derive quadrant
         quadrant = _derive_quadrant(growth_regime, inflation_regime)
@@ -177,122 +258,312 @@ def get_sector_macro_alignment(sector_id: str, macro_context: MacroRegime) -> st
 
 
 def _classify_growth() -> tuple:
-    """Classify growth regime from SPY momentum and trend"""
+    """
+    Classify growth regime using real economic indicators.
+
+    Primary signals (FRED):
+        - Unemployment rate trend (rising = slowing, falling = expanding)
+        - Initial jobless claims trend (leading indicator)
+
+    Secondary signal (yfinance):
+        - SPY SMA 50/200 crossover (market's forward-looking growth view)
+        - Used as tiebreaker only, not primary signal
+
+    Returns: (regime_string, confidence_float)
+    """
+    scores = []  # positive = expanding, negative = slowing
+    confidence_factors = []
+
+    # ── Signal 1: Unemployment Rate (FRED UNRATE) ──────────────────────────
+    # Most reliable growth indicator. Rising unemployment = slowing economy.
     try:
-        spy = yf.Ticker("SPY")
-        hist = spy.history(period="1y")  # Get more history
-        
-        if hist is None or len(hist) < 50:
-            print("Growth: Insufficient SPY data")
-            return "UNKNOWN", 0.0
-        
-        # Ensure we have Close column
-        if 'Close' not in hist.columns:
-            print("Growth: No Close column in SPY data")
-            return "UNKNOWN", 0.0
-        
-        close_prices = hist['Close'].dropna()
-        if len(close_prices) < 50:
-            print("Growth: Insufficient non-NaN prices")
-            return "UNKNOWN", 0.0
-        
-        # 20-day momentum
-        if len(close_prices) >= 20:
-            momentum_20 = (close_prices.iloc[-1] / close_prices.iloc[-20] - 1) * 100
+        unrate = _fetch_fred_series('UNRATE', limit=6)
+        if unrate and len(unrate) >= 3:
+            # Compare latest to 3 months ago
+            recent = unrate[-1]
+            prior = unrate[-3]
+            unrate_change = recent - prior
+
+            if unrate_change > 0.3:
+                scores.append(-2)  # Clearly slowing — unemployment rising fast
+                confidence_factors.append(0.9)
+            elif unrate_change > 0.1:
+                scores.append(-1)  # Softening
+                confidence_factors.append(0.8)
+            elif unrate_change < -0.2:
+                scores.append(2)  # Clearly expanding — unemployment falling
+                confidence_factors.append(0.9)
+            elif unrate_change < 0:
+                scores.append(1)  # Modest improvement
+                confidence_factors.append(0.7)
+            else:
+                scores.append(0)  # Stable
+                confidence_factors.append(0.6)
+
+            print(f'Growth UNRATE: {recent:.1f}% (change: {unrate_change:+.2f}pp)')
         else:
-            momentum_20 = 0
-        
-        # 50/200 SMA
-        if len(close_prices) >= 50:
-            sma_50 = close_prices.iloc[-50:].mean()
-        else:
-            sma_50 = close_prices.mean()
-            
-        if len(close_prices) >= 200:
-            sma_200 = close_prices.iloc[-200:].mean()
-        else:
-            sma_200 = sma_50
-        
-        # Check for NaN
-        if pd.isna(momentum_20) or pd.isna(sma_50) or pd.isna(sma_200):
-            print(f"Growth: NaN values - momentum={momentum_20}, sma_50={sma_50}, sma_200={sma_200}")
-            return "UNKNOWN", 0.0
-        
-        if momentum_20 > 5 and sma_50 > sma_200:
-            return "EXPANDING", 0.9
-        elif momentum_20 < -5 and sma_50 < sma_200:
-            return "CONTRACTING", 0.9
-        elif momentum_20 < 0 and sma_50 > sma_200:
-            return "SLOWING", 0.7
-        elif momentum_20 > 0 and sma_50 < sma_200:
-            return "RECOVERING", 0.7
-        else:
-            return "SLOWING", 0.5
-            
+            print('Growth: UNRATE data unavailable')
     except Exception as e:
-        print(f"Growth classification error: {e}")
-        import traceback
-        traceback.print_exc()
-        return "UNKNOWN", 0.0
+        print(f'Growth UNRATE error: {e}')
+
+    # ── Signal 2: Initial Jobless Claims (FRED ICSA) ───────────────────────
+    # Weekly leading indicator. Spike in claims = labor market deteriorating.
+    try:
+        claims = _fetch_fred_series('ICSA', limit=8)
+        if claims and len(claims) >= 4:
+            # 4-week moving average vs prior 4-week average
+            recent_avg = sum(claims[-4:]) / 4
+            prior_avg = sum(claims[-8:-4]) / 4
+            claims_change_pct = (recent_avg - prior_avg) / prior_avg * 100
+
+            if claims_change_pct > 10:
+                scores.append(-2)  # Claims spiking — bad sign
+                confidence_factors.append(0.85)
+            elif claims_change_pct > 5:
+                scores.append(-1)
+                confidence_factors.append(0.7)
+            elif claims_change_pct < -5:
+                scores.append(1)  # Claims falling — healthy
+                confidence_factors.append(0.75)
+            else:
+                scores.append(0)
+                confidence_factors.append(0.6)
+
+            print(f'Growth ICSA: {recent_avg:.0f}k avg (change: {claims_change_pct:+.1f}%)')
+        else:
+            print('Growth: ICSA data unavailable')
+    except Exception as e:
+        print(f'Growth ICSA error: {e}')
+
+    # ── Signal 3: SPY SMA crossover (secondary confirmation only) ─────────
+    # Market is forward-looking. Use as tiebreaker with lower weight.
+    try:
+        spy = yf.Ticker('SPY')
+        hist = spy.history(period='1y')
+        if hist is not None and len(hist) >= 50 and 'Close' in hist.columns:
+            close = hist['Close'].dropna()
+            if len(close) >= 200:
+                sma_50 = close.iloc[-50:].mean()
+                sma_200 = close.iloc[-200:].mean()
+                if sma_50 > sma_200 * 1.02:
+                    scores.append(1)  # Bull trend — modest positive signal
+                    confidence_factors.append(0.5)  # Low weight
+                elif sma_50 < sma_200 * 0.98:
+                    scores.append(-1)
+                    confidence_factors.append(0.5)
+                else:
+                    scores.append(0)
+                    confidence_factors.append(0.4)
+                print(f'Growth SPY SMA50/200: {sma_50:.1f}/{sma_200:.1f}')
+    except Exception as e:
+        print(f'Growth SPY error: {e}')
+
+    # ── Derive regime from composite score ─────────────────────────────────
+    if not scores:
+        return 'UNKNOWN', 0.0
+
+    composite = sum(scores) / len(scores)
+    confidence = sum(confidence_factors) / len(confidence_factors) if confidence_factors else 0.5
+
+    if composite >= 1.5:
+        return 'EXPANDING', min(confidence, 0.9)
+    elif composite >= 0.5:
+        return 'RECOVERING', confidence
+    elif composite >= -0.5:
+        return 'SLOWING', confidence
+    else:
+        return 'CONTRACTING', min(confidence, 0.9)
 
 
 def _classify_inflation() -> tuple:
-    """Classify inflation regime from commodities and bonds"""
+    """
+    Classify inflation regime using real CPI data.
+
+    Primary signals (FRED):
+        - CPI YoY rate (actual inflation, not a proxy)
+        - 10-year breakeven inflation rate (market's inflation expectation)
+
+    Secondary signals (yfinance):
+        - Oil price (CL=F): geopolitical energy inflation
+        - Gold (GLD): inflation hedge demand
+
+    Returns: (regime_string, confidence_float)
+    """
+    scores = []  # positive = higher inflation, negative = lower/falling
+    confidence_factors = []
+    cpi_yoy = None
+
+    # ── Signal 1: CPI YoY Rate (FRED CPIAUCSL) ────────────────────────────
+    # The definitive inflation measure. Not a proxy — the real number.
     try:
-        # DBC (commodities) and TLT (bonds) as inflation proxies
-        dbc = yf.Ticker("DBC")
-        tlt = yf.Ticker("TLT")
-        
-        dbc_hist = dbc.history(period="3mo")
-        tlt_hist = tlt.history(period="3mo")
-        
-        if dbc_hist is None or tlt_hist is None:
-            print("Inflation: No data returned")
-            return "UNKNOWN", 0.0
-        
-        if len(dbc_hist) < 20 or len(tlt_hist) < 20:
-            print(f"Inflation: Insufficient data - DBC={len(dbc_hist)}, TLT={len(tlt_hist)}")
-            return "UNKNOWN", 0.0
-        
-        # Ensure Close column exists
-        if 'Close' not in dbc_hist.columns or 'Close' not in tlt_hist.columns:
-            print("Inflation: No Close column")
-            return "UNKNOWN", 0.0
-        
-        dbc_close = dbc_hist['Close'].dropna()
-        tlt_close = tlt_hist['Close'].dropna()
-        
-        if len(dbc_close) < 20 or len(tlt_close) < 20:
-            print("Inflation: Insufficient non-NaN prices")
-            return "UNKNOWN", 0.0
-        
-        # Commodity momentum (inflation proxy)
-        dbc_momentum = (dbc_close.iloc[-1] / dbc_close.iloc[-20] - 1) * 100
-        
-        # Bond price momentum (inverse inflation)
-        tlt_momentum = (tlt_close.iloc[-1] / tlt_close.iloc[-20] - 1) * 100
-        
-        # Check for NaN
-        if pd.isna(dbc_momentum) or pd.isna(tlt_momentum):
-            print(f"Inflation: NaN values - dbc={dbc_momentum}, tlt={tlt_momentum}")
-            return "UNKNOWN", 0.0
-        
-        if dbc_momentum > 5 and tlt_momentum < -2:
-            return "RISING", 0.8
-        elif dbc_momentum > 10:
-            return "HIGH", 0.9
-        elif dbc_momentum < -5 and tlt_momentum > 2:
-            return "FALLING", 0.8
-        elif dbc_momentum < -5:
-            return "LOW", 0.7
+        cpi = _fetch_fred_series('CPIAUCSL', limit=14)
+        if cpi and len(cpi) >= 13:
+            # Calculate YoY rate: (current / 12-months-ago - 1) * 100
+            cpi_yoy = (cpi[-1] / cpi[-13] - 1) * 100
+            # Calculate MoM trend (last 3 months annualized)
+            cpi_3m_trend = (cpi[-1] / cpi[-4] - 1) * 400  # annualized
+
+            print(f'Inflation CPI YoY: {cpi_yoy:.2f}%, 3M trend: {cpi_3m_trend:.2f}%')
+
+            # Fed target is 2.0%. Score based on distance from target.
+            if cpi_yoy > 4.0:
+                scores.append(3)  # Significantly above target
+                confidence_factors.append(0.95)
+            elif cpi_yoy > 3.0:
+                scores.append(2)  # Above target, rising
+                confidence_factors.append(0.9)
+            elif cpi_yoy > 2.5:
+                scores.append(1)  # Mildly elevated
+                confidence_factors.append(0.85)
+            elif cpi_yoy > 2.0:
+                scores.append(0.5)  # At/near target
+                confidence_factors.append(0.8)
+            elif cpi_yoy > 1.5:
+                scores.append(-1)  # Below target, mild deflation risk
+                confidence_factors.append(0.8)
+            else:
+                scores.append(-2)  # Well below target
+                confidence_factors.append(0.85)
         else:
-            return "LOW", 0.6
-            
+            print('Inflation: CPI data unavailable from FRED')
     except Exception as e:
-        print(f"Inflation classification error: {e}")
-        import traceback
-        traceback.print_exc()
-        return "UNKNOWN", 0.0
+        print(f'Inflation CPI error: {e}')
+
+    # ── Signal 2: 10-Year Breakeven Inflation (FRED T10YIE) ───────────────
+    # Market's forward-looking inflation expectation. Highly reliable.
+    try:
+        breakeven = _fetch_fred_series('T10YIE', limit=20)
+        if breakeven and len(breakeven) >= 5:
+            current_be = breakeven[-1]
+            prior_be = breakeven[-5]  # ~1 week ago
+            be_trend = current_be - prior_be
+
+            print(f'Inflation 10Y Breakeven: {current_be:.2f}% (trend: {be_trend:+.2f})')
+
+            if current_be > 3.0:
+                scores.append(2)
+                confidence_factors.append(0.85)
+            elif current_be > 2.5:
+                scores.append(1)
+                confidence_factors.append(0.8)
+            elif current_be > 2.0:
+                scores.append(0)
+                confidence_factors.append(0.75)
+            else:
+                scores.append(-1)
+                confidence_factors.append(0.75)
+
+            # Trend matters too — rising expectations are a warning
+            if be_trend > 0.1:
+                scores.append(0.5)  # Expectations rising
+                confidence_factors.append(0.7)
+            elif be_trend < -0.1:
+                scores.append(-0.5)  # Expectations falling
+                confidence_factors.append(0.7)
+        else:
+            print('Inflation: Breakeven data unavailable')
+    except Exception as e:
+        print(f'Inflation breakeven error: {e}')
+
+    # ── Signal 3: Oil Price (yfinance CL=F) ───────────────────────────────
+    # Energy inflation directly impacts CPI. Oil above $80 = inflationary.
+    # Especially relevant given current Strait of Hormuz disruption.
+    try:
+        oil = yf.Ticker('CL=F')
+        oil_hist = oil.history(period='3mo')
+        if oil_hist is not None and len(oil_hist) >= 20 and 'Close' in oil_hist.columns:
+            oil_close = oil_hist['Close'].dropna()
+            current_oil = oil_close.iloc[-1]
+            oil_3m_change = (oil_close.iloc[-1] / oil_close.iloc[-20] - 1) * 100
+
+            print(f'Inflation Oil: ${current_oil:.2f} (3M change: {oil_3m_change:+.1f}%)')
+
+            # Oil above $80 is inflationary, above $90 significantly so
+            if current_oil > 90:
+                scores.append(1.5)
+                confidence_factors.append(0.8)
+            elif current_oil > 80:
+                scores.append(0.5)
+                confidence_factors.append(0.7)
+            elif current_oil < 60:
+                scores.append(-1)
+                confidence_factors.append(0.7)
+            else:
+                scores.append(0)
+                confidence_factors.append(0.6)
+        else:
+            print('Inflation: Oil price unavailable')
+    except Exception as e:
+        print(f'Inflation oil error: {e}')
+
+    # ── Signal 4: Gold (yfinance GLD) ─────────────────────────────────────
+    # Gold rising = inflation hedge demand / fear. Secondary signal.
+    try:
+        gld = yf.Ticker('GLD')
+        gld_hist = gld.history(period='3mo')
+        if gld_hist is not None and len(gld_hist) >= 20 and 'Close' in gld_hist.columns:
+            gld_close = gld_hist['Close'].dropna()
+            gld_momentum = (gld_close.iloc[-1] / gld_close.iloc[-20] - 1) * 100
+
+            print(f'Inflation GLD momentum: {gld_momentum:+.1f}%')
+
+            if gld_momentum > 10:
+                scores.append(1)  # Strong gold demand = inflation fear
+                confidence_factors.append(0.6)
+            elif gld_momentum > 5:
+                scores.append(0.5)
+                confidence_factors.append(0.55)
+            elif gld_momentum < -5:
+                scores.append(-0.5)
+                confidence_factors.append(0.55)
+            else:
+                scores.append(0)
+                confidence_factors.append(0.5)
+        else:
+            print('Inflation: GLD data unavailable')
+    except Exception as e:
+        print(f'Inflation GLD error: {e}')
+
+    # ── Derive regime from composite score ─────────────────────────────────
+    if not scores:
+        # Last resort fallback: use DBC/TLT if all else fails
+        try:
+            dbc = yf.Ticker('DBC')
+            tlt = yf.Ticker('TLT')
+            dbc_hist = dbc.history(period='3mo')
+            tlt_hist = tlt.history(period='3mo')
+            if (dbc_hist is not None and tlt_hist is not None and
+                    len(dbc_hist) >= 20 and len(tlt_hist) >= 20):
+                dbc_mom = (dbc_hist['Close'].iloc[-1] /
+                           dbc_hist['Close'].iloc[-20] - 1) * 100
+                tlt_mom = (tlt_hist['Close'].iloc[-1] /
+                           tlt_hist['Close'].iloc[-20] - 1) * 100
+                if dbc_mom > 5 and tlt_mom < -2:
+                    return 'RISING', 0.4  # Low confidence fallback
+                elif dbc_mom < -5:
+                    return 'FALLING', 0.4
+                else:
+                    return 'LOW', 0.3
+        except Exception:
+            pass
+        return 'UNKNOWN', 0.0
+
+    composite = sum(scores) / len(scores)
+    confidence = sum(confidence_factors) / len(confidence_factors)
+
+    # Map composite score to regime
+    # Score > 1.5 = clearly elevated inflation
+    # Score 0.5-1.5 = mildly elevated / rising
+    # Score -0.5 to 0.5 = near target
+    # Score < -0.5 = below target / falling
+    if composite >= 1.5:
+        return 'HIGH', min(confidence, 0.9)
+    elif composite >= 0.5:
+        return 'RISING', confidence
+    elif composite >= -0.5:
+        return 'LOW', confidence
+    else:
+        return 'FALLING', confidence
 
 
 def _derive_quadrant(growth: str, inflation: str) -> str:

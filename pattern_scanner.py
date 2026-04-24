@@ -2650,6 +2650,7 @@ def home():
         <div class="navbar">
             <a href="/">Home</a>
             <a href="/tracked">Tracked Stocks</a>
+            <a href="/watchlist">👁 Watchlist</a>
             <a href="/research">🔬 Alpha Research</a>
             <a href="/journal/">📊 Trade Journal</a>
             <a href="/saved-results">📁 Saved Results</a>
@@ -2721,6 +2722,7 @@ def home():
                 </div>
             </div>
             <div id="poller-card-body" style="display: none; padding: 20px;">
+                <div id="poller-trade-rec" style="margin-bottom: 15px;"></div>
                 <div id="poller-settings" style="margin-bottom: 15px;">
                     <div style="cursor:pointer; color:#9e9e9e; font-size:14px;" onclick="document.getElementById('poller-settings-body').style.display = document.getElementById('poller-settings-body').style.display === 'none' ? 'block' : 'none';">⚙️ Poller Settings ▾</div>
                     <div id="poller-settings-body" style="display:none; background:#16213e; padding:15px; border-radius:8px; margin-top:8px;">
@@ -2784,6 +2786,54 @@ def home():
     </div>
     
     <script>
+    async function loadTradeRecommendation() {
+        const el = document.getElementById('poller-trade-rec');
+        if (!el) return;
+        el.innerHTML = '<p style="color:#9e9e9e; text-align:center;">⏳ Loading trade recommendation...</p>';
+        try {
+            const resp = await fetch('/api/observations/spx/prefill');
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const d = await resp.json();
+            const hasPut = d.short_put_strike && d.short_put_premium;
+            const hasCall = d.short_call_strike && d.short_call_premium;
+            let icHtml = '';
+            if (hasPut && hasCall) {
+                icHtml = `<div style="margin-top:12px; padding:10px; background:#1e1e2e; border-radius:6px;">
+                    <strong>💡 Suggested Iron Condor:</strong><br>
+                    Put: ${d.short_put_strike} ($${d.short_put_premium}) | Call: ${d.short_call_strike} ($${d.short_call_premium})<br>
+                    Width: ${d.spread_width} | Total Premium: $${d.est_total_premium}
+                </div>`;
+            } else if (hasPut) {
+                icHtml = `<div style="margin-top:12px; padding:10px; background:#1e1e2e; border-radius:6px;">
+                    <strong>💡 Single-leg: Put spread at ${d.short_put_strike} for $${d.short_put_premium}</strong><br>
+                    <span style="color:#f59e0b;">Call leg unavailable</span></div>`;
+            } else if (hasCall) {
+                icHtml = `<div style="margin-top:12px; padding:10px; background:#1e1e2e; border-radius:6px;">
+                    <strong>💡 Single-leg: Call spread at ${d.short_call_strike} for $${d.short_call_premium}</strong><br>
+                    <span style="color:#f59e0b;">Put leg unavailable</span></div>`;
+            } else {
+                icHtml = '<p style="color:#f59e0b; margin-top:10px;">⚠️ Insufficient liquidity for iron condor</p>';
+            }
+            el.innerHTML = `<div style="background:#16213e; padding:15px; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h4 style="margin:0;">📊 Live Market Snapshot</h4>
+                    <button onclick="loadTradeRecommendation()" style="padding:4px 8px; background:#667eea; border:none; border-radius:4px; cursor:pointer; color:#fff; font-size:12px;">🔄 Refresh</button>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; font-size:14px;">
+                    <div><strong>SPX:</strong> $${d.spx_price || 'N/A'}</div>
+                    <div><strong>VIX:</strong> ${d.vix || 'N/A'}</div>
+                    <div><strong>Expiry:</strong> ${d.target_expiry || 'N/A'} (${d.dte}DTE)</div>
+                    <div><strong>ATM Strike:</strong> ${d.atm_strike || 'N/A'}</div>
+                    <div><strong>Straddle:</strong> $${d.atm_straddle_price || 'N/A'}</div>
+                    <div><strong>Vol Edge:</strong> ${d.vol_edge ? (d.vol_edge * 100).toFixed(1) + '%' : 'N/A'}</div>
+                </div>
+                ${icHtml}
+            </div>`;
+        } catch (e) {
+            el.innerHTML = `<p style="color:#ef4444;">❌ Error: ${e.message}</p>`;
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         refreshPollerStatus();
     });
@@ -2799,6 +2849,7 @@ def home():
         if (body.style.display === 'none') {
             body.style.display = 'block';
             icon.textContent = '▲';
+            loadTradeRecommendation();
             refreshPollerStatus();
             loadPollerHistory();
         } else {
@@ -2823,12 +2874,6 @@ def home():
         await fetch('/api/poller/spx/stop', {method: 'POST'});
         stopPollerStatusUpdates();
         showPollerToast('⏹ Poller stopped');
-        refreshPollerStatus();
-    }
-
-    async function toggleEconOverride(active) {
-        await fetch('/api/poller/spx/econ_override', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({active})});
-        showPollerToast(active ? '🚫 Econ override ON' : '✅ Econ override OFF');
         refreshPollerStatus();
     }
 
@@ -2873,17 +2918,22 @@ def home():
             stopProximityPolling();
         }
 
-        // Econ override toggle
+        // Economic calendar display
         const econEl = document.getElementById('poller-econ-override');
-        const checked = data.econ_override_active ? 'checked' : '';
-        econEl.innerHTML = `
-            <div style="display:flex; align-items:center; gap:10px;">
-                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:#f59e0b; font-size:14px;">
-                    <input type="checkbox" id="econ-override-cb" ${checked} onchange="toggleEconOverride(this.checked)" style="width:16px; height:16px; cursor:pointer;">
-                    ⚠️ Major Econ Event Today
-                </label>
-            </div>
-            ${data.econ_override_active ? '<div style="background:#3b1c1c; border:1px solid #ef4444; border-radius:6px; padding:10px; margin-top:8px; color:#ef4444; font-size:13px;">🚫 ECON OVERRIDE ACTIVE — All polls will return SKIP until unchecked</div>' : ''}`;
+        const events = data.econ_events || [];
+        if (events.length === 0) {
+            econEl.innerHTML = '<div style="color:#22c55e; font-size:13px;">✅ No high-impact economic events scheduled today</div>';
+        } else {
+            const rows = events.map(e => `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #333;">
+                <span style="color:#f59e0b; font-size:13px;">⚠️ ${e.name}</span>
+                <span style="color:#888; font-size:12px; margin-left:10px;">${e.time}</span>
+            </div>`).join('');
+            econEl.innerHTML = `<div style="background:#2d2008; border:1px solid #f59e0b; border-radius:6px; padding:10px;">
+                <div style="color:#f59e0b; font-size:13px; font-weight:bold; margin-bottom:8px;">⚠️ High-Impact Events Today — Trade with caution</div>
+                ${rows}
+                <div style="color:#888; font-size:11px; margin-top:8px;">Events near entry window will be flagged in recommendations.</div>
+            </div>`;
+        }
 
         const poll = data.last_poll;
         if (poll && poll.polled_at) {
@@ -3405,6 +3455,7 @@ SCAN_RESULTS_TEMPLATE = """
         <div class="navbar">
             <a href="/">Home</a>
             <a href="/tracked">Tracked Stocks</a>
+            <a href="/watchlist">👁 Watchlist</a>
             <a href="/research">🔬 Alpha Research</a>
             <a href="/saved-results">📁 Saved Results</a>
             {% if is_saved %}
@@ -3600,6 +3651,7 @@ SCAN_RESULTS_TEMPLATE = """
                 <td>
                     <a class="view-btn" href="/chart/{{ r.symbol }}">View</a>
                     <a class="view-btn" href="/journal/new?symbol={{ r.symbol }}&score={{ r.score }}&buy_point={{ r.buy_point }}&stop={{ r.stop_loss }}&target={{ r.target }}&pattern={{ r.pattern_type }}&adx={{ r.adx }}&rsi={{ r.rsi }}" style="background: #4caf50; margin-left: 5px;">Log Trade</a>
+                    <a class="view-btn" href="/watchlist?ticker={{ r.symbol }}&floor={{ r.stop_loss }}&resistance={{ r.buy_point }}&volume_multiplier=2.0&notes={{ r.pattern_type }}%20R:R%20{{ r.rr_ratio }}:1" style="background: #667eea; margin-left: 5px;">👁 Watch</a>
                 </td>
                 <td>{{ r.pattern_count }}</td>
                 <td>{% if r.asc_triangle %}<span class="pattern-badge badge-triangle">YES<br>R: ${{ r.asc_triangle.resistance }}</span>{% else %}-{% endif %}</td>
@@ -4410,6 +4462,7 @@ def chart(symbol):
             <div class="navbar">
                 <a href="/">Home</a>
                 <a href="/tracked">Tracked Stocks</a>
+            <a href="/watchlist">👁 Watchlist</a>
             </div>
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -4524,24 +4577,16 @@ def chart(symbol):
                 </div>
             </div>
 
-            <!-- Track Stock Form -->
+            <!-- Add to Watchlist -->
             {% if analysis %}
             <div class="track-form">
-                <h3>📈 Track This Stock</h3>
-                <form action="/track" method="post">
-                    <input type="hidden" name="ticker" value="{{ symbol }}">
-                    <input type="hidden" name="buy_point" value="{{ analysis.buy_point }}">
-                    <input type="hidden" name="rsi_min" value="50">
-                    <input type="hidden" name="rsi_max" value="70">
-                    <input type="hidden" name="volume_multiple" value="2.0">
-                    <input type="hidden" name="breakeven_move" value="{% if options.breakeven_move_pct %}{{ options.breakeven_move_pct|default(0)|float|round(1) }}{% elif cup_pattern %}{{ cup_pattern.cup_depth_pct|default(0)|float|round(1) }}{% else %}0{% endif %}">
-                    <label for="email">Email (required): </label>
-                    <input type="email" name="email" id="email" required placeholder="your@email.com" value="{{ analysis.email if analysis.email else '' }}">
-                    <button type="submit">Start Tracking</button>
-                </form>
+                <h3>👁 Add to Watchlist</h3>
+                <a class="view-btn" style="background:#667eea; padding:10px 20px; font-size:14px; text-decoration:none; display:inline-block;"
+                   href="/watchlist?ticker={{ symbol }}&floor={{ analysis.stop_loss }}&resistance={{ analysis.buy_point }}&volume_multiplier=2.0&notes={% if cup_pattern and cup_pattern.cup_depth %}Cup%26Handle{% elif asc_triangle and asc_triangle.resistance %}AscTriangle{% elif bull_flag and bull_flag.pole_gain %}BullFlag{% elif double_bottom and double_bottom.neckline %}DoubleBottom{% else %}Pattern{% endif %}%20R:R%20{{ analysis.rr_ratio }}:1">
+                    👁 Add to Watchlist
+                </a>
                 <p style="font-size: 12px; color: #888; margin-top: 10px;">
-                    Will track for breakout above ${{ analysis.buy_point }}, RSI 50-70, 2x volume, and email alerts.
-                    Breakeven move: {% if options.breakeven_move_pct %}{{ options.breakeven_move_pct|default(0)|float|round(1) }}%{% elif cup_pattern %}{{ cup_pattern.cup_depth_pct|default(0)|float|round(1) }}% (cup depth){% else %}0%{% endif %}.
+                    Floor: ${{ analysis.stop_loss }} | Resistance: ${{ analysis.buy_point }} | R:R {{ analysis.rr_ratio }}:1
                 </p>
             </div>
             {% endif %}
@@ -5488,6 +5533,7 @@ def tracked():
             <div class="navbar">
                 <a href="/">Home</a>
                 <a href="/tracked">Tracked Stocks</a>
+            <a href="/watchlist">👁 Watchlist</a>
             </div>
             <h1>📈 Tracked Stocks</h1>
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -5787,19 +5833,62 @@ _poller_running = False
 _poller_thread = None
 _poller_last_result = None
 _poller_session_start = None
-_econ_override_active = False
+_econ_events_cache = None
+_econ_events_cache_date = None
+
+HIGH_IMPACT_KEYWORDS = [
+    'fomc', 'federal reserve', 'fed rate', 'interest rate decision',
+    'cpi', 'consumer price index', 'inflation rate',
+    'nfp', 'non-farm', 'nonfarm', 'payroll', 'jobs report',
+    'gdp', 'gross domestic product',
+    'pce', 'personal consumption',
+    'unemployment', 'jobless claims',
+    'retail sales', 'ppi', 'producer price'
+]
+
+
+def _fetch_economic_calendar():
+    import requests as req
+    import xml.etree.ElementTree as ET
+    from datetime import date
+    today = date.today()
+    events = []
+    try:
+        resp = req.get('https://tradingeconomics.com/calendar/rss?c=united+states&importance=3',
+                       timeout=8, headers={'User-Agent': 'Mozilla/5.0 (compatible; market-scanner/1.0)'})
+        resp.raise_for_status()
+        root = ET.fromstring(resp.content)
+        for item in root.findall('.//item'):
+            title = (item.findtext('title', '') or '').strip()
+            pub_date = item.findtext('pubDate', '') or ''
+            try:
+                event_date = datetime.strptime(pub_date[:16], '%a, %d %b %Y').date()
+                if event_date != today:
+                    continue
+            except Exception:
+                continue
+            if any(kw in title.lower() for kw in HIGH_IMPACT_KEYWORDS):
+                try:
+                    event_time = datetime.strptime(pub_date, '%a, %d %b %Y %H:%M:%S %z').strftime('%I:%M %p')
+                except Exception:
+                    event_time = 'TBD'
+                events.append({'name': title, 'time': event_time, 'importance': 'HIGH'})
+    except Exception as e:
+        app.logger.warning(f'Economic calendar fetch failed: {e}')
+    return events
+
+
+def _get_cached_economic_events():
+    global _econ_events_cache, _econ_events_cache_date
+    from datetime import date
+    today = date.today()
+    if _econ_events_cache_date != today or _econ_events_cache is None:
+        _econ_events_cache = _fetch_economic_calendar()
+        _econ_events_cache_date = today
+    return _econ_events_cache or []
 
 
 def _evaluate_spx_entry_criteria(regime, spx_price):
-    if _econ_override_active:
-        return {
-            'criteria': {'regime_ok': False, 'adx_ok': False, 'term_ok': False, 'vol_edge_ok': False, 'vix_ok': False},
-            'all_passed': False, 'recommendation': 'SKIP',
-            'notes': 'Manual econ event override active — major scheduled event today',
-            'skip_reason': 'Manual econ event override active — major scheduled event today',
-            'adx': None, 'vix': None, 'term': None, 'vol_edge': None,
-        }
-
     dims = regime.get('dimensions', {})
     verdict = regime.get('verdict', 'RED')
     adx = dims.get('trend_assessment', {}).get('adx', 99)
@@ -6076,10 +6165,23 @@ def _execute_single_poll():
         result['call_alert'] = int(prox['call_alert'])
         result['proximity_message'] = prox['alert_message']
 
+    # 8. Economic calendar warning (informational, does not block)
+    econ_events = _get_cached_economic_events()
+    result['econ_events'] = econ_events
+    result['econ_warning'] = None
+    if econ_events:
+        names = ', '.join(e['name'] for e in econ_events[:2])
+        result['econ_warning'] = f'⚠️ High-impact events today: {names}'
+        for ev in econ_events:
+            try:
+                ev_hr = datetime.strptime(ev['time'], '%I:%M %p').hour
+                if 9 <= ev_hr <= 11:
+                    result['recommendation_notes'] = (result.get('recommendation_notes') or '') + f' | ⚠️ Caution: {ev["name"]} at {ev["time"]}'
+            except Exception:
+                pass
+
     _save_poll_result(result)
     return result
-
-
 def _polling_loop():
     import time
     global _poller_running
@@ -6143,20 +6245,13 @@ def stop_spx_poller():
 @app.route('/api/poller/spx/status', methods=['GET'])
 def get_spx_poller_status():
     return {'running': _poller_running, 'started_at': _poller_session_start,
-            'last_poll': _poller_last_result, 'econ_override_active': _econ_override_active}
+            'last_poll': _poller_last_result, 'econ_override_active': False,
+            'econ_events': _get_cached_economic_events()}
 
 
 @app.route('/api/poller/spx/latest', methods=['GET'])
 def get_spx_poller_latest():
     return _poller_last_result or {'message': 'No polls yet today'}
-
-
-@app.route('/api/poller/spx/econ_override', methods=['POST'])
-def set_econ_override():
-    global _econ_override_active
-    data = request.get_json() or {}
-    _econ_override_active = bool(data.get('active', False))
-    return {'econ_override_active': _econ_override_active}
 
 
 @app.route('/api/poller/spx/proximity', methods=['GET'])
@@ -6776,6 +6871,8 @@ try:
     app.register_blueprint(journal_bp)
     from research_dashboard import add_research_routes
     add_research_routes(app)
+    from watchlist import add_watchlist_routes
+    add_watchlist_routes(app)
 except ImportError:
     pass  # Research API not available
 

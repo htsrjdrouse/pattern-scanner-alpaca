@@ -29,6 +29,7 @@ COPY risk_manager.py .
 COPY tastytrade_client.py .
 COPY tastytrade_data.py .
 COPY macro_regime.py .
+COPY watchlist.py .
 COPY pattern_screener.py .
 COPY sectors.json .
 COPY sector_scan.py .

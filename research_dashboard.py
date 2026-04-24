@@ -2251,6 +2251,7 @@ RESEARCH_DASHBOARD_HTML = """
             const data = await resp.json();
             if (data.error) throw new Error(data.error);
             renderMorningBrief(data);
+            storeBriefDataForTicket(data);
             const t = new Date(data.generated_at);
             document.getElementById('mb-updated').textContent = 'Last updated: ' + t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
         } catch(e) {
@@ -2327,20 +2328,41 @@ RESEARCH_DASHBOARD_HTML = """
                          YELLOW:{bg:'#4a3728',border:'#f59e0b',text:'#f59e0b',icon:'⚠️'},
                          RED:{bg:'#3b1c1c',border:'#ef4444',text:'#ef4444',icon:'🛑'}};
         const vc = vColors[v.value] || vColors.RED;
+        const volEdge = (s.volatility_edge?.vol_edge_pct || 0);
+        const adx = s.trend_assessment?.adx || 99;
+        const VOL_EDGE_MIN = 5.0, ADX_MAX = 28;
+        let verdictText, verdictSubtext;
+        if (v.value === 'RED') { verdictText = 'DO NOT TRADE'; verdictSubtext = 'Sit in cash.'; }
+        else if (v.value === 'YELLOW') { verdictText = 'TRADE CAUTIOUSLY'; verdictSubtext = 'Single-side spread only, half size.'; }
+        else if (v.value === 'GREEN' && volEdge < VOL_EDGE_MIN && adx > ADX_MAX) { verdictText = 'WAIT — Vol Edge Thin + ADX High'; verdictSubtext = `Vol edge ${volEdge.toFixed(1)}% (need 5%) and ADX ${adx.toFixed(1)} (need < 28). No trade today.`; }
+        else if (v.value === 'GREEN' && volEdge < VOL_EDGE_MIN) { verdictText = 'WAIT — Vol Edge Too Thin'; verdictSubtext = `Vol edge ${volEdge.toFixed(1)}% below 5% minimum. Premium math doesn't work today.`; }
+        else if (v.value === 'GREEN' && adx > ADX_MAX) { verdictText = 'WAIT — ADX Too High'; verdictSubtext = `ADX ${adx.toFixed(1)} above 28 threshold. Iron condor suspended.`; }
+        else { verdictText = 'TRADE AGGRESSIVELY'; verdictSubtext = 'All conditions favorable. Run the chain poller.'; }
+
+        let strategyText, sizingText, entryText;
+        if (v.value === 'RED') { strategyText = 'No trade — sit in cash'; sizingText = '$0'; entryText = 'N/A'; }
+        else if (volEdge < VOL_EDGE_MIN && adx > ADX_MAX) { strategyText = 'No trade today — vol edge absent and ADX too high'; sizingText = '$0 — skip today'; entryText = 'Wait for conditions to improve'; }
+        else if (volEdge < VOL_EDGE_MIN) { strategyText = 'No trade today — vol edge too thin for premium selling'; sizingText = '$0 — skip today'; entryText = 'Monitor vol edge — target 5%+'; }
+        else if (adx > ADX_MAX) { strategyText = 'Single-side credit spread only — half size'; sizingText = '$125–$187 per spread'; entryText = '9:45–10:30 AM — confirm direction first'; }
+        else { strategyText = v.strategy; sizingText = v.sizing; entryText = v.entry_window; }
+
         const nextLink = v.value === 'RED'
             ? `<a href="#" onclick="showTab('risk'); return false;" style="color:${vc.text}; font-size:15px;">→ Review open positions</a>`
-            : `<a href="/" style="color:${vc.text}; font-size:15px;">→ Go to Scanner — start the chain poller</a>`;
+            : (verdictText === 'TRADE AGGRESSIVELY' || verdictText === 'TRADE CAUTIOUSLY')
+            ? `<a href="/" style="color:${vc.text}; font-size:15px;">→ Go to Scanner — start the chain poller</a>`
+            : '';
         html += `<div style="background:${vc.bg}; border:2px solid ${vc.border}; border-radius:12px; padding:30px; margin-top:10px;">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
-                <div style="font-size:26px; font-weight:bold; color:${vc.text};">${vc.icon} ${v.value} — ${v.value === 'GREEN' ? 'TRADE AGGRESSIVELY' : (v.value === 'YELLOW' ? 'TRADE CAUTIOUSLY' : 'DO NOT TRADE')}</div>
+                <div style="font-size:26px; font-weight:bold; color:${vc.text};">${vc.icon} ${v.value} — ${verdictText}</div>
                 <div style="font-size:18px; color:${vc.text};">Score: ${v.composite_score}/100</div>
             </div>
+            <div style="color:${vc.text}; font-size:14px; margin-top:8px;">${verdictSubtext}</div>
             <div style="display:grid; grid-template-columns:auto 1fr; gap:6px 20px; margin-top:20px; font-size:15px; color:#ccc;">
-                <div style="color:#999;">Strategy:</div><div>${v.strategy}</div>
-                <div style="color:#999;">Sizing:</div><div>${v.sizing}</div>
-                <div style="color:#999;">Entry:</div><div>${v.entry_window}</div>
+                <div style="color:#999;">Strategy:</div><div>${strategyText}</div>
+                <div style="color:#999;">Sizing:</div><div>${sizingText}</div>
+                <div style="color:#999;">Entry:</div><div>${entryText}</div>
             </div>
-            <div style="color:#bbb; margin-top:15px; font-size:14px;">${v.notes}</div>
+            <div style="color:#bbb; margin-top:15px; font-size:14px;">${verdictText === 'TRADE AGGRESSIVELY' ? v.notes : 'Monitor conditions — check back when vol edge crosses 5% and ADX drops below 28.'}</div>
             <div style="margin-top:15px;">${nextLink}</div>
             <div id="mb-position-status" style="margin-top:10px; color:#888; font-size:13px;">○ No active 0DTE position today</div>
         </div>`;
@@ -2431,6 +2453,15 @@ RESEARCH_DASHBOARD_HTML = """
             html += `</div>`;
         }
 
+        // Trade Ticket Section
+        html += `<div id="trade-ticket-section" style="margin:16px 0;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+                <button id="trade-ticket-btn" onclick="generateTradeTicket()" style="background:#1d4ed8; color:white; border:none; border-radius:6px; padding:10px 20px; font-size:14px; font-weight:bold; cursor:pointer;">📋 Generate Trade Ticket</button>
+                <span id="trade-ticket-strategy-label" style="color:#888; font-size:13px;"></span>
+            </div>
+            <div id="trade-ticket-output" style="display:none;"></div>
+        </div>`;
+
         // Section 7 — Trade Plan
         html += `<div class="section" style="margin-top:20px;"><h2>📋 Trade Plan</h2>`;
 
@@ -2463,15 +2494,17 @@ RESEARCH_DASHBOARD_HTML = """
                 html += `<div style="background:#4a3728; border:1px solid #f59e0b; border-radius:6px; padding:10px; margin-bottom:12px; color:#f59e0b; font-size:13px;">${pb.adx_note}</div>`;
             }
             const scenColors = {bull:'#22c55e', bear:'#ef4444', neutral:'#666'};
+            const activeStratLabel = (volEdge >= VOL_EDGE_MIN && adx < ADX_MAX) ? 'the iron condor' : (adx >= ADX_MAX) ? 'the put spread' : 'the position';
             html += `<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; margin-bottom:15px;">`;
             ['bull','bear','neutral'].forEach(key => {
                 const sc = pb.scenarios[key];
                 const bc = scenColors[key];
+                const actionText = sc.action.replace(/the full IC/g, activeStratLabel);
                 html += `<div style="background:#1a1a2e; padding:15px; border-radius:8px; border-left:4px solid ${bc};">
                     <div style="font-size:16px; font-weight:bold; color:${bc}; margin-bottom:8px;">${sc.label}</div>
                     <div style="color:#999; font-size:12px; margin-bottom:4px;">Trigger: ${sc.trigger}</div>
                     <div style="color:#ccc; font-size:12px; margin-bottom:8px;">Risk: ${sc.spread_risk}</div>
-                    <div style="color:#bbb; font-size:13px;">${sc.action}</div>
+                    <div style="color:#bbb; font-size:13px;">${actionText}</div>
                 </div>`;
             });
             html += `</div>`;
@@ -2485,6 +2518,193 @@ RESEARCH_DASHBOARD_HTML = """
         html += `</div>`;
 
         el.innerHTML = html;
+    }
+
+    // ── Trade Ticket Generator ────────────────────────────────────────
+    let _briefData = null;
+
+    function storeBriefDataForTicket(data) {
+        _briefData = data;
+        updateTradeTicketButton(data);
+    }
+
+    function updateTradeTicketButton(data) {
+        const btn = document.getElementById('trade-ticket-btn');
+        const label = document.getElementById('trade-ticket-strategy-label');
+        if (!btn || !label) return;
+
+        const volEdgePct = data.sections?.volatility_edge?.vol_edge_pct || 0;
+        const adxVal = data.sections?.trend_assessment?.adx || 99;
+        const verdict = data.sections?.verdict?.value || 'RED';
+
+        const isWaitDay = (verdict === 'RED' || volEdgePct < 5.0 || adxVal > 35);
+        if (isWaitDay) {
+            btn.disabled = true;
+            btn.style.background = '#374151';
+            btn.style.cursor = 'not-allowed';
+            label.textContent = volEdgePct < 5.0
+                ? `Vol edge ${volEdgePct.toFixed(1)}% — no trade today`
+                : 'No trade — conditions not met';
+            label.style.color = '#ef4444';
+            const output = document.getElementById('trade-ticket-output');
+            if (output) output.style.display = 'none';
+            return;
+        }
+
+        const strategy = _getAutoStrategy(data);
+        if (strategy === 'NONE') {
+            btn.disabled = true;
+            btn.style.background = '#374151';
+            btn.style.cursor = 'not-allowed';
+            label.textContent = 'No trade — conditions not met';
+            label.style.color = '#ef4444';
+        } else {
+            btn.disabled = false;
+            btn.style.background = '#1d4ed8';
+            btn.style.cursor = 'pointer';
+            label.textContent = strategy === 'IC' ? 'Iron Condor (4 legs)' : 'Put Credit Spread (2 legs)';
+            label.style.color = '#22c55e';
+        }
+        document.getElementById('trade-ticket-output').style.display = 'none';
+    }
+
+    function _getAutoStrategy(data) {
+        if (!data) return 'NONE';
+        const verdict = (data.sections?.verdict?.value) || 'RED';
+        const adx = data.sections?.trend_assessment?.adx || 99;
+        const volEdge = data.sections?.volatility_edge?.vol_edge_pct || 0;
+        const term = data.sections?.vix_regime?.term_structure || 'UNKNOWN';
+        if (verdict === 'RED' || term === 'BACKWARDATION' || adx > 35) return 'NONE';
+        if (verdict === 'GREEN' && adx < 28 && volEdge >= 5.0) return 'IC';
+        if (verdict === 'YELLOW' || (adx >= 28 && adx <= 35)) return 'PS';
+        if (verdict === 'GREEN' && volEdge < 5.0) return 'PS';
+        return 'NONE';
+    }
+
+    function generateTradeTicket() {
+        if (!_briefData) return;
+        const _ve = _briefData.sections?.volatility_edge?.vol_edge_pct || 0;
+        const _verdict = _briefData.sections?.verdict?.value || 'RED';
+        if (_ve < 5.0 || _verdict === 'RED') return;
+        const strategy = _getAutoStrategy(_briefData);
+        if (strategy === 'NONE') return;
+
+        const spx = _briefData.strike_probability?.spx_price || 0;
+        const dm = _briefData.strike_probability?.delta_map || [];
+        const target = dm.find(r => r.is_current_target) || dm.find(r => Math.abs(r.delta - 0.12) < 0.03);
+        const putStrike = target ? target.put_strike : _estStrike(spx, -1);
+        const callStrike = target ? target.call_strike : _estStrike(spx, 1);
+        const putWing = putStrike - 5;
+        const callWing = callStrike + 5;
+        const expiry = _getTodayExpiry();
+
+        const tickets = {
+            tastytrade: _ticketTT(strategy, putStrike, putWing, callStrike, callWing, expiry),
+            thinkorswim: _ticketTOS(strategy, putStrike, putWing, callStrike, callWing, expiry),
+            robinhood: _ticketRH(strategy, putStrike, putWing, callStrike, callWing, expiry)
+        };
+        _renderTicket(strategy, tickets, putStrike, putWing, callStrike, callWing, expiry);
+    }
+
+    function _estStrike(spx, dir) { return Math.round((spx + spx * 0.012 * 1.17 * dir) / 5) * 5; }
+    function _getTodayExpiry() {
+        const d = new Date();
+        const mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0'), yy = String(d.getFullYear()).slice(2);
+        return `${mm}/${dd}/${yy}`;
+    }
+
+    function _ticketTT(s, ps, pw, cs, cw, exp) {
+        if (s === 'IC') return {
+            title: 'Tastytrade — Iron Condor',
+            steps: ['1. Search: SPX', `2. Select expiry: ${exp} (0DTE)`, '3. Click "Iron Condor" under Spreads', `4. Short Put: ${ps} | Long Put: ${pw}`, `5. Short Call: ${cs} | Long Call: ${cw}`, '6. Qty: 1 | Limit (mid)'],
+            clipboard: `SPX ${exp} Iron Condor\\nSell Put ${ps} / Buy Put ${pw}\\nSell Call ${cs} / Buy Call ${cw}\\nQty: 1 | Limit (mid)`
+        };
+        return {
+            title: 'Tastytrade — Put Credit Spread',
+            steps: ['1. Search: SPX', `2. Select expiry: ${exp} (0DTE)`, '3. Click "Vertical" → Put', `4. Short Put: ${ps} | Long Put: ${pw}`, '5. Qty: 1 | Limit (mid)'],
+            clipboard: `SPX ${exp} Put Credit Spread\\nSell Put ${ps} / Buy Put ${pw}\\nQty: 1 | Limit (mid)`
+        };
+    }
+
+    function _ticketTOS(s, ps, pw, cs, cw, exp) {
+        if (s === 'IC') return {
+            title: 'Thinkorswim — Iron Condor',
+            steps: ['1. Trade tab → search SPX', `2. Expiry: ${exp}`, '3. Right-click → Sell → Iron Condor', `4. Or manually set: Put ${ps}/${pw}, Call ${cs}/${cw}`, '5. Limit order at mid | Qty: 1'],
+            clipboard: `SPX ${exp} Iron Condor (TOS)\\n-1 SPX ${exp} ${ps}P\\n+1 SPX ${exp} ${pw}P\\n-1 SPX ${exp} ${cs}C\\n+1 SPX ${exp} ${cw}C`
+        };
+        return {
+            title: 'Thinkorswim — Put Credit Spread',
+            steps: ['1. Trade tab → search SPX', `2. Expiry: ${exp}`, `3. Right-click Put ${ps} → Sell`, `4. Right-click Put ${pw} → Buy`, '5. Limit order at mid | Qty: 1'],
+            clipboard: `SPX ${exp} Put Credit Spread (TOS)\\n-1 SPX ${exp} ${ps}P\\n+1 SPX ${exp} ${pw}P`
+        };
+    }
+
+    function _ticketRH(s, ps, pw, cs, cw, exp) {
+        const sps=Math.round(ps/10), spw=sps-1, scs=Math.round(cs/10), scw=scs+1;
+        const warn = '⚠️ Robinhood does not support SPX. Using SPY equivalent (SPX ÷ 10). Width: 1 point (SPY equivalent of 5-point SPX spread).';
+        if (s === 'IC') return {
+            title: 'Robinhood — SPY Iron Condor', warning: warn,
+            steps: ['1. Search: SPY', `2. Expiry: ${exp} (0DTE)`, '3. Trade → Trade Options → Iron Condor', `4. Short Put: ${sps} | Long Put: ${spw}`, `5. Short Call: ${scs} | Long Call: ${scw}`, '6. Qty: 1 | Width: 1pt | Review credit'],
+            clipboard: `SPY ${exp} Iron Condor (RH)\\nSell Put ${sps} / Buy Put ${spw}\\nSell Call ${scs} / Buy Call ${scw}\\nQty: 1 | Width: 1pt\\n⚠️ SPX equivalent`
+        };
+        return {
+            title: 'Robinhood — SPY Put Credit Spread', warning: warn,
+            steps: ['1. Search: SPY', `2. Expiry: ${exp}`, '3. Trade → Trade Options → Put Credit Spread', `4. Short Put: ${sps} | Long Put: ${spw}`, '5. Qty: 1 | Width: 1pt | Review credit'],
+            clipboard: `SPY ${exp} Put Credit Spread (RH)\\nSell Put ${sps} / Buy Put ${spw}\\nQty: 1 | Width: 1pt\\n⚠️ SPX equivalent`
+        };
+    }
+
+    function _renderTicket(strategy, tickets, ps, pw, cs, cw, exp) {
+        const out = document.getElementById('trade-ticket-output');
+        out.style.display = 'block';
+        const label = strategy === 'IC' ? 'Iron Condor' : 'Put Credit Spread';
+        const legs = strategy === 'IC' ? `Sell Put ${ps} / Buy Put ${pw} | Sell Call ${cs} / Buy Call ${cw}` : `Sell Put ${ps} / Buy Put ${pw}`;
+        const platforms = ['tastytrade','thinkorswim','robinhood'];
+        const pNames = {tastytrade:'Tastytrade', thinkorswim:'Thinkorswim', robinhood:'Robinhood'};
+
+        out.innerHTML = `<div style="background:#1a1a2e; border:1px solid #334155; border-radius:8px; padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <div>
+                    <div style="font-size:16px; font-weight:bold; color:#e2e8f0;">📋 ${label} — SPX ${exp}</div>
+                    <div style="font-size:13px; color:#94a3b8; margin-top:4px;">${legs}</div>
+                    <div style="font-size:11px; color:#64748b; margin-top:4px;">For manual entry only — not an automated order</div>
+                </div>
+                <button onclick="document.getElementById('trade-ticket-output').style.display='none'" style="background:none; border:none; color:#64748b; cursor:pointer; font-size:18px;">✕</button>
+            </div>
+            <div style="display:flex; gap:8px; margin-bottom:16px;">
+                ${platforms.map(p => `<button onclick="showTicketPlatform('${p}')" id="ticket-tab-${p}" style="padding:6px 14px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:#94a3b8; cursor:pointer; font-size:13px;">${pNames[p]}</button>`).join('')}
+            </div>
+            ${platforms.map(p => {
+                const t = tickets[p]; if (!t) return '';
+                return `<div id="ticket-panel-${p}" style="display:none;">
+                    <div style="font-size:14px; font-weight:bold; color:#e2e8f0; margin-bottom:8px;">${t.title}</div>
+                    ${t.warning ? `<div style="background:#451a03; border:1px solid #f59e0b; border-radius:6px; padding:8px; margin-bottom:10px; color:#fbbf24; font-size:12px;">${t.warning}</div>` : ''}
+                    <ol style="color:#cbd5e1; font-size:13px; line-height:1.8; margin:0 0 12px 16px; padding:0;">${t.steps.map(s => `<li>${s}</li>`).join('')}</ol>
+                    <button onclick="copyTicket('${p}')" style="background:#1d4ed8; color:white; border:none; border-radius:6px; padding:8px 16px; font-size:13px; cursor:pointer; width:100%;">📋 Copy to Clipboard</button>
+                    <div id="ticket-copied-${p}" style="display:none; color:#22c55e; font-size:12px; margin-top:6px; text-align:center;">✅ Copied to clipboard</div>
+                </div>`;
+            }).join('')}
+        </div>`;
+        window._tickets = tickets;
+        showTicketPlatform('tastytrade');
+    }
+
+    function showTicketPlatform(p) {
+        ['tastytrade','thinkorswim','robinhood'].forEach(x => {
+            const panel = document.getElementById('ticket-panel-'+x);
+            const tab = document.getElementById('ticket-tab-'+x);
+            if (panel) panel.style.display = x===p ? 'block' : 'none';
+            if (tab) { tab.style.background = x===p ? '#1d4ed8' : '#0f172a'; tab.style.color = x===p ? 'white' : '#94a3b8'; }
+        });
+    }
+
+    async function copyTicket(p) {
+        const text = (window._tickets?.[p]?.clipboard || '').replace(/\\n/g, '\\n');
+        try { await navigator.clipboard.writeText(text); } catch(e) {
+            const el = document.createElement('textarea'); el.value = text; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+        }
+        const c = document.getElementById('ticket-copied-'+p);
+        if (c) { c.style.display = 'block'; setTimeout(() => c.style.display = 'none', 3000); }
     }
     </script>
 </body>
