@@ -30,6 +30,14 @@ COPY tastytrade_client.py .
 COPY tastytrade_data.py .
 COPY macro_regime.py .
 COPY watchlist.py .
+COPY ic_selector.py .
+COPY ic_preview.py .
+COPY ic_copy.py .
+COPY options_parser.py .
+COPY options_tracker.py .
+COPY options_tracker_routes.py .
+COPY earnings_scanner.py .
+COPY earnings_scanner_routes.py .
 COPY pattern_screener.py .
 COPY sectors.json .
 COPY sector_scan.py .

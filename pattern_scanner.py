@@ -2651,6 +2651,8 @@ def home():
             <a href="/">Home</a>
             <a href="/tracked">Tracked Stocks</a>
             <a href="/watchlist">👁 Watchlist</a>
+            <a href="/options-tracker">📊 Options</a>
+            <a href="/earnings-scanner">📡 Earnings</a>
             <a href="/research">🔬 Alpha Research</a>
             <a href="/journal/">📊 Trade Journal</a>
             <a href="/saved-results">📁 Saved Results</a>
@@ -3456,6 +3458,8 @@ SCAN_RESULTS_TEMPLATE = """
             <a href="/">Home</a>
             <a href="/tracked">Tracked Stocks</a>
             <a href="/watchlist">👁 Watchlist</a>
+            <a href="/options-tracker">📊 Options</a>
+            <a href="/earnings-scanner">📡 Earnings</a>
             <a href="/research">🔬 Alpha Research</a>
             <a href="/saved-results">📁 Saved Results</a>
             {% if is_saved %}
@@ -3652,6 +3656,7 @@ SCAN_RESULTS_TEMPLATE = """
                     <a class="view-btn" href="/chart/{{ r.symbol }}">View</a>
                     <a class="view-btn" href="/journal/new?symbol={{ r.symbol }}&score={{ r.score }}&buy_point={{ r.buy_point }}&stop={{ r.stop_loss }}&target={{ r.target }}&pattern={{ r.pattern_type }}&adx={{ r.adx }}&rsi={{ r.rsi }}" style="background: #4caf50; margin-left: 5px;">Log Trade</a>
                     <a class="view-btn" href="/watchlist?ticker={{ r.symbol }}&floor={{ r.stop_loss }}&resistance={{ r.buy_point }}&volume_multiplier=2.0&notes={{ r.pattern_type }}%20R:R%20{{ r.rr_ratio }}:1" style="background: #667eea; margin-left: 5px;">👁 Watch</a>
+                    <button class="view-btn" onclick="showIC('{{ r.symbol }}')" style="background: #9333ea; margin-left: 5px; border: none; cursor: pointer; color: white;">IC</button>
                 </td>
                 <td>{{ r.pattern_count }}</td>
                 <td>{% if r.asc_triangle %}<span class="pattern-badge badge-triangle">YES<br>R: ${{ r.asc_triangle.resistance }}</span>{% else %}-{% endif %}</td>
@@ -3712,6 +3717,45 @@ SCAN_RESULTS_TEMPLATE = """
         </table>
 
         <script>
+        {% raw %}
+        async function showIC(symbol) {
+            let el = document.getElementById('ic-modal');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'ic-modal';
+                el.style.cssText = 'position:fixed;top:0;right:0;width:420px;height:100%;background:#16213e;z-index:9999;padding:20px;overflow-y:auto;box-shadow:-4px 0 20px rgba(0,0,0,0.5);';
+                document.body.appendChild(el);
+            }
+            el.style.display = 'block';
+            el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;"><h3 style="color:#9333ea;margin:0;">Iron Condor — ${symbol}</h3><button onclick="document.getElementById('ic-modal').style.display='none'" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;">✕</button></div><p style="color:#888;">Loading...</p>`;
+            try {
+                const resp = await fetch('/api/ic/' + symbol);
+                const ic = await resp.json();
+                if (!ic.viable) {
+                    el.innerHTML += `<p style="color:#f59e0b;">No viable IC setup: ${ic.reason || 'unknown'}</p>`;
+                    return;
+                }
+                const f = v => Number(v).toFixed(2);
+                el.querySelector('p').innerHTML = `
+                    <div style="font-family:monospace;font-size:13px;color:#ccc;line-height:1.8;">
+                        <div style="color:#9333ea;font-weight:bold;margin-bottom:8px;">Expiry: ${ic.expiry} (${ic.dte} DTE)</div>
+                        <div>Short Put: <strong>${f(ic.short_put.strike)}</strong> Δ${ic.short_put.delta} mid $${f(ic.short_put.mid)}</div>
+                        <div>Long Put: <strong>${f(ic.long_put.strike)}</strong> Δ${ic.long_put.delta} mid $${f(ic.long_put.mid)}</div>
+                        <div>Short Call: <strong>${f(ic.short_call.strike)}</strong> Δ${ic.short_call.delta} mid $${f(ic.short_call.mid)}</div>
+                        <div>Long Call: <strong>${f(ic.long_call.strike)}</strong> Δ${ic.long_call.delta} mid $${f(ic.long_call.mid)}</div>
+                        <hr style="border-color:#333;margin:10px 0;">
+                        <div>Est. Credit: <strong style="color:#22c55e;">$${f(ic.est_credit)}</strong> | Max Loss: <strong style="color:#ef4444;">$${f(ic.max_loss)}</strong></div>
+                        <div>Breakevens: $${f(ic.breakeven_low)} / $${f(ic.breakeven_high)}</div>
+                        <div>Credit/Width: ${(ic.credit_to_width_ratio*100).toFixed(1)}% ${ic.credit_to_width_ratio >= 0.25 ? '✓' : '✗'}</div>
+                        <hr style="border-color:#333;margin:10px 0;">
+                        <div style="color:#888;font-size:11px;">CLI: python ic_preview.py ${symbol} --execute-on-tasty</div>
+                    </div>`;
+            } catch(e) {
+                el.querySelector('p').innerHTML = `<span style="color:#ef4444;">Error: ${e.message}</span>`;
+            }
+        }
+        {% endraw %}
+
         function toggleSettings() {
             const settings = document.getElementById('screeningSettings');
             settings.style.display = settings.style.display === 'none' ? 'block' : 'none';
@@ -4463,6 +4507,8 @@ def chart(symbol):
                 <a href="/">Home</a>
                 <a href="/tracked">Tracked Stocks</a>
             <a href="/watchlist">👁 Watchlist</a>
+            <a href="/options-tracker">📊 Options</a>
+            <a href="/earnings-scanner">📡 Earnings</a>
             </div>
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -4578,7 +4624,7 @@ def chart(symbol):
             </div>
 
             <!-- Add to Watchlist -->
-            {% if analysis %}
+            {% if analysis and analysis.stop_loss %}
             <div class="track-form">
                 <h3>👁 Add to Watchlist</h3>
                 <a class="view-btn" style="background:#667eea; padding:10px 20px; font-size:14px; text-decoration:none; display:inline-block;"
@@ -4589,11 +4635,18 @@ def chart(symbol):
                     Floor: ${{ analysis.stop_loss }} | Resistance: ${{ analysis.buy_point }} | R:R {{ analysis.rr_ratio }}:1
                 </p>
             </div>
+            {% else %}
+            <div class="track-form">
+                <h3>👁 Add to Watchlist</h3>
+                <a class="view-btn" style="background:#667eea; padding:10px 20px; font-size:14px; text-decoration:none; display:inline-block;"
+                   href="/watchlist?ticker={{ symbol }}&floor={{ (company.current_price * 0.95)|round(2) if company.current_price else 0 }}&resistance={{ company.current_price|round(2) if company.current_price else 0 }}&volume_multiplier=2.0&notes=Manual%20add">
+                    👁 Add to Watchlist
+                </a>
+                <p style="font-size: 12px; color: #888; margin-top: 10px;">
+                    No pattern detected — floor set to 5% below current price. Edit on the watchlist page.
+                </p>
+            </div>
             {% endif %}
-
-            <div class="grid">
-                <!-- Breakout Criteria -->
-                <div class="card">
                     <h3>📊 Breakout Criteria</h3>
                     {% if analysis %}
                     <table>
@@ -4971,9 +5024,25 @@ def chart(symbol):
                     </div>
                     {% endif %}
                     
+                    <!-- TOS Order String -->
                     {% if options.status == 'success' %}
-                    
-                    <!-- Budget Adjustment -->
+                    <div style="margin-top: 15px; background: #0d0d1a; border: 1px solid #333; border-radius: 6px; padding: 12px;">
+                        <div style="font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 6px;">TOS Order String — Click to Copy</div>
+                        {% if options.strategy == 'Long Call' %}
+                        <div id="tos-order-str" onclick="copyTosOrder(this)" style="font-family: monospace; font-size: 12px; color: #00ff88; cursor: pointer; padding: 8px; background: #0f0f23; border-radius: 4px;">BUY +{{ options.contracts|default(1) }} {{ symbol }} 100 {{ options.expiration }} {{ options.buy_strike|int if options.buy_strike == options.buy_strike|int else options.buy_strike }} CALL @{{ options.buy_premium }} LMT</div>
+                        {% elif options.strategy == 'Cash-Secured Put' %}
+                        <div id="tos-order-str" onclick="copyTosOrder(this)" style="font-family: monospace; font-size: 12px; color: #00ff88; cursor: pointer; padding: 8px; background: #0f0f23; border-radius: 4px;">SELL -{{ options.contracts|default(1) }} {{ symbol }} 100 {{ options.expiration }} {{ options.sell_strike|int if options.sell_strike == options.sell_strike|int else options.sell_strike }} PUT @{{ options.sell_premium }} LMT</div>
+                        {% elif options.strategy == "Poor Man's Covered Call" %}
+                        <div id="tos-order-str" onclick="copyTosOrder(this)" style="font-family: monospace; font-size: 12px; color: #00ff88; cursor: pointer; padding: 8px; background: #0f0f23; border-radius: 4px;">BUY +{{ options.contracts|default(1) }} {{ symbol }} 100 {{ options.long_expiration }} {{ options.buy_strike|int if options.buy_strike == options.buy_strike|int else options.buy_strike }} CALL @{{ options.buy_premium }} LMT</div>
+                        <div onclick="copyTosOrder(this)" style="font-family: monospace; font-size: 12px; color: #ff8888; cursor: pointer; padding: 8px; background: #0f0f23; border-radius: 4px; margin-top: 4px;">SELL -{{ options.contracts|default(1) }} {{ symbol }} 100 {{ options.short_expiration }} {{ options.sell_strike|int if options.sell_strike == options.sell_strike|int else options.sell_strike }} CALL @{{ options.sell_premium }} LMT</div>
+                        {% elif options.strategy == 'Iron Condor' %}
+                        <div id="tos-order-str" onclick="copyTosOrder(this)" style="font-family: monospace; font-size: 12px; color: #00ff88; cursor: pointer; padding: 8px; background: #0f0f23; border-radius: 4px;">BUY +{{ options.contracts|default(1) }} 1/-1/-1/1 CUSTOM {{ symbol }} 100 {{ options.expiration }} {{ options.long_call_strike|int }}/{{ options.short_call_strike|int }}/{{ options.short_put_strike|int }}/{{ options.long_put_strike|int }} CALL/CALL/PUT/PUT @{{ options.net_credit }} LMT</div>
+                        {% endif %}
+                        <div style="font-size: 10px; color: #555; margin-top: 4px;">Click to copy → TOS: Trade tab → Order Entry Tools → Paste from Clipboard</div>
+                    </div>
+                    {% endif %}
+
+                    {% if options.status == 'success' %}
                     <div style="margin-top: 10px;">
                         <form style="display: inline-flex; gap: 10px; align-items: center;">
                             <span style="color: #888; font-size: 12px;">Adjust budget:</span>
@@ -5225,6 +5294,32 @@ def chart(symbol):
         let atrPriceChart = null, atrATRChart = null;
         let chartData = null, currentChartType = 'line', currentTF = 'day';
         let showSignals = true;
+
+        function copyTosOrder(el) {
+            var text = el.textContent;
+            navigator.clipboard.writeText(text).then(function() {
+                var orig = el.textContent;
+                el.textContent = '✓ Copied to clipboard!';
+                el.style.color = '#00c853';
+                setTimeout(function() { el.textContent = orig; el.style.color = ''; }, 2000);
+            }).catch(function() {
+                var ta = document.createElement('textarea');
+                ta.value = text; document.body.appendChild(ta); ta.select();
+                document.execCommand('copy'); document.body.removeChild(ta);
+                var orig = el.textContent;
+                el.textContent = '✓ Copied!';
+                setTimeout(function() { el.textContent = orig; }, 2000);
+            });
+        }
+        // Convert YYYY-MM-DD dates in TOS strings to DD MON YY format on page load
+        (function() {
+            var ms = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+            document.querySelectorAll('[id=tos-order-str]').forEach(function(el) {
+                el.textContent = el.textContent.replace(/(\d{4})-(\d{2})-(\d{2})/g, function(m,y,mo,d) {
+                    return parseInt(d) + ' ' + ms[parseInt(mo)-1] + ' ' + y.slice(2);
+                });
+            });
+        })();
 
         async function loadATRChart(tf) {
             currentTF = tf;
@@ -5534,6 +5629,8 @@ def tracked():
                 <a href="/">Home</a>
                 <a href="/tracked">Tracked Stocks</a>
             <a href="/watchlist">👁 Watchlist</a>
+            <a href="/options-tracker">📊 Options</a>
+            <a href="/earnings-scanner">📡 Earnings</a>
             </div>
             <h1>📈 Tracked Stocks</h1>
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -6030,10 +6127,15 @@ def _execute_single_poll():
         'put_alert': None, 'call_alert': None, 'proximity_message': None,
     }
 
-    # 1. Get regime from cache
+    # 1. Get regime — force refresh if cached data looks stale
     try:
         regime = run_regime_analysis()
         dims = regime.get('dimensions', {})
+        # Detect stale cache: ADX=0 and vol_spread=0 means data fetch failed
+        if (dims.get('trend_assessment', {}).get('adx', 0) == 0 and
+                dims.get('vol_spread', {}).get('spread', 0) == 0):
+            regime = run_regime_analysis(force_refresh=True)
+            dims = regime.get('dimensions', {})
         result['spx_price'] = regime.get('spx_price')
         result['vix'] = regime.get('vix_level')
         result['adx'] = dims.get('trend_assessment', {}).get('adx')
@@ -6710,12 +6812,16 @@ def get_spx_observation_prefill():
     try:
         from regime_classifier import run_regime_analysis
         regime = run_regime_analysis()
+        dims = regime.get('dimensions', {})
+        if (dims.get('trend_assessment', {}).get('adx', 0) == 0 and
+                dims.get('vol_spread', {}).get('spread', 0) == 0):
+            regime = run_regime_analysis(force_refresh=True)
+            dims = regime.get('dimensions', {})
         result['spx_price'] = regime.get('spx_price')
         result['vix'] = regime.get('vix_level')
         result['regime_verdict'] = regime.get('verdict')
         result['regime_score'] = round((regime.get('composite_score', 0) + 1) / 2 * 100, 1)
         result['recommended_strategy'] = regime.get('recommended_strategy')
-        dims = regime.get('dimensions', {})
         result['term_structure'] = dims.get('term_structure', {}).get('value')
         result['adx'] = dims.get('trend_assessment', {}).get('adx')
         result['vol_edge'] = dims.get('vol_spread', {}).get('spread')
@@ -6861,6 +6967,143 @@ def get_spx_observation_prefill():
     
     return result
 
+# Iron Condor API
+@app.route('/api/ic/<symbol>')
+def api_ic_setup(symbol):
+    try:
+        from ic_selector import get_ic_setup
+        ic = get_ic_setup(symbol.upper())
+        return ic
+    except Exception as e:
+        return {'viable': False, 'symbol': symbol.upper(), 'reason': str(e)}
+
+
+@app.route('/api/ic/submit', methods=['POST'])
+def api_ic_submit():
+    """Submit an iron condor to tastytrade as a working limit order.
+
+    The limit price is set 20% above the natural mid credit so the order
+    will NOT fill immediately. It shows up in the tastytrade app where
+    the user can adjust the price and confirm.
+    """
+    try:
+        import asyncio
+        import nest_asyncio
+        nest_asyncio.apply()
+
+        from tastytrade_client import get_session
+        from tastytrade import Account
+        from tastytrade.instruments import get_option_chain
+        from tastytrade.order import (
+            NewOrder, Leg, OrderAction, OrderTimeInForce,
+            OrderType, PriceEffect, InstrumentType,
+        )
+        from decimal import Decimal
+        from datetime import datetime
+
+        session = get_session()
+        if not session:
+            return {'success': False, 'error': 'Tastytrade not connected — check credentials in .env'}, 400
+
+        data = request.get_json()
+        symbol = data.get('symbol', 'SPX')
+        short_put_strike = float(data['short_put_strike'])
+        long_put_strike = float(data['long_put_strike'])
+        short_call_strike = float(data['short_call_strike'])
+        long_call_strike = float(data['long_call_strike'])
+        mid_credit = float(data.get('mid_credit', 0))
+        expiry_str = data.get('expiry')
+
+        # Parse expiry
+        for fmt in ('%Y-%m-%d', '%m/%d/%y'):
+            try:
+                expiry = datetime.strptime(expiry_str, fmt).date()
+                break
+            except (ValueError, TypeError):
+                continue
+        else:
+            expiry = datetime.now().date()
+
+        async def _submit():
+            # Get option chain to find OCC symbols
+            chain = await get_option_chain(session, symbol)
+            if expiry not in chain:
+                if symbol == 'SPX':
+                    chain = await get_option_chain(session, 'SPXW')
+                if expiry not in chain:
+                    return {'success': False, 'error': f'No chain for {symbol} expiry {expiry}'}
+
+            options = chain[expiry]
+
+            def find_occ(strike, opt_type):
+                matches = [o for o in options if o.option_type.value == opt_type]
+                if not matches:
+                    return None
+                best = min(matches, key=lambda o: abs(float(o.strike_price) - strike))
+                return best.symbol
+
+            sp_sym = find_occ(short_put_strike, 'P')
+            lp_sym = find_occ(long_put_strike, 'P')
+            sc_sym = find_occ(short_call_strike, 'C')
+            lc_sym = find_occ(long_call_strike, 'C')
+
+            if not all([sp_sym, lp_sym, sc_sym, lc_sym]):
+                return {'success': False, 'error': 'Could not find matching options in chain'}
+
+            # Set limit 20% above mid so it won't fill — user adjusts in app
+            limit_price = Decimal(str(round(mid_credit * 1.20, 2)))
+
+            legs = [
+                Leg(instrument_type=InstrumentType.EQUITY_OPTION, symbol=sp_sym,
+                    action=OrderAction.SELL_TO_OPEN, quantity=Decimal('1')),
+                Leg(instrument_type=InstrumentType.EQUITY_OPTION, symbol=lp_sym,
+                    action=OrderAction.BUY_TO_OPEN, quantity=Decimal('1')),
+                Leg(instrument_type=InstrumentType.EQUITY_OPTION, symbol=sc_sym,
+                    action=OrderAction.SELL_TO_OPEN, quantity=Decimal('1')),
+                Leg(instrument_type=InstrumentType.EQUITY_OPTION, symbol=lc_sym,
+                    action=OrderAction.BUY_TO_OPEN, quantity=Decimal('1')),
+            ]
+
+            order = NewOrder(
+                time_in_force=OrderTimeInForce.DAY,
+                order_type=OrderType.LIMIT,
+                legs=legs,
+                price=limit_price,
+                source=f'{symbol} IC via scanner',
+            )
+
+            accounts = await Account.get(session)
+            if not accounts:
+                return {'success': False, 'error': 'No tastytrade accounts found'}
+            acct = accounts[0] if isinstance(accounts, list) else accounts
+
+            resp = await acct.place_order(session, order, dry_run=False)
+
+            return {
+                'success': True,
+                'message': f'Order sent to tastytrade — adjust limit from ${limit_price} down to fill',
+                'account': acct.account_number,
+                'limit_price': float(limit_price),
+                'mid_credit': mid_credit,
+                'legs': {
+                    'short_put': sp_sym, 'long_put': lp_sym,
+                    'short_call': sc_sym, 'long_call': lc_sym,
+                },
+            }
+
+        result = asyncio.get_event_loop().run_until_complete(_submit())
+        status_code = 200 if result.get('success') else 400
+        return result, status_code
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        msg = str(e)
+        # Clean up tastytrade error messages
+        if 'margin_check' in msg or 'buying_power' in msg.lower():
+            return {'success': False, 'error': f'Tastytrade rejected: {msg.split(chr(10))[0]}'}, 400
+        return {'success': False, 'error': msg}, 500
+
 # Register research API blueprint
 try:
     from research_api import research_bp
@@ -6873,6 +7116,10 @@ try:
     add_research_routes(app)
     from watchlist import add_watchlist_routes
     add_watchlist_routes(app)
+    from options_tracker_routes import add_options_tracker_routes
+    add_options_tracker_routes(app)
+    from earnings_scanner_routes import add_earnings_scanner_routes
+    add_earnings_scanner_routes(app)
 except ImportError:
     pass  # Research API not available
 

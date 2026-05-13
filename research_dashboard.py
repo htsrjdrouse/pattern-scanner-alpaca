@@ -2603,6 +2603,9 @@ RESEARCH_DASHBOARD_HTML = """
             thinkorswim: _ticketTOS(strategy, putStrike, putWing, callStrike, callWing, expiry),
             robinhood: _ticketRH(strategy, putStrike, putWing, callStrike, callWing, expiry)
         };
+        // Estimate credit from straddle data for order submission
+        const straddle = _briefData.strike_probability?.straddle_range?.move || 0;
+        window._icEstCredit = straddle ? Math.round(straddle * 0.08 * 100) / 100 : 1.50; // ~8% of straddle or default
         _renderTicket(strategy, tickets, putStrike, putWing, callStrike, callWing, expiry);
     }
 
@@ -2614,28 +2617,77 @@ RESEARCH_DASHBOARD_HTML = """
     }
 
     function _ticketTT(s, ps, pw, cs, cw, exp) {
+        const link = 'https://trade.tastytrade.com';
         if (s === 'IC') return {
             title: 'Tastytrade — Iron Condor',
-            steps: ['1. Search: SPX', `2. Select expiry: ${exp} (0DTE)`, '3. Click "Iron Condor" under Spreads', `4. Short Put: ${ps} | Long Put: ${pw}`, `5. Short Call: ${cs} | Long Call: ${cw}`, '6. Qty: 1 | Limit (mid)'],
+            link: link,
+            steps: [
+                `<a href="${link}" target="_blank" style="color:#4fc3f7; font-weight:bold;">→ Open Tastytrade</a>`,
+                '2. Type <strong>SPX</strong> in the search bar at top',
+                `3. Click the <strong>Trade</strong> tab → find expiry <strong>${exp}</strong> (0DTE)`,
+                '4. In the option chain, click the <strong>Strategies</strong> dropdown → select <strong>Iron Condor</strong>',
+                `5. Set <strong>Short Put: ${ps}</strong> and <strong>Long Put: ${pw}</strong>`,
+                `6. Set <strong>Short Call: ${cs}</strong> and <strong>Long Call: ${cw}</strong>`,
+                '7. Set Qty: <strong>1</strong> | Order type: <strong>Limit</strong> at the mid price',
+                '8. Click <strong>Review & Send</strong> — verify credit before confirming'
+            ],
             clipboard: `SPX ${exp} Iron Condor\\nSell Put ${ps} / Buy Put ${pw}\\nSell Call ${cs} / Buy Call ${cw}\\nQty: 1 | Limit (mid)`
         };
         return {
             title: 'Tastytrade — Put Credit Spread',
-            steps: ['1. Search: SPX', `2. Select expiry: ${exp} (0DTE)`, '3. Click "Vertical" → Put', `4. Short Put: ${ps} | Long Put: ${pw}`, '5. Qty: 1 | Limit (mid)'],
+            link: link,
+            steps: [
+                `<a href="${link}" target="_blank" style="color:#4fc3f7; font-weight:bold;">→ Open Tastytrade</a>`,
+                '2. Type <strong>SPX</strong> in the search bar at top',
+                `3. Click the <strong>Trade</strong> tab → find expiry <strong>${exp}</strong> (0DTE)`,
+                '4. In the option chain, click the <strong>Strategies</strong> dropdown → select <strong>Vertical</strong> → <strong>Put</strong>',
+                `5. Set <strong>Short Put: ${ps}</strong> and <strong>Long Put: ${pw}</strong>`,
+                '6. Set Qty: <strong>1</strong> | Order type: <strong>Limit</strong> at the mid price',
+                '7. Click <strong>Review & Send</strong> — verify credit before confirming'
+            ],
             clipboard: `SPX ${exp} Put Credit Spread\\nSell Put ${ps} / Buy Put ${pw}\\nQty: 1 | Limit (mid)`
         };
     }
 
     function _ticketTOS(s, ps, pw, cs, cw, exp) {
+        // Build TOS paste-from-clipboard order string
+        const months = ['','JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+        const d = new Date();
+        const dd = String(d.getDate()).padStart(2,'0');
+        const mon = months[d.getMonth()+1];
+        const yy = String(d.getFullYear()).slice(2);
+        const expTos = `${dd} ${mon} ${yy}`;
+        const series = '(Weeklys)'; // 0DTE is always weeklys
+        // Snap strikes to nearest 5
+        const snap = v => Math.round(v / 5) * 5;
+        const sps = snap(ps), spw = snap(pw), scs = snap(cs), scw = snap(cw);
+        const credit = (window._icEstCredit || 1.50).toFixed(2);
+        const tosStr = `BUY +1 1/-1/-1/1 CUSTOM SPX 100 ${series} ${expTos} ${scw}/${scs}/${sps}/${spw} CALL/CALL/PUT/PUT @${credit} LMT`;
         if (s === 'IC') return {
-            title: 'Thinkorswim — Iron Condor',
-            steps: ['1. Trade tab → search SPX', `2. Expiry: ${exp}`, '3. Right-click → Sell → Iron Condor', `4. Or manually set: Put ${ps}/${pw}, Call ${cs}/${cw}`, '5. Limit order at mid | Qty: 1'],
-            clipboard: `SPX ${exp} Iron Condor (TOS)\\n-1 SPX ${exp} ${ps}P\\n+1 SPX ${exp} ${pw}P\\n-1 SPX ${exp} ${cs}C\\n+1 SPX ${exp} ${cw}C`
+            title: 'Thinkorswim — Iron Condor (TOS Paste Ready)',
+            tosString: tosStr,
+            steps: [
+                '<strong style="color:#4fc3f7;">TOS Order String — copy and paste directly:</strong>',
+                `<code style="background:#0f172a; padding:6px 10px; border-radius:4px; display:block; margin:4px 0; font-size:12px; word-break:break-all; color:#22c55e;">${tosStr}</code>`,
+                'In TOS: <strong>Trade tab → Order Entry Tools → Paste from Clipboard</strong>',
+                `Strikes: Short Put ${sps} / Long Put ${spw} | Short Call ${scs} / Long Call ${scw}`,
+                `Expiry: ${expTos} (0DTE) | Credit: $${credit} | Qty: 1`
+            ],
+            clipboard: tosStr
         };
+        // Put spread
+        const psStr = `BUY +1 1/-1 CUSTOM SPX 100 ${series} ${expTos} ${sps}/${spw} PUT/PUT @${credit} LMT`;
         return {
-            title: 'Thinkorswim — Put Credit Spread',
-            steps: ['1. Trade tab → search SPX', `2. Expiry: ${exp}`, `3. Right-click Put ${ps} → Sell`, `4. Right-click Put ${pw} → Buy`, '5. Limit order at mid | Qty: 1'],
-            clipboard: `SPX ${exp} Put Credit Spread (TOS)\\n-1 SPX ${exp} ${ps}P\\n+1 SPX ${exp} ${pw}P`
+            title: 'Thinkorswim — Put Credit Spread (TOS Paste Ready)',
+            tosString: psStr,
+            steps: [
+                '<strong style="color:#4fc3f7;">TOS Order String — copy and paste directly:</strong>',
+                `<code style="background:#0f172a; padding:6px 10px; border-radius:4px; display:block; margin:4px 0; font-size:12px; color:#22c55e;">${psStr}</code>`,
+                'In TOS: <strong>Trade tab → Order Entry Tools → Paste from Clipboard</strong>',
+                `Strikes: Short Put ${sps} / Long Put ${spw}`,
+                `Expiry: ${expTos} (0DTE) | Credit: $${credit} | Qty: 1`
+            ],
+            clipboard: psStr
         };
     }
 
@@ -2680,12 +2732,14 @@ RESEARCH_DASHBOARD_HTML = """
                     <div style="font-size:14px; font-weight:bold; color:#e2e8f0; margin-bottom:8px;">${t.title}</div>
                     ${t.warning ? `<div style="background:#451a03; border:1px solid #f59e0b; border-radius:6px; padding:8px; margin-bottom:10px; color:#fbbf24; font-size:12px;">${t.warning}</div>` : ''}
                     <ol style="color:#cbd5e1; font-size:13px; line-height:1.8; margin:0 0 12px 16px; padding:0;">${t.steps.map(s => `<li>${s}</li>`).join('')}</ol>
+                    ${p === 'tastytrade' ? `<button onclick="submitToTastytrade()" id="tt-submit-btn" style="background:#22c55e; color:#000; border:none; border-radius:6px; padding:10px 16px; font-size:14px; font-weight:bold; cursor:pointer; width:100%; margin-bottom:8px;">🚀 Send to Tastytrade (working order at +20% limit)</button><div id="tt-submit-status" style="display:none; margin-bottom:8px; padding:8px; border-radius:6px; font-size:13px;"></div>` : ''}
                     <button onclick="copyTicket('${p}')" style="background:#1d4ed8; color:white; border:none; border-radius:6px; padding:8px 16px; font-size:13px; cursor:pointer; width:100%;">📋 Copy to Clipboard</button>
                     <div id="ticket-copied-${p}" style="display:none; color:#22c55e; font-size:12px; margin-top:6px; text-align:center;">✅ Copied to clipboard</div>
                 </div>`;
             }).join('')}
         </div>`;
         window._tickets = tickets;
+        window._icOrder = {ps, pw, cs, cw, exp, est_credit: (window._icEstCredit || 0)};
         showTicketPlatform('tastytrade');
     }
 
@@ -2705,6 +2759,57 @@ RESEARCH_DASHBOARD_HTML = """
         }
         const c = document.getElementById('ticket-copied-'+p);
         if (c) { c.style.display = 'block'; setTimeout(() => c.style.display = 'none', 3000); }
+    }
+
+    async function submitToTastytrade() {
+        const o = window._icOrder;
+        if (!o) { alert('Generate a ticket first'); return; }
+        const btn = document.getElementById('tt-submit-btn');
+        const status = document.getElementById('tt-submit-status');
+        btn.disabled = true;
+        btn.textContent = '⏳ Submitting...';
+        btn.style.background = '#666';
+        status.style.display = 'block';
+        status.style.background = '#1e293b';
+        status.style.color = '#94a3b8';
+        status.textContent = 'Connecting to tastytrade...';
+        try {
+            const resp = await fetch('/api/ic/submit', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    symbol: 'SPX',
+                    short_put_strike: o.ps,
+                    long_put_strike: o.pw,
+                    short_call_strike: o.cs,
+                    long_call_strike: o.cw,
+                    expiry: o.exp,
+                    mid_credit: o.est_credit
+                })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                status.style.background = '#14532d';
+                status.style.color = '#22c55e';
+                status.innerHTML = `✅ ${data.message}<br><small>Account: ${data.account} | Limit: $${data.limit_price} (adjust down in tastytrade to fill)</small>`;
+                btn.textContent = '✅ Sent — check tastytrade';
+                btn.style.background = '#14532d';
+            } else {
+                status.style.background = '#451a03';
+                status.style.color = '#f59e0b';
+                status.textContent = '❌ ' + (data.error || 'Unknown error');
+                btn.textContent = '🚀 Retry';
+                btn.style.background = '#22c55e';
+                btn.disabled = false;
+            }
+        } catch(e) {
+            status.style.background = '#3b1c1c';
+            status.style.color = '#ef4444';
+            status.textContent = '❌ ' + e.message;
+            btn.textContent = '🚀 Retry';
+            btn.style.background = '#22c55e';
+            btn.disabled = false;
+        }
     }
     </script>
 </body>
