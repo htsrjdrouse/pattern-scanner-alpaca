@@ -2308,12 +2308,30 @@ RESEARCH_DASHBOARD_HTML = """
             <div style="color:#bbb;">${s.volatility_edge.summary}</div>
         </div>`;
 
-        // Section 4 — Gap Risk
+        // Section 4 — Put Skew
+        const psColors = {NORMAL:'#22c55e', ELEVATED:'#f59e0b', STEEP:'#ef4444', UNKNOWN:'#9e9e9e'};
+        const ps = s.put_skew || {};
+        const psVal = ps.value || 'UNKNOWN';
+        const psRatio = ps.vix_vvix_ratio != null ? ps.vix_vvix_ratio.toFixed(3) : '—';
+        const psVvix = ps.vvix_level != null ? ps.vvix_level.toFixed(1) : '—';
+        const psVix = ps.vix_level != null ? Number(ps.vix_level).toFixed(2) : '—';
+        html += `<div class="section">
+            <h2>④ Put Skew</h2>
+            <div style="font-size:16px; margin-bottom:10px;">
+                VIX: <strong>${psVix}</strong> | VVIX: <strong>${psVvix}</strong> | Ratio: <strong>${psRatio}</strong>
+                &nbsp;&nbsp; Assessment: <strong style="color:${psColors[psVal]};">${psVal}</strong>
+            </div>
+            <div style="color:#bbb;">${ps.summary || ''}</div>
+            ${psVal === 'STEEP' ? '<div style="background:#3b1c1c; border:1px solid #ef4444; border-radius:6px; padding:10px; margin-top:10px; color:#ef4444;">⚠️ Put Skew Override — Steep put skew detected. Verdict downgraded GREEN → YELLOW. Widen put strikes by 10pts or skip put side.</div>' : ''}
+            ${psVal === 'ELEVATED' ? '<div style="background:#4a3728; border:1px solid #f59e0b; border-radius:6px; padding:10px; margin-top:10px; color:#f59e0b;">⚠️ Put Skew Elevated — Use wider put strikes than standard. Monitor put side closely.</div>' : ''}
+        </div>`;
+
+        // Section 5 — Gap Risk
         const grColors = {LOW:'#22c55e', ELEVATED:'#f59e0b', HIGH:'#ef4444', UNKNOWN:'#9e9e9e'};
         const grVal = s.gap_risk.value;
         const esPct = s.gap_risk.es_change_pct != null ? `${s.gap_risk.es_direction} ${Math.abs(s.gap_risk.es_change_pct).toFixed(2)}%` : '—';
         html += `<div class="section">
-            <h2>④ Gap Risk</h2>
+            <h2>⑤ Gap Risk</h2>
             <div style="font-size:16px; margin-bottom:10px;">
                 ES Futures: <strong>${s.gap_risk.es_price ?? '—'}</strong> (${esPct} pre-market)
                 &nbsp;&nbsp; Gap Risk: <strong style="color:${grColors[grVal]};">${grVal}</strong>
@@ -2322,7 +2340,7 @@ RESEARCH_DASHBOARD_HTML = """
             ${s.gap_risk.gap_risk_override ? '<div style="background:#3b1c1c; border:1px solid #ef4444; border-radius:6px; padding:10px; margin-top:10px; color:#ef4444;">⚠️ Gap Risk Override — Overnight move > 1%. Verdict downgraded from GREEN → YELLOW. Widen strike distances. Trade half size.</div>' : ''}
         </div>`;
 
-        // Section 5 — Verdict
+        // Section 6 — Verdict
         const v = s.verdict;
         const vColors = {GREEN:{bg:'#1b4332',border:'#22c55e',text:'#22c55e',icon:'✅'},
                          YELLOW:{bg:'#4a3728',border:'#f59e0b',text:'#f59e0b',icon:'⚠️'},
@@ -2380,11 +2398,11 @@ RESEARCH_DASHBOARD_HTML = """
             }
         }).catch(()=>{});
 
-        // Section 6 — Strike Probability Panel
+        // Section 7 — Strike Probability Panel
         const sp = data.strike_probability;
         if (sp) {
             html += `<div class="section" style="margin-top:20px;">
-                <h2>⑥ Strike Probability Panel</h2>
+                <h2>⑦ Strike Probability Panel</h2>
                 <div style="color:#999; margin-bottom:10px;">SPX: ${sp.spx_price} | VIX: ${sp.vix} | Daily IV: ${sp.daily_iv_pct}%</div>
                 <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:20px;">
                     <tr style="color:#9e9e9e; border-bottom:1px solid #3a3a52;"><th style="text-align:left;padding:8px;">Delta</th><th style="text-align:right;padding:8px;">Put Strike</th><th style="text-align:right;padding:8px;">Call Strike</th><th style="text-align:right;padding:8px;">Prob OTM</th><th style="text-align:left;padding:8px;">Status</th></tr>`;
@@ -2462,7 +2480,7 @@ RESEARCH_DASHBOARD_HTML = """
             <div id="trade-ticket-output" style="display:none;"></div>
         </div>`;
 
-        // Section 7 — Trade Plan
+        // Section 8 — Trade Plan
         html += `<div class="section" style="margin-top:20px;"><h2>📋 Trade Plan</h2>`;
 
         // Sub-section A: Key Levels
@@ -2562,8 +2580,9 @@ RESEARCH_DASHBOARD_HTML = """
             btn.disabled = false;
             btn.style.background = '#1d4ed8';
             btn.style.cursor = 'pointer';
-            label.textContent = strategy === 'IC' ? 'Iron Condor (4 legs)' : 'Put Credit Spread (2 legs)';
-            label.style.color = '#22c55e';
+            const stratLabels = {IC: 'Iron Condor (4 legs)', PS: 'Put Credit Spread (2 legs)', CS: 'Call Spread only — put skew too steep for IC'};
+            label.textContent = stratLabels[strategy] || strategy;
+            label.style.color = strategy === 'CS' ? '#f59e0b' : '#22c55e';
         }
         document.getElementById('trade-ticket-output').style.display = 'none';
     }
@@ -2574,8 +2593,11 @@ RESEARCH_DASHBOARD_HTML = """
         const adx = data.sections?.trend_assessment?.adx || 99;
         const volEdge = data.sections?.volatility_edge?.vol_edge_pct || 0;
         const term = data.sections?.vix_regime?.term_structure || 'UNKNOWN';
+        const putSkewSteep = data.sections?.put_skew?.value === 'STEEP';
         if (verdict === 'RED' || term === 'BACKWARDATION' || adx > 35) return 'NONE';
-        if (verdict === 'GREEN' && adx < 28 && volEdge >= 5.0) return 'IC';
+        if (verdict === 'GREEN' && adx < 28 && volEdge >= 5.0) {
+            return putSkewSteep ? 'CS' : 'IC';
+        }
         if (verdict === 'YELLOW' || (adx >= 28 && adx <= 35)) return 'PS';
         if (verdict === 'GREEN' && volEdge < 5.0) return 'PS';
         return 'NONE';
@@ -2590,48 +2612,79 @@ RESEARCH_DASHBOARD_HTML = """
         if (strategy === 'NONE') return;
 
         const spx = _briefData.strike_probability?.spx_price || 0;
-        const dm = _briefData.strike_probability?.delta_map || [];
-        const target = dm.find(r => r.is_current_target) || dm.find(r => Math.abs(r.delta - 0.12) < 0.03);
-        const putStrike = target ? target.put_strike : _estStrike(spx, -1);
-        const callStrike = target ? target.call_strike : _estStrike(spx, 1);
-        const putWing = putStrike - 5;
-        const callWing = callStrike + 5;
+        const SPREAD_WIDTH = 25;
+        // Use backend expected-move strikes from prefill
+        const pf = window._spxPrefillData || {};
+        let putStrike, putWing, callStrike, callWing, totalPremium;
+
+        if (pf.short_put_strike && pf.short_call_strike) {
+            putStrike = pf.short_put_strike;
+            putWing = pf.long_put_strike || (putStrike - SPREAD_WIDTH);
+            callStrike = pf.short_call_strike;
+            callWing = pf.long_call_strike || (callStrike + SPREAD_WIDTH);
+            totalPremium = pf.est_total_premium || null;
+        } else {
+            const dm = _briefData.strike_probability?.delta_map || [];
+            const target = dm.find(r => r.is_current_target) || dm.find(r => Math.abs(r.delta - 0.16) < 0.03);
+            putStrike = target ? target.put_strike : _estStrike(spx, -1);
+            callStrike = target ? target.call_strike : _estStrike(spx, 1);
+            putWing = putStrike - SPREAD_WIDTH;
+            callWing = callStrike + SPREAD_WIDTH;
+            totalPremium = null;
+        }
+
         const expiry = _getTodayExpiry();
+        // Use real premium for TOS order string
+        window._icEstCredit = totalPremium || ((_briefData.strike_probability?.straddle_range?.move || 0) * 0.08) || 1.50;
 
         const tickets = {
             tastytrade: _ticketTT(strategy, putStrike, putWing, callStrike, callWing, expiry),
             thinkorswim: _ticketTOS(strategy, putStrike, putWing, callStrike, callWing, expiry),
             robinhood: _ticketRH(strategy, putStrike, putWing, callStrike, callWing, expiry)
         };
-        // Estimate credit from straddle data for order submission
-        const straddle = _briefData.strike_probability?.straddle_range?.move || 0;
-        window._icEstCredit = straddle ? Math.round(straddle * 0.08 * 100) / 100 : 1.50; // ~8% of straddle or default
         _renderTicket(strategy, tickets, putStrike, putWing, callStrike, callWing, expiry);
     }
 
     function _estStrike(spx, dir) { return Math.round((spx + spx * 0.012 * 1.17 * dir) / 5) * 5; }
     function _getTodayExpiry() {
         const d = new Date();
+        const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
         const mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0'), yy = String(d.getFullYear()).slice(2);
-        return `${mm}/${dd}/${yy}`;
+        return { display: `${mm}/${dd}/${yy}`, tos: `${d.getDate()} ${months[d.getMonth()]} ${yy}` };
     }
 
     function _ticketTT(s, ps, pw, cs, cw, exp) {
         const link = 'https://trade.tastytrade.com';
+        const expDisplay = exp.display || exp;
+        const creditDisplay = window._icEstCredit ? `$${Number(window._icEstCredit).toFixed(2)} total credit` : 'use natural midpoint';
         if (s === 'IC') return {
             title: 'Tastytrade — Iron Condor',
             link: link,
             steps: [
                 `<a href="${link}" target="_blank" style="color:#4fc3f7; font-weight:bold;">→ Open Tastytrade</a>`,
                 '2. Type <strong>SPX</strong> in the search bar at top',
-                `3. Click the <strong>Trade</strong> tab → find expiry <strong>${exp}</strong> (0DTE)`,
+                `3. Click the <strong>Trade</strong> tab → find expiry <strong>${expDisplay}</strong> (0DTE)`,
                 '4. In the option chain, click the <strong>Strategies</strong> dropdown → select <strong>Iron Condor</strong>',
                 `5. Set <strong>Short Put: ${ps}</strong> and <strong>Long Put: ${pw}</strong>`,
                 `6. Set <strong>Short Call: ${cs}</strong> and <strong>Long Call: ${cw}</strong>`,
-                '7. Set Qty: <strong>1</strong> | Order type: <strong>Limit</strong> at the mid price',
+                `7. Set Qty: <strong>1</strong> | Order type: <strong>Limit</strong> @ ${creditDisplay}`,
                 '8. Click <strong>Review & Send</strong> — verify credit before confirming'
             ],
-            clipboard: `SPX ${exp} Iron Condor\\nSell Put ${ps} / Buy Put ${pw}\\nSell Call ${cs} / Buy Call ${cw}\\nQty: 1 | Limit (mid)`
+            clipboard: `SPX ${expDisplay} Iron Condor\\nSell Put ${ps} / Buy Put ${pw}\\nSell Call ${cs} / Buy Call ${cw}\\nQty: 1 | ${creditDisplay}`
+        };
+        if (s === 'CS') return {
+            title: 'Tastytrade — Call Credit Spread (put skew too steep)',
+            link: link,
+            steps: [
+                `<a href="${link}" target="_blank" style="color:#4fc3f7; font-weight:bold;">→ Open Tastytrade</a>`,
+                '2. Type <strong>SPX</strong> in the search bar at top',
+                `3. Click the <strong>Trade</strong> tab → find expiry <strong>${expDisplay}</strong> (0DTE)`,
+                '4. In the option chain, click the <strong>Strategies</strong> dropdown → select <strong>Vertical</strong> → <strong>Call</strong>',
+                `5. Set <strong>Short Call: ${cs}</strong> and <strong>Long Call: ${cw}</strong>`,
+                `6. Set Qty: <strong>1</strong> | Order type: <strong>Limit</strong> @ ${creditDisplay}`,
+                '7. Click <strong>Review & Send</strong> — verify credit before confirming'
+            ],
+            clipboard: `SPX ${expDisplay} Call Credit Spread\\nSell Call ${cs} / Buy Call ${cw}\\nQty: 1 | ${creditDisplay}`
         };
         return {
             title: 'Tastytrade — Put Credit Spread',
@@ -2639,29 +2692,22 @@ RESEARCH_DASHBOARD_HTML = """
             steps: [
                 `<a href="${link}" target="_blank" style="color:#4fc3f7; font-weight:bold;">→ Open Tastytrade</a>`,
                 '2. Type <strong>SPX</strong> in the search bar at top',
-                `3. Click the <strong>Trade</strong> tab → find expiry <strong>${exp}</strong> (0DTE)`,
+                `3. Click the <strong>Trade</strong> tab → find expiry <strong>${expDisplay}</strong> (0DTE)`,
                 '4. In the option chain, click the <strong>Strategies</strong> dropdown → select <strong>Vertical</strong> → <strong>Put</strong>',
                 `5. Set <strong>Short Put: ${ps}</strong> and <strong>Long Put: ${pw}</strong>`,
-                '6. Set Qty: <strong>1</strong> | Order type: <strong>Limit</strong> at the mid price',
+                `6. Set Qty: <strong>1</strong> | Order type: <strong>Limit</strong> @ ${creditDisplay}`,
                 '7. Click <strong>Review & Send</strong> — verify credit before confirming'
             ],
-            clipboard: `SPX ${exp} Put Credit Spread\\nSell Put ${ps} / Buy Put ${pw}\\nQty: 1 | Limit (mid)`
+            clipboard: `SPX ${expDisplay} Put Credit Spread\\nSell Put ${ps} / Buy Put ${pw}\\nQty: 1 | ${creditDisplay}`
         };
     }
 
     function _ticketTOS(s, ps, pw, cs, cw, exp) {
-        // Build TOS paste-from-clipboard order string
-        const months = ['','JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-        const d = new Date();
-        const dd = String(d.getDate()).padStart(2,'0');
-        const mon = months[d.getMonth()+1];
-        const yy = String(d.getFullYear()).slice(2);
-        const expTos = `${dd} ${mon} ${yy}`;
-        const series = '(Weeklys)'; // 0DTE is always weeklys
-        // Snap strikes to nearest 5
+        const expTos = exp.tos || exp;
+        const series = '(Weeklys)';
         const snap = v => Math.round(v / 5) * 5;
         const sps = snap(ps), spw = snap(pw), scs = snap(cs), scw = snap(cw);
-        const credit = (window._icEstCredit || 1.50).toFixed(2);
+        const credit = (window._icEstCredit && window._icEstCredit > 0.10) ? Number(window._icEstCredit).toFixed(2) : 'MID';
         const tosStr = `BUY +1 1/-1/-1/1 CUSTOM SPX 100 ${series} ${expTos} ${scw}/${scs}/${sps}/${spw} CALL/CALL/PUT/PUT @${credit} LMT`;
         if (s === 'IC') return {
             title: 'Thinkorswim — Iron Condor (TOS Paste Ready)',
@@ -2675,7 +2721,19 @@ RESEARCH_DASHBOARD_HTML = """
             ],
             clipboard: tosStr
         };
-        // Put spread
+        const csStr = `BUY +1 1/-1 CUSTOM SPX 100 ${series} ${expTos} ${scs}/${scw} CALL/CALL @${credit} LMT`;
+        if (s === 'CS') return {
+            title: 'Thinkorswim — Call Credit Spread (put skew too steep)',
+            tosString: csStr,
+            steps: [
+                '<strong style="color:#4fc3f7;">TOS Order String — copy and paste directly:</strong>',
+                `<code style="background:#0f172a; padding:6px 10px; border-radius:4px; display:block; margin:4px 0; font-size:12px; color:#22c55e;">${csStr}</code>`,
+                'In TOS: <strong>Trade tab → Order Entry Tools → Paste from Clipboard</strong>',
+                `Strikes: Short Call ${scs} / Long Call ${scw}`,
+                `Expiry: ${expTos} (0DTE) | Credit: $${credit} | Qty: 1`
+            ],
+            clipboard: csStr
+        };
         const psStr = `BUY +1 1/-1 CUSTOM SPX 100 ${series} ${expTos} ${sps}/${spw} PUT/PUT @${credit} LMT`;
         return {
             title: 'Thinkorswim — Put Credit Spread (TOS Paste Ready)',
@@ -2692,32 +2750,40 @@ RESEARCH_DASHBOARD_HTML = """
     }
 
     function _ticketRH(s, ps, pw, cs, cw, exp) {
-        const sps=Math.round(ps/10), spw=sps-1, scs=Math.round(cs/10), scw=scs+1;
-        const warn = '⚠️ Robinhood does not support SPX. Using SPY equivalent (SPX ÷ 10). Width: 1 point (SPY equivalent of 5-point SPX spread).';
+        const expDisplay = exp.display || exp;
+        const sps=Math.round(ps/10), spw=sps-2, scs=Math.round(cs/10), scw=scs+2;
+        const warn = '⚠️ Robinhood does not support SPX. Using SPY equivalent (SPX ÷ 10). Width: 2 points (SPY equivalent of 25-point SPX spread). Note: SPY 2-wide = $200 max loss vs SPX 25-wide = $2,500.';
         if (s === 'IC') return {
             title: 'Robinhood — SPY Iron Condor', warning: warn,
-            steps: ['1. Search: SPY', `2. Expiry: ${exp} (0DTE)`, '3. Trade → Trade Options → Iron Condor', `4. Short Put: ${sps} | Long Put: ${spw}`, `5. Short Call: ${scs} | Long Call: ${scw}`, '6. Qty: 1 | Width: 1pt | Review credit'],
-            clipboard: `SPY ${exp} Iron Condor (RH)\\nSell Put ${sps} / Buy Put ${spw}\\nSell Call ${scs} / Buy Call ${scw}\\nQty: 1 | Width: 1pt\\n⚠️ SPX equivalent`
+            steps: ['1. Search: SPY', `2. Expiry: ${expDisplay} (0DTE)`, '3. Trade → Trade Options → Iron Condor', `4. Short Put: ${sps} | Long Put: ${spw}`, `5. Short Call: ${scs} | Long Call: ${scw}`, '6. Qty: 1 | Width: 2pt | Review credit'],
+            clipboard: `SPY ${expDisplay} Iron Condor (RH)\\nSell Put ${sps} / Buy Put ${spw}\\nSell Call ${scs} / Buy Call ${scw}\\nQty: 1 | Width: 2pt\\n⚠️ SPX equivalent`
+        };
+        if (s === 'CS') return {
+            title: 'Robinhood — SPY Call Credit Spread (put skew too steep)', warning: warn,
+            steps: ['1. Search: SPY', `2. Expiry: ${expDisplay}`, '3. Trade → Trade Options → Call Credit Spread', `4. Short Call: ${scs} | Long Call: ${scw}`, '5. Qty: 1 | Width: 2pt | Review credit'],
+            clipboard: `SPY ${expDisplay} Call Credit Spread (RH)\\nSell Call ${scs} / Buy Call ${scw}\\nQty: 1 | Width: 2pt\\n⚠️ SPX equivalent`
         };
         return {
             title: 'Robinhood — SPY Put Credit Spread', warning: warn,
-            steps: ['1. Search: SPY', `2. Expiry: ${exp}`, '3. Trade → Trade Options → Put Credit Spread', `4. Short Put: ${sps} | Long Put: ${spw}`, '5. Qty: 1 | Width: 1pt | Review credit'],
-            clipboard: `SPY ${exp} Put Credit Spread (RH)\\nSell Put ${sps} / Buy Put ${spw}\\nQty: 1 | Width: 1pt\\n⚠️ SPX equivalent`
+            steps: ['1. Search: SPY', `2. Expiry: ${expDisplay}`, '3. Trade → Trade Options → Put Credit Spread', `4. Short Put: ${sps} | Long Put: ${spw}`, '5. Qty: 1 | Width: 2pt | Review credit'],
+            clipboard: `SPY ${expDisplay} Put Credit Spread (RH)\\nSell Put ${sps} / Buy Put ${spw}\\nQty: 1 | Width: 2pt\\n⚠️ SPX equivalent`
         };
     }
 
     function _renderTicket(strategy, tickets, ps, pw, cs, cw, exp) {
         const out = document.getElementById('trade-ticket-output');
         out.style.display = 'block';
-        const label = strategy === 'IC' ? 'Iron Condor' : 'Put Credit Spread';
-        const legs = strategy === 'IC' ? `Sell Put ${ps} / Buy Put ${pw} | Sell Call ${cs} / Buy Call ${cw}` : `Sell Put ${ps} / Buy Put ${pw}`;
+        const label = strategy === 'IC' ? 'Iron Condor' : (strategy === 'CS' ? 'Call Credit Spread' : 'Put Credit Spread');
+        const creditSummary = window._icEstCredit ? ` | Est. Credit: $${Number(window._icEstCredit).toFixed(2)}` : '';
+        const legs = strategy === 'IC' ? `Sell Put ${ps} / Buy Put ${pw} | Sell Call ${cs} / Buy Call ${cw}${creditSummary}` : (strategy === 'CS' ? `Sell Call ${cs} / Buy Call ${cw}${creditSummary}` : `Sell Put ${ps} / Buy Put ${pw}${creditSummary}`);
+        const expDisplay = exp.display || exp;
         const platforms = ['tastytrade','thinkorswim','robinhood'];
         const pNames = {tastytrade:'Tastytrade', thinkorswim:'Thinkorswim', robinhood:'Robinhood'};
 
         out.innerHTML = `<div style="background:#1a1a2e; border:1px solid #334155; border-radius:8px; padding:16px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                 <div>
-                    <div style="font-size:16px; font-weight:bold; color:#e2e8f0;">📋 ${label} — SPX ${exp}</div>
+                    <div style="font-size:16px; font-weight:bold; color:#e2e8f0;">📋 ${label} — SPX ${expDisplay}</div>
                     <div style="font-size:13px; color:#94a3b8; margin-top:4px;">${legs}</div>
                     <div style="font-size:11px; color:#64748b; margin-top:4px;">For manual entry only — not an automated order</div>
                 </div>

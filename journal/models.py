@@ -324,6 +324,10 @@ class SPXObservation(Base):
     max_adverse_move = Column(Float)
     notes = Column(Text)
 
+    # Put skew context
+    put_skew_ratio = Column(Float)
+    put_skew_assessment = Column(String(10))
+
 
 class SPXPollResult(Base):
     __tablename__ = 'spx_poll_results'
@@ -424,6 +428,18 @@ def init_db():
                 conn.execute(__import__('sqlalchemy').text(
                     f"ALTER TABLE spx_poll_results ADD COLUMN {col} {ctype}"
                 ))
+        # Migrate spx_observations for put_skew columns
+        try:
+            obs_existing = [r[1] for r in conn.execute(
+                __import__('sqlalchemy').text("PRAGMA table_info(spx_observations)")
+            ).fetchall()]
+            for col, ctype in [('put_skew_ratio', 'REAL'), ('put_skew_assessment', 'TEXT')]:
+                if col not in obs_existing:
+                    conn.execute(__import__('sqlalchemy').text(
+                        f"ALTER TABLE spx_observations ADD COLUMN {col} {ctype}"
+                    ))
+        except:
+            pass
         conn.commit()
 
 def get_session():

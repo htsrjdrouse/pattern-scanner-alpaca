@@ -35,6 +35,30 @@ A Flask-based stock pattern scanner with **live trading capabilities** powered b
 - Graceful single-leg fallback when one side lacks liquidity
 - Observation history sorted by date and time (most recent first)
 - Would-trade / strategy / notes tracking for building a decision baseline
+- Put skew ratio (VIX/VVIX) logged with each observation for historical analysis
+
+### 🌅 Morning Brief
+- Pre-market intelligence dashboard with trade/no-trade verdict
+- **① VIX Regime**: Current VIX level, VIX3M, term structure (contango/backwardation)
+- **② Trend Assessment**: ADX-based range-bound vs trending classification
+- **③ Volatility Edge**: IV vs realized vol spread — minimum 5% edge required
+- **④ Put Skew (VIX/VVIX)**: Detects steep put skew that signals elevated downside risk
+  - VIX/VVIX ratio classification: NORMAL (>0.35), ELEVATED (0.28–0.35), STEEP (<0.28)
+  - Automatic verdict override: GREEN → YELLOW when put skew is STEEP
+  - Consistent with chain poller — both instruments use identical thresholds
+- **⑤ Gap Risk**: ES futures overnight move detection with automatic override
+- **⑥ Verdict**: GREEN (trade aggressively) / YELLOW (trade cautiously) / RED (sit in cash)
+- **⑦ Strike Probability Panel**: Delta-based strike map with historical win rates
+- **Trade Ticket Generator**: One-click order strings for Tastytrade, ThinkorSwim, and Robinhood
+  - Automatically switches from Iron Condor to Call Spread when put skew is STEEP
+
+### 📡 SPX Chain Poller
+- Automated polling of SPX 0DTE options chain on configurable interval
+- Entry criteria checklist: regime, ADX, term structure, vol edge, VIX, min credit, put skew
+- **Put skew assessment**: VIX/VVIX ratio displayed on every poll (even when other criteria fail)
+- Real-time strike proximity monitoring with SAFE/WARNING/CRITICAL alerts
+- Trade outcome tracking (expired worthless, closed 50%, stopped out)
+- History table with Skew column showing VIX/VVIX ratio per poll
 
 ### Alpha Research Platform
 - Signal backtesting with IC/Sharpe metrics

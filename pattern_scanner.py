@@ -2796,14 +2796,16 @@ def home():
             const resp = await fetch('/api/observations/spx/prefill');
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const d = await resp.json();
+            window._spxPrefillData = d;  // expose to trade ticket generator
             const hasPut = d.short_put_strike && d.short_put_premium;
             const hasCall = d.short_call_strike && d.short_call_premium;
             let icHtml = '';
             if (hasPut && hasCall) {
                 icHtml = `<div style="margin-top:12px; padding:10px; background:#1e1e2e; border-radius:6px;">
-                    <strong>💡 Suggested Iron Condor:</strong><br>
-                    Put: ${d.short_put_strike} ($${d.short_put_premium}) | Call: ${d.short_call_strike} ($${d.short_call_premium})<br>
-                    Width: ${d.spread_width} | Total Premium: $${d.est_total_premium}
+                    <strong>💡 Suggested Iron Condor (${d.selection_note || '1σ expected move'}):</strong><br>
+                    PUT SPREAD: Sell ${d.short_put_strike} / Buy ${d.long_put_strike || (d.short_put_strike - d.spread_width)} @ $${d.short_put_premium}<br>
+                    CALL SPREAD: Sell ${d.short_call_strike} / Buy ${d.long_call_strike || (d.short_call_strike + d.spread_width)} @ $${d.short_call_premium}<br>
+                    Width: ${d.spread_width}pts | Total Credit: $${d.est_total_premium} | Max Loss: $${d.spread_width * 100}
                 </div>`;
             } else if (hasPut) {
                 icHtml = `<div style="margin-top:12px; padding:10px; background:#1e1e2e; border-radius:6px;">
@@ -3075,7 +3077,7 @@ def home():
             }
             const rows = data.polls;
             let html = '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
-            html += '<tr style="color:#9e9e9e; border-bottom:1px solid #2a2a3e;"><th style="text-align:left; padding:8px;">Time</th><th style="text-align:left; padding:8px;">Rec</th><th style="text-align:right; padding:8px;">ADX</th><th style="text-align:right; padding:8px;">Vol Edge</th><th style="text-align:center; padding:8px;">Prox</th><th style="text-align:left; padding:8px;">Outcome</th><th style="text-align:left; padding:8px;">Notes</th></tr>';
+            html += '<tr style="color:#9e9e9e; border-bottom:1px solid #2a2a3e;"><th style="text-align:left; padding:8px;">Time</th><th style="text-align:left; padding:8px;">Rec</th><th style="text-align:right; padding:8px;">ADX</th><th style="text-align:right; padding:8px;">Vol Edge</th><th style="text-align:center; padding:8px;">Skew</th><th style="text-align:center; padding:8px;">Prox</th><th style="text-align:left; padding:8px;">Outcome</th><th style="text-align:left; padding:8px;">Notes</th></tr>';
             const badgeColors = {ENTER:'#22c55e', WAIT:'#f59e0b', SKIP:'#ef4444'};
             const proxIcons = {SAFE:'<span style="color:#22c55e;">●</span>', WARNING:'<span style="color:#f59e0b;">⚠️</span>', CRITICAL:'<span style="color:#ef4444;">⛔</span>'};
             const outcomeBadges = {expired_worthless:'<span style="background:#22c55e; color:#000; padding:1px 6px; border-radius:3px; font-size:11px;">Expired ✓</span>',
@@ -3087,6 +3089,9 @@ def home():
                 const bc = badgeColors[r.recommendation] || '#888';
                 const adx = r.adx != null ? Number(r.adx).toFixed(1) : '—';
                 const ve = r.vol_edge != null ? (r.vol_edge * 100).toFixed(1) + '%' : '—';
+                const skewColors = {NORMAL:'#22c55e', ELEVATED:'#f59e0b', STEEP:'#ef4444'};
+                const skewRatio = r.vix_vvix_ratio != null ? Number(r.vix_vvix_ratio).toFixed(3) : '—';
+                const skewColor = skewColors[r.skew_status] || '#666';
                 const prox = proxIcons[r.proximity_status] || '<span style="color:#666;">—</span>';
                 const notes = (r.recommendation_notes || '').substring(0, 60);
                 let outcomeCell = '—';
@@ -3107,6 +3112,7 @@ def home():
                     <td style="padding:6px 8px;"><span style="background:${bc}; color:#000; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;">${r.recommendation}</span></td>
                     <td style="padding:6px 8px; text-align:right; color:#ccc;">${adx}</td>
                     <td style="padding:6px 8px; text-align:right; color:#ccc;">${ve}</td>
+                    <td style="padding:6px 8px; text-align:center; color:${skewColor}; font-size:12px;">${skewRatio}</td>
                     <td style="padding:6px 8px; text-align:center;">${prox}</td>
                     <td style="padding:6px 8px;">${outcomeCell}</td>
                     <td style="padding:6px 8px; color:#999; font-size:12px;">${notes}</td>
@@ -5917,10 +5923,11 @@ def api_chart_data(symbol):
 POLLER_ADX_THRESHOLD = 28
 POLLER_VOL_EDGE_MIN = 0.05
 POLLER_VIX_MAX = 30
-POLLER_TARGET_DELTA = 0.12
-POLLER_SPREAD_WIDTH = 5
+POLLER_TARGET_DELTA = 0.16         # kept for reference; actual selection uses expected move
+POLLER_SIGMA_MULTIPLIER = 1.0      # short strikes at 1.0x daily expected move
+POLLER_SPREAD_WIDTH = 25  # 25-wide: $2,500 max loss, target $7.50+ credit (30% of max)
 POLLER_STOP_MULTIPLIER = 2.0
-POLLER_MIN_CREDIT = 0.50
+POLLER_MIN_CREDIT = 1.00  # minimum $1.00 per side to trade ($2.00 total IC)
 POLLER_ENTRY_WINDOW_START = (9, 45)
 POLLER_ENTRY_WINDOW_END = (10, 30)
 POLLER_INTERVAL_SECONDS = 600
@@ -5983,6 +5990,81 @@ def _get_cached_economic_events():
         _econ_events_cache = _fetch_economic_calendar()
         _econ_events_cache_date = today
     return _econ_events_cache or []
+
+
+def _select_spx_strikes_by_expected_move(spx_price, vix, sigma_multiplier=None, spread_width=None):
+    """Select SPX 0DTE iron condor strikes based on expected move (not delta)."""
+    import math
+    import yfinance as yf
+
+    if sigma_multiplier is None:
+        sigma_multiplier = POLLER_SIGMA_MULTIPLIER
+    if spread_width is None:
+        spread_width = POLLER_SPREAD_WIDTH
+
+    daily_iv_pct = (vix / 100) / math.sqrt(252)
+    expected_move = spx_price * daily_iv_pct
+
+    raw_short_put = spx_price - (expected_move * sigma_multiplier)
+    raw_short_call = spx_price + (expected_move * sigma_multiplier)
+
+    short_put = round(raw_short_put / 5) * 5
+    short_call = round(raw_short_call / 5) * 5
+    long_put = short_put - spread_width
+    long_call = short_call + spread_width
+
+    put_distance = spx_price - short_put
+    call_distance = short_call - spx_price
+
+    short_put_premium = None
+    short_call_premium = None
+    total_premium = None
+
+    try:
+        from datetime import date
+        spx = yf.Ticker('^SPX')
+        expirations = spx.options
+        if expirations:
+            today_str = date.today().strftime('%Y-%m-%d')
+            expiry = today_str if today_str in expirations else expirations[0]
+            chain = spx.option_chain(expiry)
+
+            def get_mid(df, target_strike):
+                if df.empty:
+                    return None
+                idx = (df['strike'] - target_strike).abs().idxmin()
+                row = df.loc[idx]
+                bid = float(row.get('bid', 0) or 0)
+                ask = float(row.get('ask', 0) or 0)
+                if ask > 0:
+                    return round((bid + ask) / 2, 2)
+                return None
+
+            short_put_premium = get_mid(chain.puts, short_put)
+            short_call_premium = get_mid(chain.calls, short_call)
+            if short_put_premium and short_call_premium:
+                total_premium = round(short_put_premium + short_call_premium, 2)
+    except Exception as e:
+        app.logger.warning(f'Strike premium fetch failed: {e}')
+
+    return {
+        'short_put_strike': float(short_put),
+        'long_put_strike': float(long_put),
+        'short_call_strike': float(short_call),
+        'long_call_strike': float(long_call),
+        'expected_move': round(expected_move, 2),
+        'sigma_multiplier': sigma_multiplier,
+        'put_distance': round(put_distance, 0),
+        'call_distance': round(call_distance, 0),
+        'spread_width': spread_width,
+        'short_put_premium': short_put_premium,
+        'short_call_premium': short_call_premium,
+        'total_premium': total_premium,
+        'max_loss': round(spread_width - (total_premium or 0), 2),
+        'stop_loss_level': round((total_premium or 0) * POLLER_STOP_MULTIPLIER, 2),
+        'strike_method': 'expected_move',
+        'selection_note': f'Short strikes at {sigma_multiplier}\u03c3 (expected move \u00b1${expected_move:.0f})',
+    }
 
 
 def _evaluate_spx_entry_criteria(regime, spx_price):
@@ -6159,6 +6241,13 @@ def _execute_single_poll():
     result['recommendation_notes'] = evaluation['notes']
 
     if not evaluation['all_passed']:
+        # Still run put skew assessment for display even when criteria fail
+        skew = _get_put_skew_assessment(result.get('vix') or 20)
+        result['skew_status'] = skew['skew_status']
+        result['vvix'] = skew['vvix']
+        result['vix_vvix_ratio'] = skew['ratio']
+        result['put_width_adjustment'] = skew['put_width_adjustment']
+        result['criteria_skew_ok'] = int(skew['criteria_skew_ok'])
         _save_poll_result(result)
         return result
 
@@ -6198,32 +6287,33 @@ def _execute_single_poll():
         _save_poll_result(result)
         return result
 
-    # 4. Delta-targeted strikes from Tastytrade
+    # 4. Expected-move-based strike selection
     try:
-        from tastytrade_data import get_strike_by_delta
-        put_data = get_strike_by_delta('SPX', exp_date, POLLER_TARGET_DELTA, option_type='put')
-        call_data = get_strike_by_delta('SPX', exp_date, POLLER_TARGET_DELTA, option_type='call')
+        spx_price = result.get('spx_price') or 0
+        vix_level = result.get('vix') or 18.0
 
-        if put_data:
-            result['short_put_strike'] = put_data.get('strike')
-            result['short_put_delta'] = put_data.get('delta')
-            result['short_put_premium'] = put_data.get('mid')
-            result['put_wing_strike'] = (put_data.get('strike') or 0) - POLLER_SPREAD_WIDTH
+        if spx_price > 0:
+            strikes = _select_spx_strikes_by_expected_move(
+                spx_price=spx_price,
+                vix=vix_level,
+                sigma_multiplier=POLLER_SIGMA_MULTIPLIER
+            )
+            result['short_put_strike'] = strikes['short_put_strike']
+            result['short_put_premium'] = strikes['short_put_premium']
+            result['short_put_delta'] = None
+            result['short_call_strike'] = strikes['short_call_strike']
+            result['short_call_premium'] = strikes['short_call_premium']
+            result['short_call_delta'] = None
+            result['put_wing_strike'] = strikes['long_put_strike']
+            result['call_wing_strike'] = strikes['long_call_strike']
 
-        if call_data:
-            result['short_call_strike'] = call_data.get('strike')
-            result['short_call_delta'] = call_data.get('delta')
-            result['short_call_premium'] = call_data.get('mid')
-            result['call_wing_strike'] = (call_data.get('strike') or 0) + POLLER_SPREAD_WIDTH
-
-        if result['short_put_premium'] and result['short_call_premium']:
-            total = round(result['short_put_premium'] + result['short_call_premium'], 2)
-            result['total_premium'] = total
-            result['max_loss'] = round(POLLER_SPREAD_WIDTH - total, 2)
-            result['stop_loss_level'] = round(total * POLLER_STOP_MULTIPLIER, 2)
-            result['profit_target_50'] = round(total * 0.50, 2)
+            if strikes['total_premium']:
+                result['total_premium'] = strikes['total_premium']
+                result['max_loss'] = strikes['max_loss']
+                result['stop_loss_level'] = strikes['stop_loss_level']
+                result['profit_target_50'] = round(strikes['total_premium'] * 0.50, 2)
     except Exception as e:
-        result['recommendation_notes'] += f' | Delta strikes unavailable: {str(e)}'
+        result['recommendation_notes'] += f' | Strike selection failed: {str(e)}'
 
     # 5. Min credit gate check
     pc = result.get('short_put_premium')
@@ -6543,6 +6633,14 @@ def save_spx_observation():
             }
     except:
         pass
+
+    # Auto-populate put skew
+    put_skew_context = {}
+    try:
+        skew = _get_put_skew_assessment(regime_context.get('vix_level') or 20)
+        put_skew_context = {'put_skew_ratio': skew['ratio'], 'put_skew_assessment': skew['skew_status']}
+    except:
+        pass
     
     session = get_session()
     try:
@@ -6556,6 +6654,8 @@ def save_spx_observation():
             term_structure=regime_context.get('term_structure') or data.get('term_structure'),
             adx_value=regime_context.get('adx_value') or data.get('adx_value'),
             vol_spread_edge=regime_context.get('vol_spread_edge') or data.get('vol_spread_edge'),
+            put_skew_ratio=put_skew_context.get('put_skew_ratio') or data.get('put_skew_ratio'),
+            put_skew_assessment=put_skew_context.get('put_skew_assessment') or data.get('put_skew_assessment'),
             spx_price_945=data.get('spx_price_945'),
             vix_945=data.get('vix_945'),
             atm_straddle_price=data.get('atm_straddle_price'),
@@ -6598,6 +6698,8 @@ def get_spx_observations():
                 'term_structure': obs.term_structure,
                 'adx_value': obs.adx_value,
                 'vol_spread_edge': obs.vol_spread_edge,
+                'put_skew_ratio': obs.put_skew_ratio,
+                'put_skew_assessment': obs.put_skew_assessment,
                 'spx_price_945': obs.spx_price_945,
                 'vix_945': obs.vix_945,
                 'atm_straddle_price': obs.atm_straddle_price,
@@ -6796,7 +6898,7 @@ def get_spx_observation_prefill():
         'short_call_strike': None,
         'short_call_delta': None,
         'short_call_premium': None,
-        'spread_width': 5,
+        'spread_width': POLLER_SPREAD_WIDTH,
         'est_total_premium': None,
         'regime_verdict': None,
         'regime_score': None,
@@ -6877,91 +6979,35 @@ def get_spx_observation_prefill():
         result['errors'].append(f'ATM: {str(e)}')
     
     # 4. Delta-targeted strikes — Tastytrade first, then yfinance approximation
+    # 4. Expected-move-based strike selection (replaces delta-based)
     try:
-        from tastytrade_data import get_strike_by_delta
-        from datetime import datetime as dt
-        
-        if result['target_expiry']:
-            exp_date = dt.strptime(result['target_expiry'], '%Y-%m-%d').date()
-            
-            put_data = get_strike_by_delta('SPX', exp_date, 0.12, option_type='put')
-            if put_data:
-                result['short_put_strike'] = put_data.get('strike')
-                result['short_put_delta'] = put_data.get('delta')
-                result['short_put_premium'] = put_data.get('mid')
-            
-            call_data = get_strike_by_delta('SPX', exp_date, 0.12, option_type='call')
-            if call_data:
-                result['short_call_strike'] = call_data.get('strike')
-                result['short_call_delta'] = call_data.get('delta')
-                result['short_call_premium'] = call_data.get('mid')
+        spx_price = result.get('spx_price') or 0
+        vix = result.get('vix') or 18.0
+
+        if spx_price > 0 and vix > 0:
+            strikes = _select_spx_strikes_by_expected_move(
+                spx_price=spx_price,
+                vix=vix,
+                sigma_multiplier=POLLER_SIGMA_MULTIPLIER,
+                spread_width=POLLER_SPREAD_WIDTH
+            )
+            result['short_put_strike'] = strikes['short_put_strike']
+            result['short_put_premium'] = strikes['short_put_premium']
+            result['short_put_delta'] = None
+            result['short_call_strike'] = strikes['short_call_strike']
+            result['short_call_premium'] = strikes['short_call_premium']
+            result['short_call_delta'] = None
+            result['long_put_strike'] = strikes['long_put_strike']
+            result['long_call_strike'] = strikes['long_call_strike']
+            result['est_total_premium'] = strikes['total_premium']
+            result['spread_width'] = strikes['spread_width']
+            result['expected_move'] = strikes['expected_move']
+            result['strike_method'] = strikes['strike_method']
+            result['selection_note'] = strikes['selection_note']
+        else:
+            result['errors'].append('Cannot select strikes: SPX price or VIX unavailable')
     except Exception as e:
-        result['errors'].append(f'Tastytrade: {str(e)}')
-    
-    # 4b. Fallback: approximate delta strikes from yfinance chain if Tastytrade missed either leg
-    try:
-        if result['target_expiry'] and result['spx_price'] and result['atm_straddle_price']:
-            need_put = result['short_put_strike'] is None or not result.get('short_put_premium')
-            need_call = result['short_call_strike'] is None or not result.get('short_call_premium')
-            
-            if need_put or need_call:
-                if 'calls' not in dir() or 'puts' not in dir():
-                    chain = spx_ticker.option_chain(result['target_expiry'])
-                    calls = chain.calls
-                    puts = chain.puts
-                current_price = result['spx_price']
-                straddle = result['atm_straddle_price']
-                
-                # ~0.10-0.12 delta proxy: mid price is 2-4% of straddle
-                target_mid_low = straddle * 0.02
-                target_mid_high = straddle * 0.04
-                target_mid = straddle * 0.03  # center of range
-                
-                if need_put:
-                    otm_puts = puts[puts['strike'] < current_price].copy()
-                    if not otm_puts.empty:
-                        otm_puts['mid'] = (otm_puts['bid'].fillna(0) + otm_puts['ask'].fillna(0)) / 2
-                        candidates = otm_puts[(otm_puts['mid'] >= target_mid_low) & (otm_puts['mid'] <= target_mid_high)]
-                        if not candidates.empty:
-                            # Pick strike closest to target mid
-                            best = candidates.iloc[(candidates['mid'] - target_mid).abs().argsort()[:1]].iloc[0]
-                        else:
-                            # Fallback: closest mid to target_mid among all OTM puts with bid > 0
-                            liquid = otm_puts[otm_puts['mid'] > 0]
-                            if not liquid.empty:
-                                best = liquid.iloc[(liquid['mid'] - target_mid).abs().argsort()[:1]].iloc[0]
-                            else:
-                                best = None
-                        if best is not None:
-                            result['short_put_strike'] = float(best['strike'])
-                            result['short_put_premium'] = round(float(best['mid']), 2)
-                            result['short_put_delta'] = '~0.10'
-                
-                if need_call:
-                    otm_calls = calls[calls['strike'] > current_price].copy()
-                    if not otm_calls.empty:
-                        otm_calls['mid'] = (otm_calls['bid'].fillna(0) + otm_calls['ask'].fillna(0)) / 2
-                        candidates = otm_calls[(otm_calls['mid'] >= target_mid_low) & (otm_calls['mid'] <= target_mid_high)]
-                        if not candidates.empty:
-                            best = candidates.iloc[(candidates['mid'] - target_mid).abs().argsort()[:1]].iloc[0]
-                        else:
-                            liquid = otm_calls[otm_calls['mid'] > 0]
-                            if not liquid.empty:
-                                best = liquid.iloc[(liquid['mid'] - target_mid).abs().argsort()[:1]].iloc[0]
-                            else:
-                                best = None
-                        if best is not None:
-                            result['short_call_strike'] = float(best['strike'])
-                            result['short_call_premium'] = round(float(best['mid']), 2)
-                            result['short_call_delta'] = '~0.10'
-    except Exception as e:
-        result['errors'].append(f'Delta fallback: {str(e)}')
-    
-    # 4c. Compute total premium only when both legs are valid
-    if result.get('short_put_premium') and result.get('short_call_premium'):
-        result['est_total_premium'] = round(result['short_put_premium'] + result['short_call_premium'], 2)
-    else:
-        result['est_total_premium'] = None
+        result['errors'].append(f'Strike selection failed: {str(e)}')
     
     result['market_open'] = result['spx_price'] is not None
     
@@ -7118,10 +7164,14 @@ try:
     add_watchlist_routes(app)
     from options_tracker_routes import add_options_tracker_routes
     add_options_tracker_routes(app)
+except ImportError:
+    pass
+
+try:
     from earnings_scanner_routes import add_earnings_scanner_routes
     add_earnings_scanner_routes(app)
 except ImportError:
-    pass  # Research API not available
+    pass
 
 if __name__ == "__main__":
     # Disable reloader to prevent crashes during long scans

@@ -1350,6 +1350,27 @@ def morning_brief():
         verdict = 'YELLOW'
         gap_override = True
 
+    # Put skew — reuse exact same logic as chain poller (_get_put_skew_assessment)
+    put_skew_override = False
+    try:
+        from pattern_scanner import _get_put_skew_assessment
+        skew = _get_put_skew_assessment(vix or 20)
+        put_skew_data = {
+            'vix_vvix_ratio': skew['ratio'],
+            'vvix_level': skew['vvix'],
+            'assessment': skew['skew_status'],
+            'description': skew['note'],
+            'score': -1 if skew['skew_status'] == 'STEEP' else (-0.5 if skew['skew_status'] == 'ELEVATED' else 0)
+        }
+    except Exception as e:
+        put_skew_data = {'vix_vvix_ratio': None, 'vvix_level': None, 'assessment': 'UNKNOWN',
+                         'description': f'Put skew check failed: {str(e)}', 'score': 0}
+
+    # Put skew override — downgrade GREEN to YELLOW if skew is STEEP
+    if put_skew_data.get('assessment') == 'STEEP' and verdict == 'GREEN':
+        verdict = 'YELLOW'
+        put_skew_override = True
+
     if verdict == 'GREEN':
         strat, sizing, notes = 'Iron Condor — full size', '$250–$375 per spread', 'All conditions favorable. Run the chain poller during the entry window.'
     elif verdict == 'YELLOW':
@@ -1402,9 +1423,19 @@ def morning_brief():
                 'es_direction': es.get('es_direction', 'UNKNOWN'),
                 'gap_risk_override': gap_override, 'summary': gap_sum
             },
+            'put_skew': {
+                'label': 'Put Skew', 'value': put_skew_data.get('assessment', 'UNKNOWN'),
+                'vix_vvix_ratio': put_skew_data.get('vix_vvix_ratio'),
+                'vvix_level': put_skew_data.get('vvix_level'),
+                'vix_level': vix,
+                'score': put_skew_data.get('score', 0),
+                'put_skew_override': put_skew_override,
+                'summary': put_skew_data.get('description', '')
+            },
             'verdict': {
                 'label': 'Verdict', 'value': verdict, 'composite_score': composite,
                 'strategy': strat, 'sizing': sizing, 'entry_window': '9:45–10:30 AM', 'notes': notes
             }
         }
     })
+
