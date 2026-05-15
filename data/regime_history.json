@@ -1,149 +1,212 @@
 [
   {
-    "timestamp": "2026-03-10T15:14:04.254343",
-    "spx_price": 6815.39,
-    "vix_level": 22.72,
-    "composite_score": 0.625,
+    "timestamp": "2026-05-13T07:25:26.727821",
+    "spx_price": 7408.92,
+    "vix_level": 18.16,
+    "composite_score": 0.605,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-10T16:17:02.846294",
-    "spx_price": 6817.29,
-    "vix_level": 22.93,
-    "composite_score": 0.625,
+    "timestamp": "2026-05-14T06:52:41.264121",
+    "spx_price": 7474.3,
+    "vix_level": 17.91,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-11T03:23:27.799355",
-    "spx_price": 6781.48,
-    "vix_level": 24.93,
-    "composite_score": 0.625,
+    "timestamp": "2026-05-14T06:52:49.604099",
+    "spx_price": 7475.74,
+    "vix_level": 17.91,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-11T03:39:57.774045",
-    "spx_price": 6781.48,
-    "vix_level": 24.93,
-    "composite_score": 0.625,
+    "timestamp": "2026-05-14T07:13:01.935588",
+    "spx_price": 7477.52,
+    "vix_level": 17.91,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-11T03:49:38.056862",
-    "spx_price": 6781.48,
-    "vix_level": 24.93,
-    "composite_score": 0.625,
+    "timestamp": "2026-05-14T08:16:40.091336",
+    "spx_price": 7504.72,
+    "vix_level": 17.98,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-11T03:56:18.849884",
-    "spx_price": 6781.48,
-    "vix_level": 24.93,
-    "composite_score": 0.645,
+    "timestamp": "2026-05-14T09:16:47.097003",
+    "spx_price": 7513.13,
+    "vix_level": 17.83,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-11T13:31:34.450920",
-    "spx_price": 6791.83,
-    "vix_level": 25.28,
-    "composite_score": 0.645,
+    "timestamp": "2026-05-14T10:17:02.758629",
+    "spx_price": 7486.47,
+    "vix_level": 17.56,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-11T14:31:57.456412",
-    "spx_price": 6772.08,
-    "vix_level": 24.71,
-    "composite_score": 0.645,
+    "timestamp": "2026-05-14T11:17:15.295466",
+    "spx_price": 7499.92,
+    "vix_level": 17.47,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-11T14:33:59.059620",
-    "spx_price": 6766.44,
-    "vix_level": 24.56,
-    "composite_score": 0.645,
+    "timestamp": "2026-05-14T12:17:29.119899",
+    "spx_price": 7506.69,
+    "vix_level": 17.25,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-11T16:53:50.179119",
-    "spx_price": 6769.93,
-    "vix_level": 25.29,
-    "composite_score": 0.645,
+    "timestamp": "2026-05-14T13:17:41.396958",
+    "spx_price": 7501.24,
+    "vix_level": 17.31,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-12T04:05:52.340972",
-    "spx_price": 6775.8,
-    "vix_level": 24.23,
-    "composite_score": 0.645,
+    "timestamp": "2026-05-14T14:17:54.835807",
+    "spx_price": 7501.24,
+    "vix_level": 17.26,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-12T15:47:20.425630",
-    "spx_price": 6775.8,
-    "vix_level": 26.66,
-    "composite_score": 0.325,
-    "verdict": "YELLOW"
-  },
-  {
-    "timestamp": "2026-03-12T21:05:03.651913",
-    "spx_price": 6672.62,
-    "vix_level": 27.29,
-    "composite_score": 0.325,
-    "verdict": "YELLOW"
-  },
-  {
-    "timestamp": "2026-03-13T11:18:06.385639",
-    "spx_price": 6672.62,
-    "vix_level": 25.95,
-    "composite_score": 0.525,
+    "timestamp": "2026-05-14T15:18:08.021237",
+    "spx_price": 7501.24,
+    "vix_level": 17.26,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-13T12:35:16.358827",
-    "spx_price": 6672.62,
-    "vix_level": 25.91,
-    "composite_score": 0.525,
+    "timestamp": "2026-05-14T16:18:21.258242",
+    "spx_price": 7501.24,
+    "vix_level": 17.26,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-13T19:13:53.142849",
-    "spx_price": 6645.6,
-    "vix_level": 27.02,
-    "composite_score": 0.325,
-    "verdict": "YELLOW"
-  },
-  {
-    "timestamp": "2026-03-13T20:16:17.831286",
-    "spx_price": NaN,
-    "vix_level": 27.24,
-    "composite_score": 0.325,
-    "verdict": "YELLOW"
-  },
-  {
-    "timestamp": "2026-03-13T20:32:17.434703",
-    "spx_price": 6632.19,
-    "vix_level": 27.19,
-    "composite_score": 0.525,
+    "timestamp": "2026-05-14T17:18:35.260610",
+    "spx_price": 7501.24,
+    "vix_level": 17.26,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-13T20:32:43.595088",
-    "spx_price": 6632.19,
-    "vix_level": 27.19,
-    "composite_score": 0.525,
+    "timestamp": "2026-05-14T18:18:53.345563",
+    "spx_price": 7501.24,
+    "vix_level": 17.26,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-14T00:05:25.244150",
-    "spx_price": 6632.19,
-    "vix_level": 27.19,
-    "composite_score": 0.525,
+    "timestamp": "2026-05-14T19:19:11.505088",
+    "spx_price": 7501.24,
+    "vix_level": 17.26,
+    "composite_score": 0.725,
     "verdict": "GREEN"
   },
   {
-    "timestamp": "2026-03-14T02:24:21.264833",
-    "spx_price": 6632.19,
-    "vix_level": 27.19,
-    "composite_score": 0.525,
+    "timestamp": "2026-05-14T20:19:29.438590",
+    "spx_price": 7501.24,
+    "vix_level": 17.26,
+    "composite_score": 0.725,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-05-14T21:19:47.059642",
+    "spx_price": 7501.24,
+    "vix_level": 17.26,
+    "composite_score": 0.725,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-05-14T22:20:05.264518",
+    "spx_price": 7501.24,
+    "vix_level": 17.26,
+    "composite_score": 0.725,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-05-14T23:20:22.869834",
+    "spx_price": 7501.24,
+    "vix_level": 17.26,
+    "composite_score": 0.725,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-05-15T00:20:40.688084",
+    "spx_price": 7501.24,
+    "vix_level": 17.26,
+    "composite_score": 0.725,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-05-15T01:20:57.607243",
+    "spx_price": 7501.24,
+    "vix_level": 18.27,
+    "composite_score": 0.725,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-05-15T02:21:15.116023",
+    "spx_price": 7501.24,
+    "vix_level": 18.65,
+    "composite_score": 0.725,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-05-15T03:21:32.938440",
+    "spx_price": 7501.24,
+    "vix_level": 18.86,
+    "composite_score": 0.725,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-05-15T04:21:50.416540",
+    "spx_price": 7501.24,
+    "vix_level": 18.54,
+    "composite_score": 0.725,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-05-15T05:22:08.323788",
+    "spx_price": 7501.24,
+    "vix_level": 19.07,
+    "composite_score": 0.725,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-05-15T06:22:26.321465",
+    "spx_price": 7501.24,
+    "vix_level": 19.04,
+    "composite_score": 0.725,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-05-15T07:22:44.213823",
+    "spx_price": 7445.01,
+    "vix_level": 18.82,
+    "composite_score": 0.605,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-05-15T08:31:22.221649",
+    "spx_price": 7437.45,
+    "vix_level": 18.18,
+    "composite_score": 0.605,
+    "verdict": "GREEN"
+  },
+  {
+    "timestamp": "2026-05-15T09:31:36.532610",
+    "spx_price": 7434.08,
+    "vix_level": 18.4,
+    "composite_score": 0.605,
     "verdict": "GREEN"
   }
 ]

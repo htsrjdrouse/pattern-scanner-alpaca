@@ -520,7 +520,7 @@ def run_regime_analysis(force_refresh=False):
     
     # Strategy recommendations
     if verdict == 'GREEN':
-        result['recommended_strategy'] = 'Iron Condor — sell 0.10-0.15 delta on both sides, standard 5-wide spreads'
+        result['recommended_strategy'] = 'Iron Condor — sell 0.10-0.15 delta on both sides, 25-wide spreads'
         result['position_sizing'] = 'Full size — up to $500 per spread'
         result['entry_timing'] = '9:45-10:30 AM after opening volatility settles'
     elif verdict == 'YELLOW':

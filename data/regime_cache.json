@@ -1,34 +1,34 @@
 {
-  "timestamp": "2026-03-14T02:24:21.264833",
+  "timestamp": "2026-05-15T09:31:36.532610",
   "cache_age_minutes": 0,
-  "spx_price": 6632.19,
-  "vix_level": 27.19,
-  "vix_3m": 27.28,
+  "spx_price": 7434.08,
+  "vix_level": 18.4,
+  "vix_3m": 21.38,
   "term_structure_source": "yfinance_fallback",
   "pcr_source": "cboe_equity_csv",
   "dimensions": {
     "vix_regime": {
-      "value": "ELEVATED",
-      "score": 0.6,
-      "description": "Good premium but wider strikes required"
+      "value": "NORMAL",
+      "score": 1.0,
+      "description": "Ideal for selling premium"
     },
     "term_structure": {
       "value": "CONTANGO",
-      "spread": 0.09,
+      "spread": 2.98,
       "score": 1.0,
       "description": "Normal, favorable for sellers"
     },
     "trend_assessment": {
       "value": "TRENDING",
-      "adx": 31.4,
+      "adx": 29.5,
       "score": -0.5,
       "description": "Bad for iron condors, use directional spreads"
     },
     "vol_spread": {
       "value": "STRONG",
-      "realized_vol": 0.1169,
-      "implied_vol": 0.2719,
-      "spread": 0.155,
+      "realized_vol": 0.1055,
+      "implied_vol": 0.184,
+      "spread": 0.0785,
       "score": 1.0,
       "description": "IV significantly overpricing, clear seller edge"
     },
@@ -47,16 +47,16 @@
     },
     "correlation_regime": {
       "value": "LOW",
-      "avg_correlation": 0.274,
+      "avg_correlation": 0.028,
       "score": 0.8,
       "description": "Stock-picking environment, individual names work"
     }
   },
-  "composite_score": 0.525,
+  "composite_score": 0.605,
   "hard_override_triggered": false,
   "override_reason": null,
   "verdict": "GREEN",
-  "recommended_strategy": "Iron Condor \u2014 sell 0.10-0.15 delta on both sides, standard 5-wide spreads",
+  "recommended_strategy": "Iron Condor \u2014 sell 0.10-0.15 delta on both sides, 25-wide spreads",
   "position_sizing": "Full size \u2014 up to $500 per spread",
   "entry_timing": "9:45-10:30 AM after opening volatility settles",
   "errors": []

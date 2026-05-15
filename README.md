@@ -60,6 +60,29 @@ A Flask-based stock pattern scanner with **live trading capabilities** powered b
 - Trade outcome tracking (expired worthless, closed 50%, stopped out)
 - History table with Skew column showing VIX/VVIX ratio per poll
 
+### 📡 Earnings Scanner
+- Scans S&P 500 for upcoming earnings with elevated implied volatility
+- **IV/HV Ratio Filter**: Ranks candidates by implied vs historical vol edge
+- IV Rank, HV 30-day, and scoring system (3+ to qualify)
+- **Strike Snapping**: Selects ~0.85x put / ~1.15x call strikes from live chain with active bids
+- Auto-generates TOS (ThinkOrSwim) strangle order strings — click to copy
+- Detail modal with full IV breakdown per symbol
+- **Scheduled Scanning**: Cron job runs weekdays at 7 PM (`scripts/setup_cron.sh`)
+- Scan log viewer and cache status in UI
+- 12-hour cache to avoid redundant API calls
+
+### 📋 Options Position Tracker
+- Paste TOS order strings to instantly parse and track positions
+- **Live P&L**: Fetches real-time bid/ask from yfinance options chains
+- Supports strangles, single legs, and multi-line order entry
+- **Profit Zone Bar**: Visual strike proximity with price pin indicator
+- **Trade Economics Panel**: Premium collected, paid, net credit/debit breakdown
+- **Capital Requirements**: Approximate Reg T margin, capital at risk, return on collateral
+- Status monitoring: ON_TRACK / WARNING / DANGER based on strike proximity
+- Stale price detection with fallback to last-trade data
+- TOS string reconstruction — click to copy for order entry
+- Auto-refresh every 15 minutes
+
 ### Alpha Research Platform
 - Signal backtesting with IC/Sharpe metrics
 - Decay analysis across multiple horizons

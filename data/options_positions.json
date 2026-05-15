@@ -1,0 +1,98 @@
+[
+  {
+    "id": 1,
+    "name": "AMAT STRANGLE",
+    "legs": [
+      {
+        "symbol": "AMAT",
+        "action": "SELL",
+        "quantity": 1,
+        "strike": 360.0,
+        "option_type": "PUT",
+        "expiration": "2026-06-20",
+        "entry_premium": 0.0,
+        "direction": "credit",
+        "strategy": "STRANGLE",
+        "raw": "SELL -1 STRANGLE AMAT 100 20 JUN 26 360/490 PUT/CALL @LMT"
+      },
+      {
+        "symbol": "AMAT",
+        "action": "SELL",
+        "quantity": 1,
+        "strike": 490.0,
+        "option_type": "CALL",
+        "expiration": "2026-06-20",
+        "entry_premium": 0.0,
+        "direction": "credit",
+        "strategy": "STRANGLE",
+        "raw": "SELL -1 STRANGLE AMAT 100 20 JUN 26 360/490 PUT/CALL @LMT"
+      }
+    ],
+    "opened_at": "2026-05-13T08:44:53.570289",
+    "status": "open"
+  },
+  {
+    "id": 2,
+    "name": "GOOG STRANGLE",
+    "legs": [
+      {
+        "symbol": "GOOG",
+        "action": "SELL",
+        "quantity": 1,
+        "strike": 350.0,
+        "option_type": "PUT",
+        "expiration": "2026-06-18",
+        "entry_premium": 39.445,
+        "direction": "credit",
+        "strategy": "STRANGLE",
+        "raw": "SELL -1 STRANGLE GOOG 100 18 JUN 26 350/420 CALL/PUT @78.89 LMT"
+      },
+      {
+        "symbol": "GOOG",
+        "action": "SELL",
+        "quantity": 1,
+        "strike": 420.0,
+        "option_type": "CALL",
+        "expiration": "2026-06-18",
+        "entry_premium": 39.445,
+        "direction": "credit",
+        "strategy": "STRANGLE",
+        "raw": "SELL -1 STRANGLE GOOG 100 18 JUN 26 350/420 CALL/PUT @78.89 LMT"
+      }
+    ],
+    "opened_at": "2026-05-13T08:45:00.088568",
+    "status": "open"
+  },
+  {
+    "id": 3,
+    "name": "AMAT STRANGLE",
+    "legs": [
+      {
+        "symbol": "AMAT",
+        "action": "SELL",
+        "quantity": 1,
+        "strike": 360.0,
+        "option_type": "PUT",
+        "expiration": "2026-06-20",
+        "entry_premium": 0.0,
+        "direction": "credit",
+        "strategy": "STRANGLE",
+        "raw": "SELL -1 STRANGLE AMAT 100 20 JUN 26 360/490 PUT/CALL @LMT"
+      },
+      {
+        "symbol": "AMAT",
+        "action": "SELL",
+        "quantity": 1,
+        "strike": 490.0,
+        "option_type": "CALL",
+        "expiration": "2026-06-20",
+        "entry_premium": 0.0,
+        "direction": "credit",
+        "strategy": "STRANGLE",
+        "raw": "SELL -1 STRANGLE AMAT 100 20 JUN 26 360/490 PUT/CALL @LMT"
+      }
+    ],
+    "opened_at": "2026-05-13T08:53:40.014049",
+    "status": "open"
+  }
+]
