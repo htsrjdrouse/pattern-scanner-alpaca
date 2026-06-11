@@ -2580,7 +2580,7 @@ RESEARCH_DASHBOARD_HTML = """
             btn.disabled = false;
             btn.style.background = '#1d4ed8';
             btn.style.cursor = 'pointer';
-            const stratLabels = {IC: 'Iron Condor (4 legs)', PS: 'Put Credit Spread (2 legs)', CS: 'Call Spread only — put skew too steep for IC'};
+            const stratLabels = {IC: 'Iron Condor (4 legs)', PS: 'Put Credit Spread (2 legs)', CS: 'Call Credit Spread (2 legs)'};
             label.textContent = stratLabels[strategy] || strategy;
             label.style.color = strategy === 'CS' ? '#f59e0b' : '#22c55e';
         }
@@ -2595,9 +2595,8 @@ RESEARCH_DASHBOARD_HTML = """
         const term = data.sections?.vix_regime?.term_structure || 'UNKNOWN';
         const putSkewSteep = data.sections?.put_skew?.value === 'STEEP';
         if (verdict === 'RED' || term === 'BACKWARDATION' || adx > 35) return 'NONE';
-        if (verdict === 'GREEN' && adx < 28 && volEdge >= 5.0) {
-            return putSkewSteep ? 'CS' : 'IC';
-        }
+        if (putSkewSteep) return 'CS';
+        if (verdict === 'GREEN' && adx < 28 && volEdge >= 5.0) return 'IC';
         if (verdict === 'YELLOW' || (adx >= 28 && adx <= 35)) return 'PS';
         if (verdict === 'GREEN' && volEdge < 5.0) return 'PS';
         return 'NONE';
@@ -2708,7 +2707,7 @@ RESEARCH_DASHBOARD_HTML = """
         const snap = v => Math.round(v / 5) * 5;
         const sps = snap(ps), spw = snap(pw), scs = snap(cs), scw = snap(cw);
         const credit = (window._icEstCredit && window._icEstCredit > 0.10) ? Number(window._icEstCredit).toFixed(2) : 'MID';
-        const tosStr = `BUY +1 1/-1/-1/1 CUSTOM SPX 100 ${series} ${expTos} ${scw}/${scs}/${sps}/${spw} CALL/CALL/PUT/PUT @${credit} LMT`;
+        const tosStr = `SELL -1 1/-1/-1/1 CUSTOM SPX 100 ${series} ${expTos} ${scw}/${scs}/${sps}/${spw} CALL/CALL/PUT/PUT @${credit} LMT`;
         if (s === 'IC') return {
             title: 'Thinkorswim — Iron Condor (TOS Paste Ready)',
             tosString: tosStr,
@@ -2721,7 +2720,7 @@ RESEARCH_DASHBOARD_HTML = """
             ],
             clipboard: tosStr
         };
-        const csStr = `BUY +1 1/-1 CUSTOM SPX 100 ${series} ${expTos} ${scs}/${scw} CALL/CALL @${credit} LMT`;
+        const csStr = `SELL -1 -1/+1 VERTICAL SPX 100 ${series} ${expTos} ${scs}/${scw} CALL @${credit} LMT`;
         if (s === 'CS') return {
             title: 'Thinkorswim — Call Credit Spread (put skew too steep)',
             tosString: csStr,
@@ -2734,7 +2733,7 @@ RESEARCH_DASHBOARD_HTML = """
             ],
             clipboard: csStr
         };
-        const psStr = `BUY +1 1/-1 CUSTOM SPX 100 ${series} ${expTos} ${sps}/${spw} PUT/PUT @${credit} LMT`;
+        const psStr = `SELL -1 -1/+1 VERTICAL SPX 100 ${series} ${expTos} ${sps}/${spw} PUT @${credit} LMT`;
         return {
             title: 'Thinkorswim — Put Credit Spread (TOS Paste Ready)',
             tosString: psStr,

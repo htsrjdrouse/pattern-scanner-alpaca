@@ -12,7 +12,7 @@ from io import BytesIO
 from pathlib import Path
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-from flask import Flask, render_template_string, request, Response, flash, redirect
+from flask import Flask, render_template_string, request, Response, flash, redirect, jsonify
 import yfinance as yf
 
 # Alpaca integration
@@ -4602,6 +4602,7 @@ def chart(symbol):
                     <h3 style="margin: 0;">📊 ATR Model</h3>
                     <div style="display: flex; gap: 4px;">
                         <button onclick="loadATRChart('day')" id="atr-btn-day" style="padding: 5px 14px; border-radius: 20px; border: none; cursor: pointer; font-size: 12px; font-weight: bold; background: #6366f1; color: #fff;">1D</button>
+                        <button onclick="loadATRChart('4h')" id="atr-btn-4h" style="padding: 5px 14px; border-radius: 20px; border: none; cursor: pointer; font-size: 12px; font-weight: bold; background: #2a2a3e; color: #9e9e9e;">4H</button>
                         <button onclick="loadATRChart('week')" id="atr-btn-week" style="padding: 5px 14px; border-radius: 20px; border: none; cursor: pointer; font-size: 12px; font-weight: bold; background: #2a2a3e; color: #9e9e9e;">1W</button>
                         <button onclick="loadATRChart('month')" id="atr-btn-month" style="padding: 5px 14px; border-radius: 20px; border: none; cursor: pointer; font-size: 12px; font-weight: bold; background: #2a2a3e; color: #9e9e9e;">1M</button>
                     </div>
@@ -4627,6 +4628,67 @@ def chart(symbol):
                     <div style="position:relative; height:280px;"><canvas id="atr-price-chart"></canvas></div>
                     <div style="position:relative; height:120px; margin-top:5px;"><canvas id="atr-atr-chart"></canvas></div>
                 </div>
+            </div>
+
+            <!-- ATR Stop & Size Panel -->
+            <div style="margin: 25px 0; background:#0f0f23; border-radius:10px; padding:15px;">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                    <h3 style="margin:0; font-size:15px;">🎯 ATR Stop & Size</h3>
+                    <span id="atr-panel-label" style="color:#9e9e9e; font-size:11px;">ATR(14) · 1D</span>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; margin-bottom:12px; font-size:12px;">
+                    <div><label style="color:#9e9e9e;">Entry $</label><br><input id="atr-entry" type="number" step="0.01" style="width:100%; padding:4px 6px; background:#1a1a2e; border:1px solid #333; border-radius:4px; color:#fff; font-size:12px;" oninput="atrPanelCalc(true)"></div>
+                    <div><label style="color:#9e9e9e;">ATR Mult</label><br><select id="atr-mult" style="width:100%; padding:4px 6px; background:#1a1a2e; border:1px solid #333; border-radius:4px; color:#fff; font-size:12px;" onchange="atrPanelCalc()"><option value="1.5">1.5×</option><option value="2.0" selected>2.0×</option><option value="2.5">2.5×</option></select></div>
+                    <div><label style="color:#9e9e9e;">Risk $</label><br><input id="atr-risk-budget" type="number" value="25" style="width:100%; padding:4px 6px; background:#1a1a2e; border:1px solid #333; border-radius:4px; color:#fff; font-size:12px;" oninput="atrPanelCalc()"></div>
+                    <div><label style="color:#9e9e9e;">Position $</label><br><input id="atr-pos-budget" type="number" value="375" style="width:100%; padding:4px 6px; background:#1a1a2e; border:1px solid #333; border-radius:4px; color:#fff; font-size:12px;" oninput="atrPanelCalc()"></div>
+                </div>
+                <div style="display:flex; gap:16px; align-items:center; margin-bottom:12px; font-size:12px; color:#ccc;">
+                    <label><input type="radio" name="atr-stop-type" value="katr" checked onchange="atrPanelCalc()"> <span id="atr-stop-katr-label">k × ATR</span></label>
+                    <label><input type="radio" name="atr-stop-type" value="supertrend" onchange="atrPanelCalc()"> Supertrend</label>
+                </div>
+                <div id="atr-panel-output" style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; font-size:12px;">
+                    <div style="color:#9e9e9e;">Stop: <span id="atr-out-stop" style="color:#ef4444;">—</span></div>
+                    <div style="color:#9e9e9e;">Shares: <span id="atr-out-shares" style="color:#fff;">—</span></div>
+                    <div style="color:#9e9e9e;">Risk $: <span id="atr-out-risk" style="color:#ef4444;">—</span></div>
+                    <div style="color:#9e9e9e;">Cost $: <span id="atr-out-cost" style="color:#4fc3f7;">—</span></div>
+                </div>
+            </div>
+
+            <!-- Financial Charts Section -->
+            <div style="margin: 25px 0; background:#0f0f23; border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.08);">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 15px; cursor:pointer;" onclick="toggleFinancials()">
+                <span style="color:rgba(255,255,255,0.8); font-size:13px; font-weight:500;">
+                  <span id="fin-arrow">▼</span> Financials (3-Year)
+                </span>
+                <span id="fin-spinner" style="display:none;">
+                  <span class="spinner-border spinner-border-sm text-secondary"></span>
+                </span>
+              </div>
+              <div id="financials-body" style="padding:0 15px 15px;">
+                <div id="fin-error" style="display:none; color:#ef4444; font-size:12px; margin-bottom:10px;"></div>
+                <p style="color:rgba(255,255,255,0.35); font-size:11px; margin-bottom:12px;">
+                  6-month intervals · Values in USD millions · Source: yfinance quarterly data
+                </p>
+                <div style="margin-bottom:20px;">
+                  <div style="color:rgba(255,255,255,0.5); font-size:12px; margin-bottom:6px;">Revenue, Net Income &amp; EBITDA</div>
+                  <div style="position:relative; height:220px;"><canvas id="fin-chart1"></canvas></div>
+                </div>
+                <div style="margin-bottom:20px;">
+                  <div style="color:rgba(255,255,255,0.5); font-size:12px; margin-bottom:6px;">Cash &amp; Total Debt</div>
+                  <div style="position:relative; height:220px;"><canvas id="fin-chart2"></canvas></div>
+                </div>
+                <div>
+                  <div style="color:rgba(255,255,255,0.5); font-size:12px; margin-bottom:6px;">Cash Flow &amp; Compensation</div>
+                  <div style="position:relative; height:220px;"><canvas id="fin-chart3"></canvas></div>
+                </div>
+                <div style="margin-top:20px;">
+                  <div id="fin-roic-summary" style="font-size:11px; margin-bottom:4px;"></div>
+                  <div style="color:rgba(255,255,255,0.5); font-size:12px; margin-bottom:6px;">
+                    ROIC vs WACC  <span style="color:rgba(255,255,255,0.25); font-size:10px;">(last 5 quarters · WACC uses constant beta &amp; current market cap)</span>
+                  </div>
+                  <div style="position:relative; height:220px;"><canvas id="fin-chart4"></canvas></div>
+                </div>
+              </div>
             </div>
 
             <!-- Add to Watchlist -->
@@ -5329,7 +5391,7 @@ def chart(symbol):
 
         async function loadATRChart(tf) {
             currentTF = tf;
-            ['day','week','month'].forEach(t => {
+            ['day','4h','week','month'].forEach(t => {
                 const btn = document.getElementById('atr-btn-' + t);
                 btn.style.background = t === tf ? '#6366f1' : '#2a2a3e';
                 btn.style.color = t === tf ? '#fff' : '#9e9e9e';
@@ -5340,6 +5402,7 @@ def chart(symbol):
                 chartData = await resp.json();
                 if (chartData.error) throw new Error(chartData.error);
                 renderCharts(chartData, currentChartType);
+                updateAtrPanel(chartData, tf);
             } catch(e) {
                 document.getElementById('atr-loading').textContent = 'Error: ' + e.message;
             }
@@ -5474,7 +5537,199 @@ def chart(symbol):
             });
         }
 
+        // ATR Stop & Size Panel
+        let _latestClose = null, _latestATR = null, _latestSupertrend = null, _entryEdited = false;
+        const tfLabels = {day:'1D', '4h':'4H', week:'1W', month:'1M'};
+
+        function updateAtrPanel(data, tf) {
+            const closes = data.ohlcv.close.filter(v => v !== null);
+            const atrs = data.indicators.atr.filter(v => v !== null);
+            const sts = data.indicators.supertrend ? data.indicators.supertrend.filter(v => v !== null) : [];
+            _latestClose = closes.length ? closes[closes.length - 1] : null;
+            _latestATR = atrs.length ? atrs[atrs.length - 1] : null;
+            _latestSupertrend = sts.length ? sts[sts.length - 1] : null;
+            document.getElementById('atr-panel-label').textContent = `ATR(14) · ${tfLabels[tf] || tf}` + (_latestATR ? ` = $${_latestATR.toFixed(2)}` : '');
+            if (!_entryEdited && _latestClose) document.getElementById('atr-entry').value = _latestClose.toFixed(2);
+            atrPanelCalc();
+        }
+
+        function atrPanelCalc(fromEntry) {
+            if (fromEntry) _entryEdited = true;
+            const entry = parseFloat(document.getElementById('atr-entry').value) || 0;
+            const mult = parseFloat(document.getElementById('atr-mult').value);
+            const riskBudget = parseFloat(document.getElementById('atr-risk-budget').value) || 0;
+            const posBudget = parseFloat(document.getElementById('atr-pos-budget').value) || 0;
+            const stopType = document.querySelector('input[name="atr-stop-type"]:checked').value;
+
+            let stop;
+            if (stopType === 'katr' && _latestATR) stop = entry - mult * _latestATR;
+            else if (stopType === 'supertrend' && _latestSupertrend) stop = _latestSupertrend;
+            else stop = null;
+
+            const elStop = document.getElementById('atr-out-stop');
+            const elShares = document.getElementById('atr-out-shares');
+            const elRisk = document.getElementById('atr-out-risk');
+            const elCost = document.getElementById('atr-out-cost');
+
+            if (stop === null || stop >= entry || entry <= 0) {
+                const msg = stop !== null && stop >= entry ? 'stop above entry — invalid' : '—';
+                elStop.textContent = msg; elShares.textContent = '—'; elRisk.textContent = '—'; elCost.textContent = '—';
+                updateStopOverlay(entry, null);
+                return;
+            }
+            const riskPerShare = entry - stop;
+            const shares = Math.min(Math.floor(riskBudget / riskPerShare), Math.floor(posBudget / entry));
+            elStop.textContent = '$' + stop.toFixed(2);
+            elShares.textContent = shares > 0 ? shares : '0';
+            elRisk.textContent = shares > 0 ? '$' + (shares * riskPerShare).toFixed(2) : '$0';
+            elCost.textContent = shares > 0 ? '$' + (shares * entry).toFixed(2) : '$0';
+            updateStopOverlay(entry, stop);
+        }
+
+        function updateStopOverlay(entry, stop) {
+            if (!atrPriceChart || !chartData) return;
+            const n = chartData.dates.length;
+            // Remove old overlay datasets (last 2 if they are ours)
+            while (atrPriceChart.data.datasets.length > 0 && atrPriceChart.data.datasets[atrPriceChart.data.datasets.length-1]._stopOverlay) {
+                atrPriceChart.data.datasets.pop();
+            }
+            if (entry > 0) {
+                atrPriceChart.data.datasets.push({ label: 'Entry', data: Array(n).fill(entry), borderColor: 'rgba(156,163,175,0.7)', borderDash: [6,3], borderWidth: 1, pointRadius: 0, fill: false, _stopOverlay: true });
+            }
+            if (stop !== null && stop > 0) {
+                atrPriceChart.data.datasets.push({ label: 'Stop', data: Array(n).fill(stop), borderColor: 'rgba(239,68,68,0.7)', borderDash: [6,3], borderWidth: 1, pointRadius: 0, fill: false, _stopOverlay: true });
+            }
+            atrPriceChart.update('none');
+        }
+
         loadATRChart('day');
+
+        // ═══════════════════════════════════════════════════════════════
+        // Financial Charts (3-Year)
+        // ═══════════════════════════════════════════════════════════════
+        let financialData = null, financialsLoaded = false;
+        let finChart1 = null, finChart2 = null, finChart3 = null, finChart4 = null;
+
+        function toggleFinancials() {
+            const body = document.getElementById('financials-body');
+            const arrow = document.getElementById('fin-arrow');
+            const isHidden = body.style.display === 'none';
+            body.style.display = isHidden ? 'block' : 'none';
+            arrow.textContent = isHidden ? '▼' : '▶';
+            if (isHidden && !financialsLoaded) {
+                financialsLoaded = true;
+                loadFinancials();
+            }
+        }
+
+        async function loadFinancials() {
+            if (financialData) { renderFinancialCharts(financialData); return; }
+            document.getElementById('fin-spinner').style.display = 'inline';
+            try {
+                const resp = await fetch(`/api/financials/${atrSymbol}?_=${Date.now()}`);
+                financialData = await resp.json();
+                if (financialData.error) { showFinError(financialData.error); return; }
+                renderFinancialCharts(financialData);
+            } catch(e) { showFinError('Failed to load financial data'); }
+        }
+
+        // Auto-load financials on page load
+        loadFinancials();
+
+        function showFinError(msg) {
+            document.getElementById('fin-spinner').style.display = 'none';
+            const el = document.getElementById('fin-error');
+            el.textContent = '⚠ ' + msg; el.style.display = 'block';
+        }
+
+        const finOpts = (yLabel, allowNeg) => ({
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top', labels: { color: 'rgba(255,255,255,0.7)', font: { size: 11 } } },
+                tooltip: { backgroundColor: 'rgba(15,15,20,0.92)', titleColor: '#fff', bodyColor: '#fff',
+                    borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+                    callbacks: { label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y != null ? ctx.parsed.y.toLocaleString() : '—'}M` } }
+            },
+            scales: {
+                x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 11 } } },
+                y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 11 } },
+                    title: { display: true, text: yLabel, color: 'rgba(255,255,255,0.5)', font: { size: 11 } },
+                    beginAtZero: !allowNeg }
+            }
+        });
+
+        function renderFinancialCharts(d) {
+            document.getElementById('fin-spinner').style.display = 'none';
+            const labels = d.labels;
+
+            // Chart 1 — Revenue, Net Income, EBITDA
+            if (finChart1) finChart1.destroy();
+            finChart1 = new Chart(document.getElementById('fin-chart1'), {
+                type: 'bar', data: { labels, datasets: [
+                    { label: 'Revenue', data: d.revenue_income_ebitda.revenue, backgroundColor: 'rgba(99,102,241,0.8)', borderRadius: 3 },
+                    { label: 'Net Income', data: d.revenue_income_ebitda.net_income, backgroundColor: 'rgba(34,197,94,0.8)', borderRadius: 3 },
+                    { label: 'EBITDA', data: d.revenue_income_ebitda.ebitda, backgroundColor: 'rgba(251,191,36,0.8)', borderRadius: 3 }
+                ]}, options: finOpts('USD (M)', false)
+            });
+
+            // Chart 2 — Cash & Debt
+            if (finChart2) finChart2.destroy();
+            finChart2 = new Chart(document.getElementById('fin-chart2'), {
+                type: 'bar', data: { labels, datasets: [
+                    { label: 'Cash & Equivalents', data: d.cash_debt.cash, backgroundColor: 'rgba(34,197,94,0.8)', borderRadius: 3 },
+                    { label: 'Total Debt', data: d.cash_debt.total_debt, backgroundColor: 'rgba(239,68,68,0.8)', borderRadius: 3 }
+                ]}, options: finOpts('USD (M)', false)
+            });
+
+            // Chart 3 — Cash Flow (mixed bar + line)
+            if (finChart3) finChart3.destroy();
+            finChart3 = new Chart(document.getElementById('fin-chart3'), {
+                type: 'bar', data: { labels, datasets: [
+                    { label: 'Operating CF', data: d.cash_flow.operating_cf, backgroundColor: 'rgba(99,102,241,0.8)', borderRadius: 3 },
+                    { label: 'Free Cash Flow', data: d.cash_flow.free_cash_flow, backgroundColor: 'rgba(34,197,94,0.8)', borderRadius: 3 },
+                    { label: 'Net Income', data: d.cash_flow.net_income_cf, backgroundColor: 'rgba(251,191,36,0.8)', borderRadius: 3 },
+                    { label: 'Dividends Paid', data: d.cash_flow.dividends_paid, backgroundColor: 'rgba(244,114,182,0.8)', borderRadius: 3 },
+                    { label: 'Stock Comp', data: d.cash_flow.stock_based_comp, backgroundColor: 'rgba(148,163,184,0.8)', borderRadius: 3 }
+                ]}, options: finOpts('USD (M)', true)
+            });
+
+            // Chart 4 — ROIC vs WACC
+            const summaryEl = document.getElementById('fin-roic-summary');
+            if (!d.roic_wacc) {
+                summaryEl.textContent = '⚠ ROIC/WACC data unavailable for this ticker';
+            } else {
+                const rw = d.roic_wacc;
+                if (rw.latest_spread !== null) {
+                    const color = rw.value_creating ? '#22c55e' : '#ef4444';
+                    const icon = rw.value_creating ? '▲' : '▼';
+                    summaryEl.innerHTML = `Latest spread: <span style="color:${color}; font-weight:600;">${icon} ${rw.latest_spread.toFixed(2)}%</span> <span style="color:rgba(255,255,255,0.35); margin-left:8px;">${rw.value_creating ? 'Value creating (ROIC > WACC)' : 'Value destroying (WACC > ROIC)'}</span>`;
+                }
+                if (finChart4) finChart4.destroy();
+                finChart4 = new Chart(document.getElementById('fin-chart4'), {
+                    type: 'bar',
+                    data: { labels: rw.labels, datasets: [
+                        { label: 'ROIC %', data: rw.roic, backgroundColor: 'rgba(34,197,94,0.85)', borderRadius: 2, borderSkipped: false, yAxisID: 'y' },
+                        { label: 'WACC %', data: rw.wacc.map(v => v !== null ? -v : null), backgroundColor: 'rgba(239,68,68,0.85)', borderRadius: 2, borderSkipped: false, yAxisID: 'y' },
+                        { label: 'Spread %', type: 'line', data: rw.spread, borderColor: 'rgba(255,255,255,0.9)', borderWidth: 2, tension: 0.3, pointRadius: 4, fill: false, yAxisID: 'y2',
+                          pointBackgroundColor: rw.spread.map(v => v !== null && v > 0 ? 'rgba(34,197,94,1.0)' : 'rgba(239,68,68,1.0)') }
+                    ]},
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top', labels: { color: 'rgba(255,255,255,0.7)', font: { size: 11 } } },
+                            tooltip: { backgroundColor: 'rgba(15,15,20,0.92)', titleColor: '#fff', bodyColor: '#fff', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+                                callbacks: { label: ctx => { const raw = ctx.raw; if (raw === null) return null; const lbl = ctx.dataset.label; const display = lbl === 'WACC %' ? Math.abs(raw) : raw; return `${lbl}: ${display.toFixed(2)}%`; } } }
+                        },
+                        scales: {
+                            x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 11 } } },
+                            y: { position: 'left', grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 11 }, callback: v => v.toFixed(1) + '%' } },
+                            y2: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10 }, callback: v => v.toFixed(1) + '%' } }
+                        }
+                    },
+                    plugins: [{ id: 'zeroLine', afterDraw(chart) { const ctx = chart.ctx; const yAxis = chart.scales['y']; const y = yAxis.getPixelForValue(0); ctx.save(); ctx.beginPath(); ctx.moveTo(chart.chartArea.left, y); ctx.lineTo(chart.chartArea.right, y); ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.stroke(); ctx.restore(); } }]
+                });
+            }
+        }
         </script>
         </body>
         </html>
@@ -5846,8 +6101,17 @@ def api_chart_data(symbol):
     import math
 
     tf = request.args.get('timeframe', 'day')
-    params = {'day': ('6mo', '1d'), 'week': ('2y', '1wk'), 'month': ('5y', '1mo')}.get(tf, ('6mo', '1d'))
-    df = yf.Ticker(symbol).history(period=params[0], interval=params[1])
+    if tf == '4h':
+        df = yf.Ticker(symbol).history(period='60d', interval='1h')
+        if df.empty:
+            return {'error': 'symbol not found'}, 400
+        df = df.resample('4h', origin=df.index.normalize().min()
+                         + pd.Timedelta(hours=9, minutes=30)) \
+               .agg({'Open':'first','High':'max','Low':'min',
+                     'Close':'last','Volume':'sum'}).dropna()
+    else:
+        params = {'day': ('6mo', '1d'), 'week': ('2y', '1wk'), 'month': ('5y', '1mo')}.get(tf, ('6mo', '1d'))
+        df = yf.Ticker(symbol).history(period=params[0], interval=params[1])
     if df.empty:
         return {'error': 'symbol not found'}, 400
 
@@ -5884,6 +6148,9 @@ def api_chart_data(symbol):
     ema20 = close.ewm(span=20).mean()
     ema50 = close.ewm(span=50).mean()
 
+    # Supertrend line: lower when bull, upper when bear
+    supertrend = [final_lower.iloc[i] if trend[i] == 'bull' else final_upper.iloc[i] for i in range(len(df))]
+
     # Buy/sell signals: trend state changes
     buy_signals = [None] * len(df)
     sell_signals = [None] * len(df)
@@ -5896,9 +6163,11 @@ def api_chart_data(symbol):
     def to_list(s):
         return [None if (v is None or (isinstance(v, float) and (np.isnan(v) or np.isinf(v)))) else round(v, 4) for v in s]
 
+    date_fmt = '%Y-%m-%d %H:%M' if tf == '4h' else '%Y-%m-%d'
+
     return {
         'symbol': symbol.upper(), 'timeframe': tf,
-        'dates': [d.strftime('%Y-%m-%d') for d in df.index],
+        'dates': [d.strftime(date_fmt) for d in df.index],
         'ohlcv': {
             'open': to_list(df['Open']), 'high': to_list(high),
             'low': to_list(low), 'close': to_list(close), 'volume': to_list(df['Volume'])
@@ -5908,11 +6177,183 @@ def api_chart_data(symbol):
             'atr_upper': to_list(close + 2.0 * atr),
             'atr_lower': to_list(close - 2.0 * atr),
             'ema20': to_list(ema20), 'ema50': to_list(ema50),
+            'supertrend': to_list(supertrend),
             'trend_state': trend,
             'buy_signals': to_list(buy_signals),
             'sell_signals': to_list(sell_signals)
         }
     }
+
+
+@app.route('/api/financials/<symbol>')
+def api_financials(symbol):
+    import yfinance as yf
+    import numpy as np
+
+    try:
+        ticker = yf.Ticker(symbol)
+        fin = ticker.quarterly_financials
+        bs = ticker.quarterly_balance_sheet
+        cf = ticker.quarterly_cashflow
+
+        # Determine labels from the longest available DataFrame
+        ref = fin if fin is not None and not fin.empty else (bs if bs is not None and not bs.empty else cf)
+        if ref is None or ref.empty:
+            return jsonify({'error': 'Data unavailable', 'symbol': symbol})
+
+        # Use only columns common to all available DataFrames
+        col_sets = [set(df.columns) for df in [fin, bs, cf] if df is not None and not df.empty]
+        common_cols = col_sets[0]
+        for s in col_sets[1:]:
+            common_cols = common_cols & s
+        if not common_cols:
+            return jsonify({'error': 'Data unavailable', 'symbol': symbol})
+
+        # Sort columns ascending (oldest first), use last 6 quarters
+        cols = sorted(common_cols)[-6:]
+        labels = [c.strftime('%b %Y') for c in cols]
+
+        def extract(df, key, fallback=None):
+            if df is None or df.empty:
+                return [None] * len(cols)
+            for k in ([key] + ([fallback] if fallback else [])):
+                if k in df.index:
+                    row = df.loc[k]
+                    vals = []
+                    for c in cols:
+                        if c in row.index:
+                            v = row[c]
+                            vals.append(round(float(v) / 1e6, 1) if v is not None and not (isinstance(v, float) and np.isnan(v)) else None)
+                        else:
+                            vals.append(None)
+                    return vals
+            return [None] * len(cols)
+
+        def extract_abs(df, key, fallback=None):
+            """Extract and convert to positive (for dividends/SBC which are negative in cashflow)"""
+            vals = extract(df, key, fallback)
+            return [abs(v) if v is not None else None for v in vals]
+
+        # ROIC vs WACC calculation
+        roic_wacc = None
+        try:
+            def raw_val(df, key, fallback=None, col=None):
+                if df is None or df.empty:
+                    return None
+                for k in ([key] + ([fallback] if fallback else [])):
+                    if k in df.index:
+                        row = df.loc[k]
+                        if col is not None and col in row.index:
+                            v = row[col]
+                            if v is not None and not (isinstance(v, float) and np.isnan(v)):
+                                return float(v)
+                return None
+
+            info = ticker.info
+            market_cap = info.get('marketCap') or 0
+            beta = info.get('beta') or 1.0
+
+            rw_cols = list(cols)  # reuse same common columns
+            rw_labels = []
+            roic_vals = []
+            wacc_vals = []
+            spread_vals = []
+
+            for c in rw_cols:
+                q = (c.month - 1) // 3 + 1
+                rw_labels.append(f'Q{q} {c.year}')
+
+                # Tax rate
+                tax_exp = raw_val(fin, 'Tax Provision', 'Income Tax Expense', c)
+                pretax = raw_val(fin, 'Pretax Income', None, c)
+                if tax_exp and pretax and pretax != 0:
+                    tax_rate = max(0.0, min(0.45, tax_exp / pretax))
+                else:
+                    tax_rate = 0.21
+
+                # ROIC
+                op_income = raw_val(fin, 'Operating Income', 'EBIT', c)
+                total_assets = raw_val(bs, 'Total Assets', None, c)
+                curr_liab = raw_val(bs, 'Current Liabilities', 'Total Current Liabilities', c)
+                excess_cash = raw_val(bs, 'Cash And Cash Equivalents', 'Cash', c) or 0
+
+                if op_income is not None and total_assets and curr_liab is not None:
+                    nopat = op_income * (1 - tax_rate)
+                    invested_capital = total_assets - (curr_liab or 0) - excess_cash
+                    if invested_capital > 0:
+                        roic_pct = round((nopat / invested_capital) * 100, 2)
+                    else:
+                        roic_pct = None
+                else:
+                    roic_pct = None
+
+                # WACC
+                total_debt = raw_val(bs, 'Total Debt', 'Long Term Debt', c) or 0
+                E = market_cap
+                D = total_debt
+                V = E + D
+                Ke = 0.043 + beta * 0.055
+
+                interest_exp = raw_val(fin, 'Interest Expense', None, c)
+                if interest_exp is not None and total_debt > 0:
+                    Kd = max(0.02, min(0.15, abs(interest_exp) / total_debt))
+                else:
+                    Kd = 0.05
+
+                if V > 0:
+                    wacc_pct = round(((E / V) * Ke + (D / V) * Kd * (1 - tax_rate)) * 100, 2)
+                else:
+                    wacc_pct = None
+
+                roic_vals.append(roic_pct)
+                wacc_vals.append(wacc_pct)
+                if roic_pct is not None and wacc_pct is not None:
+                    spread_vals.append(round(roic_pct - wacc_pct, 2))
+                else:
+                    spread_vals.append(None)
+
+            latest_spread = None
+            for s in reversed(spread_vals):
+                if s is not None:
+                    latest_spread = s
+                    break
+
+            roic_wacc = {
+                'labels': rw_labels,
+                'roic': roic_vals,
+                'wacc': wacc_vals,
+                'spread': spread_vals,
+                'latest_spread': latest_spread,
+                'value_creating': latest_spread > 0 if latest_spread is not None else False
+            }
+        except:
+            roic_wacc = None
+
+        return jsonify({
+            'symbol': symbol.upper(),
+            'labels': labels,
+            'revenue_income_ebitda': {
+                'revenue': extract(fin, 'Total Revenue'),
+                'net_income': extract(fin, 'Net Income'),
+                'ebitda': extract(fin, 'EBITDA'),
+            },
+            'cash_debt': {
+                'cash': extract(bs, 'Cash And Cash Equivalents', 'Cash'),
+                'total_debt': extract(bs, 'Total Debt', 'Long Term Debt'),
+            },
+            'cash_flow': {
+                'operating_cf': extract(cf, 'Operating Cash Flow'),
+                'free_cash_flow': extract(cf, 'Free Cash Flow'),
+                'net_income_cf': extract(cf, 'Net Income From Continuing Operations', 'Net Income'),
+                'dividends_paid': extract_abs(cf, 'Common Stock Dividend Paid', 'Cash Dividends Paid'),
+                'stock_based_comp': extract_abs(cf, 'Stock Based Compensation'),
+            },
+            'roic_wacc': roic_wacc,
+            'currency': 'USD',
+            'unit': 'millions'
+        })
+    except Exception as e:
+        return jsonify({'error': 'Data unavailable', 'symbol': symbol})
 
 
 # ═══════════════════════════════════════════════════════════════════════════
