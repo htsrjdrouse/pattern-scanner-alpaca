@@ -175,7 +175,9 @@ def new_trade():
         'pattern_type': request.args.get('pattern', ''),
         'adx_at_entry': request.args.get('adx', ''),
         'rsi_at_entry': request.args.get('rsi', ''),
-        'sector': request.args.get('sector', '')
+        'sector': request.args.get('sector', ''),
+        'shares': request.args.get('shares', ''),
+        'notes': request.args.get('notes', '')
     }
     
     return render_template_string(NEW_TRADE_TEMPLATE, prepop=prepop, today=date.today().isoformat())
@@ -739,7 +741,7 @@ NEW_TRADE_TEMPLATE = """
                 </div>
                 <div class="form-group">
                     <label id="shares_label">Number of Shares * (fractional OK)</label>
-                    <input type="number" step="0.01" name="shares" required>
+                    <input type="number" step="0.01" name="shares" value="{{ prepop.shares }}" required>
                     <small style="color: #888;" id="shares_hint">For options: number of contracts</small>
                 </div>
                 <div class="form-group">
@@ -861,7 +863,7 @@ NEW_TRADE_TEMPLATE = """
         
         <div class="form-group">
             <label>Notes</label>
-            <textarea name="notes" rows="3"></textarea>
+            <textarea name="notes" rows="3">{{ prepop.notes }}</textarea>
         </div>
         
         <button type="submit" class="btn">Save Trade</button>
