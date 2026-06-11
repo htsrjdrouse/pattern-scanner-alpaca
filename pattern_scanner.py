@@ -4635,6 +4635,7 @@ def chart(symbol):
                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
                     <h3 style="margin:0; font-size:15px;">🎯 ATR Stop & Size</h3>
                     <span id="atr-panel-label" style="color:#9e9e9e; font-size:11px;">ATR(14) · 1D</span>
+                    <button id="atr-watchlist-btn" onclick="sendAtrToWatchlist()" disabled style="margin-left:auto; padding:3px 8px; font-size:11px; background:#1a1a2e; border:1px solid #444; border-radius:4px; color:#888; cursor:pointer;">→ Watchlist</button>
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; margin-bottom:12px; font-size:12px;">
                     <div><label style="color:#9e9e9e;">Entry $</label><br><input id="atr-entry" type="number" step="0.01" style="width:100%; padding:4px 6px; background:#1a1a2e; border:1px solid #333; border-radius:4px; color:#fff; font-size:12px;" oninput="atrPanelCalc(true)"></div>
@@ -5575,6 +5576,7 @@ def chart(symbol):
                 const msg = stop !== null && stop >= entry ? 'stop above entry — invalid' : '—';
                 elStop.textContent = msg; elShares.textContent = '—'; elRisk.textContent = '—'; elCost.textContent = '—';
                 updateStopOverlay(entry, null);
+                document.getElementById('atr-watchlist-btn').disabled = true;
                 return;
             }
             const riskPerShare = entry - stop;
@@ -5584,6 +5586,20 @@ def chart(symbol):
             elRisk.textContent = shares > 0 ? '$' + (shares * riskPerShare).toFixed(2) : '$0';
             elCost.textContent = shares > 0 ? '$' + (shares * entry).toFixed(2) : '$0';
             updateStopOverlay(entry, stop);
+            document.getElementById('atr-watchlist-btn').disabled = false;
+        }
+
+        function sendAtrToWatchlist() {
+            const entry = parseFloat(document.getElementById('atr-entry').value) || 0;
+            const mult = document.getElementById('atr-mult').value;
+            const stopType = document.querySelector('input[name="atr-stop-type"]:checked').value;
+            const stop = parseFloat(document.getElementById('atr-out-stop').textContent.replace('$',''));
+            const shares = document.getElementById('atr-out-shares').textContent;
+            const risk = document.getElementById('atr-out-risk').textContent;
+            const tfLabel = document.getElementById('atr-panel-label').textContent.split('·').pop().split('=')[0].trim();
+            const stopLabel = stopType === 'katr' ? mult + 'xATR' : 'Supertrend';
+            const notes = `ATR panel: entry ${entry.toFixed(2)}, ${stopLabel} stop ${stop.toFixed(2)}, ${shares} shares, ${risk} risk (${tfLabel})`;
+            window.location.href = '/watchlist?ticker=' + encodeURIComponent(atrSymbol) + '&floor=' + stop.toFixed(2) + '&notes=' + encodeURIComponent(notes);
         }
 
         function updateStopOverlay(entry, stop) {

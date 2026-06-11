@@ -304,7 +304,18 @@ def add_watchlist_routes(app):
         ticker = request.args.get('ticker', '').strip().upper()
         if ticker:
             if any(e['ticker'] == ticker for e in entries):
-                flash(f'{ticker} is already on the watchlist.', 'error')
+                floor_param = request.args.get('floor', '').strip()
+                if floor_param:
+                    entry = next(e for e in entries if e['ticker'] == ticker)
+                    entry['floor'] = float(floor_param)
+                    new_notes = request.args.get('notes', '').strip()
+                    if new_notes:
+                        existing = entry.get('notes') or ''
+                        entry['notes'] = (existing + '\n' + new_notes).strip()
+                    _save_watchlist(entries)
+                    flash(f'Updated {ticker} floor to {floor_param}.', 'success')
+                else:
+                    flash(f'{ticker} is already on the watchlist.', 'error')
             else:
                 new_entry = {
                     'ticker': ticker,
