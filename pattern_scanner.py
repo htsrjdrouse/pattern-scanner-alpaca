@@ -4656,6 +4656,26 @@ def chart(symbol):
                 </div>
             </div>
 
+            <!-- Monte Carlo Valuation -->
+            <div style="margin: 25px 0; background:#0f0f23; border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.08);">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 15px; cursor:pointer;" onclick="toggleMonteCarlo()">
+                <span style="color:rgba(255,255,255,0.8); font-size:13px; font-weight:500;">
+                  <span id="mc-arrow">▶</span> Monte Carlo Valuation
+                </span>
+                <span id="mc-spinner" style="display:none;">
+                  <span class="spinner-border spinner-border-sm text-secondary"></span>
+                </span>
+              </div>
+              <div id="mc-body" style="display:none; padding:0 15px 15px;">
+                <div id="mc-error" style="display:none; color:#ef4444; font-size:12px; margin-bottom:10px;"></div>
+                <div id="mc-content" style="display:none;">
+                  <div style="position:relative; height:240px; margin-bottom:12px;"><canvas id="mc-histogram"></canvas></div>
+                  <div id="mc-verdict" style="font-size:12px; color:#ccc; margin-bottom:10px;"></div>
+                  <table id="mc-table" style="width:100%; font-size:12px; border-collapse:collapse;"></table>
+                </div>
+              </div>
+            </div>
+
             <!-- Financial Charts Section -->
             <div style="margin: 25px 0; background:#0f0f23; border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.08);">
               <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 15px; cursor:pointer;" onclick="toggleFinancials()">
@@ -5637,6 +5657,88 @@ def chart(symbol):
         loadATRChart('day');
 
         // ═══════════════════════════════════════════════════════════════
+        // Monte Carlo Valuation
+        // ═══════════════════════════════════════════════════════════════
+        let mcLoaded = false, mcChart = null;
+
+        function toggleMonteCarlo() {
+            const body = document.getElementById('mc-body');
+            const arrow = document.getElementById('mc-arrow');
+            const isHidden = body.style.display === 'none';
+            body.style.display = isHidden ? 'block' : 'none';
+            arrow.textContent = isHidden ? '▼' : '▶';
+            if (isHidden && !mcLoaded) { mcLoaded = true; loadMonteCarlo(); }
+        }
+
+        async function loadMonteCarlo() {
+            document.getElementById('mc-spinner').style.display = 'inline';
+            document.getElementById('mc-error').style.display = 'none';
+            try {
+                const resp = await fetch(`/api/monte_carlo/${atrSymbol}`);
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+                renderMonteCarlo(data);
+            } catch(e) {
+                document.getElementById('mc-error').textContent = '⚠ ' + e.message;
+                document.getElementById('mc-error').style.display = 'block';
+            }
+            document.getElementById('mc-spinner').style.display = 'none';
+        }
+
+        function renderMonteCarlo(data) {
+            document.getElementById('mc-content').style.display = 'block';
+            const vals = data.simulated_values;
+            const p = data.percentiles;
+
+            // Build histogram bins
+            const min = Math.min(...vals), max = Math.max(...vals);
+            const nBins = 50;
+            const binW = (max - min) / nBins;
+            const bins = Array(nBins).fill(0);
+            const binLabels = [];
+            for (let i = 0; i < nBins; i++) binLabels.push((min + i * binW + binW / 2).toFixed(0));
+            vals.forEach(v => { const idx = Math.min(Math.floor((v - min) / binW), nBins - 1); bins[idx]++; });
+
+            // Color bars
+            const cpBin = Math.min(Math.floor((data.current_price - min) / binW), nBins - 1);
+            const p50Bin = Math.min(Math.floor((p.P50 - min) / binW), nBins - 1);
+            const colors = bins.map((_, i) => i === cpBin ? 'rgba(239,68,68,0.9)' : i === p50Bin ? 'rgba(34,197,94,0.9)' : 'rgba(99,102,241,0.6)');
+
+            if (mcChart) mcChart.destroy();
+            mcChart = new Chart(document.getElementById('mc-histogram'), {
+                type: 'bar',
+                data: { labels: binLabels, datasets: [{ data: bins, backgroundColor: colors, borderRadius: 1 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false },
+                        tooltip: { callbacks: { title: ctx => `$${ctx[0].label}`, label: ctx => `${ctx.raw} trials` } }
+                    },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 9 }, maxTicksLimit: 10 }, title: { display: true, text: 'Intrinsic Value / Share', color: 'rgba(255,255,255,0.4)', font: { size: 10 } } },
+                        y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10 } }, title: { display: true, text: 'Frequency', color: 'rgba(255,255,255,0.4)', font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // Verdict
+            let verdict = 'fairly valued';
+            if (data.current_price_percentile < 30) verdict = 'undervalued';
+            else if (data.current_price_percentile > 70) verdict = 'overvalued';
+            const vc = verdict === 'undervalued' ? '#22c55e' : verdict === 'overvalued' ? '#ef4444' : '#f59e0b';
+            document.getElementById('mc-verdict').innerHTML = `Current price ($${data.current_price}) is in the <strong>${data.current_price_percentile.toFixed(0)}th percentile</strong> of simulated fair values — appears <span style="color:${vc}; font-weight:600;">${verdict}</span> at P50. <span style="color:rgba(255,255,255,0.3); font-size:10px;">Red bar = current price · Green bar = median fair value</span>`;
+
+            // Table
+            const rows = [
+                ['P10', p.P10], ['P25', p.P25], ['P50 (Median)', p.P50], ['P75', p.P75], ['P90', p.P90],
+                ['Current Price', data.current_price], ['Price Percentile', data.current_price_percentile.toFixed(1) + '%'],
+                ['Margin of Safety (P50)', data.margin_of_safety_p50.toFixed(1) + '%']
+            ];
+            let tHtml = '<tr style="color:#9e9e9e; border-bottom:1px solid #2a2a3e;"><th style="text-align:left; padding:4px 8px;">Metric</th><th style="text-align:right; padding:4px 8px;">Value</th></tr>';
+            rows.forEach(([k, v]) => { tHtml += `<tr style="border-bottom:1px solid #1a1a2e;"><td style="padding:4px 8px; color:#ccc;">${k}</td><td style="padding:4px 8px; text-align:right; color:#fff;">${typeof v === 'number' ? '$' + v.toFixed(2) : v}</td></tr>`; });
+            document.getElementById('mc-table').innerHTML = tHtml;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
         // Financial Charts (3-Year)
         // ═══════════════════════════════════════════════════════════════
         let financialData = null, financialsLoaded = false;
@@ -6386,6 +6488,15 @@ def api_financials(symbol):
         })
     except Exception as e:
         return jsonify({'error': 'Data unavailable', 'symbol': symbol})
+
+
+@app.route('/api/monte_carlo/<ticker>')
+def api_monte_carlo(ticker):
+    from utils.monte_carlo import run_monte_carlo
+    result = run_monte_carlo(ticker)
+    if 'error' in result:
+        return jsonify(result), 400
+    return jsonify(result)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
